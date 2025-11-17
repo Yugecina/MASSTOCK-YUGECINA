@@ -1,0 +1,596 @@
+openapi: 3.0.3
+info:
+  title: MasStock Backend API
+  description: |
+    MasStock SaaS platform for automating AI content generation workflows.
+
+    ## Authentication
+    All endpoints (except /auth/login and /auth/refresh) require JWT authentication.
+    Include the token in the Authorization header: `Bearer <token>`
+
+    ## Multi-tenant
+    All data is isolated per client. Clients can only access their own data.
+    Admins can access all data.
+
+    ## Async Processing
+    Workflow executions are processed asynchronously. The execute endpoint returns
+    an execution_id immediately. Poll /executions/:execution_id for status.
+  version: 1.0.0
+  contact:
+    name: MasStock Support
+    email: support@masstock.com
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: Local development
+  - url: https://masstock-backend.onrender.com/api/v1
+    description: Production
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Workflows
+    description: Workflow management and execution
+  - name: Executions
+    description: Workflow execution status and results
+  - name: Workflow Requests
+    description: Client requests for new workflow development
+  - name: Support Tickets
+    description: Customer support ticket system
+  - name: Admin
+    description: Admin-only operations
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          example: "Error message"
+        code:
+          type: string
+          example: "ERROR_CODE"
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, user]
+        status:
+          type: string
+          enum: [active, suspended, deleted]
+        created_at:
+          type: string
+          format: date-time
+
+    Client:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        company_name:
+          type: string
+        plan:
+          type: string
+          enum: [premium_custom, starter, pro]
+        status:
+          type: string
+          enum: [active, pending, suspended]
+        subscription_amount:
+          type: number
+          format: decimal
+        subscription_start_date:
+          type: string
+          format: date
+        subscription_end_date:
+          type: string
+          format: date
+
+    Workflow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [draft, deployed, archived]
+        config:
+          type: object
+        cost_per_execution:
+          type: number
+          format: decimal
+        revenue_per_execution:
+          type: number
+          format: decimal
+        created_at:
+          type: string
+          format: date-time
+
+    WorkflowExecution:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflow_id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, processing, completed, failed]
+        input_data:
+          type: object
+        output_data:
+          type: object
+        error_message:
+          type: string
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+        duration_seconds:
+          type: integer
+
+    WorkflowRequest:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        use_case:
+          type: string
+        frequency:
+          type: string
+          enum: [daily, weekly, monthly, sporadic]
+        budget:
+          type: number
+        status:
+          type: string
+          enum: [draft, submitted, reviewing, negotiation, contract_signed, development, deployed, rejected]
+        timeline:
+          type: object
+        estimated_cost:
+          type: number
+        estimated_dev_days:
+          type: integer
+
+    SupportTicket:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        client_id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        priority:
+          type: string
+          enum: [urgent, high, medium, low]
+        status:
+          type: string
+          enum: [open, in_progress, resolved, closed]
+        created_at:
+          type: string
+          format: date-time
+
+paths:
+  /auth/login:
+    post:
+      tags: [Authentication]
+      summary: User login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      access_token:
+                        type: string
+                      refresh_token:
+                        type: string
+                      user:
+                        $ref: '#/components/schemas/User'
+                      client:
+                        $ref: '#/components/schemas/Client'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/logout:
+    post:
+      tags: [Authentication]
+      summary: User logout
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+
+  /auth/refresh:
+    post:
+      tags: [Authentication]
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties:
+                refresh_token:
+                  type: string
+      responses:
+        '200':
+          description: Token refreshed successfully
+
+  /auth/me:
+    get:
+      tags: [Authentication]
+      summary: Get current user profile
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      user:
+                        $ref: '#/components/schemas/User'
+                      client:
+                        $ref: '#/components/schemas/Client'
+
+  /workflows:
+    get:
+      tags: [Workflows]
+      summary: Get all workflows for client
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of workflows
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      workflows:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Workflow'
+                      total:
+                        type: integer
+
+  /workflows/{workflow_id}:
+    get:
+      tags: [Workflows]
+      summary: Get workflow details
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Workflow details
+        '404':
+          description: Workflow not found
+
+  /workflows/{workflow_id}/execute:
+    post:
+      tags: [Workflows]
+      summary: Execute workflow asynchronously
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: workflow_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [input_data]
+              properties:
+                input_data:
+                  type: object
+                  example:
+                    prompts: ["sunset over mountains", "city at night"]
+                    count: 2
+      responses:
+        '202':
+          description: Execution queued successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      execution_id:
+                        type: string
+                        format: uuid
+                      status:
+                        type: string
+                        example: pending
+
+  /executions/{execution_id}:
+    get:
+      tags: [Executions]
+      summary: Get execution status and results
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: execution_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Execution details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/WorkflowExecution'
+
+  /workflow-requests:
+    get:
+      tags: [Workflow Requests]
+      summary: Get all workflow requests
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of workflow requests
+
+    post:
+      tags: [Workflow Requests]
+      summary: Create new workflow request
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                use_case:
+                  type: string
+                frequency:
+                  type: string
+                  enum: [daily, weekly, monthly, sporadic]
+                budget:
+                  type: number
+      responses:
+        '201':
+          description: Request created successfully
+
+  /support-tickets:
+    get:
+      tags: [Support Tickets]
+      summary: Get all support tickets
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: List of support tickets
+
+    post:
+      tags: [Support Tickets]
+      summary: Create new support ticket
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                priority:
+                  type: string
+                  enum: [urgent, high, medium, low]
+                workflow_execution_id:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Ticket created successfully
+
+  /admin/dashboard:
+    get:
+      tags: [Admin]
+      summary: Get admin dashboard statistics
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      uptime_percent:
+                        type: number
+                      errors_24h:
+                        type: integer
+                      total_executions_24h:
+                        type: integer
+                      total_revenue_month:
+                        type: string
+                      active_clients:
+                        type: integer
+
+  /admin/clients:
+    get:
+      tags: [Admin]
+      summary: Get all clients (admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, pending, suspended]
+      responses:
+        '200':
+          description: List of clients
+
+    post:
+      tags: [Admin]
+      summary: Create new client (admin only)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                company_name:
+                  type: string
+                plan:
+                  type: string
+                subscription_amount:
+                  type: number
+      responses:
+        '201':
+          description: Client created successfully
