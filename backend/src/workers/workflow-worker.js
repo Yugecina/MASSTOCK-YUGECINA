@@ -1,199 +1,387 @@
-/**
- * Workflow Worker
- * Background worker that processes workflow execution jobs
- */
-
 const { workflowQueue } = require('../queues/workflowQueue');
 const { supabaseAdmin } = require('../config/database');
-const { logger, logWorkflowExecution } = require('../config/logger');
+const { createGeminiImageService } = require('../services/geminiImageService');
+const { decryptApiKey } = require('../utils/encryption');
+const { logger } = require('../config/logger');
+const {
+  logWorkflowStart,
+  logPromptProcessing,
+  logDecryption,
+  logStorageUpload,
+  logStorageSuccess,
+  logDatabaseOperation,
+  logSuccess,
+  logError,
+  logWorkflowComplete,
+  logWorkflowFailed
+} = require('../utils/workflowLogger');
+
+logger.debug('🚀 Workflow worker starting...');
 
 /**
- * Process workflow execution
- * This is a mock implementation - replace with actual workflow logic
+ * Process Nano Banana workflow (batch image generation)
  */
-async function processWorkflow(job) {
+async function processNanoBananaWorkflow(job, executionId, inputData, config) {
+  const workflowStartTime = Date.now();
+  const { prompts, reference_images } = inputData;
+  const totalPrompts = prompts.length;
+  const referenceImagesBase64 = reference_images || [];
+
+  logger.debug(`\n🎬 Processing Nano Banana workflow - Execution ID: ${executionId}`);
+  logger.debug(`   Prompts: ${totalPrompts}, Reference images: ${referenceImagesBase64.length}`);
+
+  // Log workflow start with all context
+  logWorkflowStart(executionId, 'nano_banana', {
+    workflowId: job.data.workflowId,
+    clientId: job.data.clientId,
+    numberOfPrompts: totalPrompts,
+    hasApiKey: !!config.api_key_encrypted,
+    hasReferenceImages: referenceImagesBase64.length > 0,
+    referenceImageCount: referenceImagesBase64.length
+  });
+
+  // Validate and decrypt API key
+  try {
+    if (!config.api_key_encrypted) {
+      throw new Error('Missing API key in workflow config. Please provide api_key when executing the workflow.');
+    }
+
+    logger.debug('Processing Nano Banana workflow', {
+      executionId,
+      hasEncryptedKey: !!config.api_key_encrypted,
+      encryptedKeyLength: config.api_key_encrypted?.length,
+      configKeys: Object.keys(config)
+    });
+
+    const decryptedApiKey = decryptApiKey(config.api_key_encrypted);
+
+    logDecryption(true, {
+      keyLength: decryptedApiKey?.length
+    });
+
+    logger.debug('API key decrypted', {
+      hasDecryptedKey: !!decryptedApiKey,
+      decryptedKeyLength: decryptedApiKey?.length
+    });
+
+    var geminiService = createGeminiImageService(decryptedApiKey);
+
+    if (config.model) {
+      geminiService.setModel(config.model);
+    }
+  } catch (error) {
+    logDecryption(false, { error: error.message });
+    logError('API_KEY_DECRYPTION', error, {
+      executionId,
+      hasEncryptedKey: !!config.api_key_encrypted,
+      encryptedKeyLength: config.api_key_encrypted?.length
+    });
+    throw error;
+  }
+
+  let successCount = 0;
+  let failCount = 0;
+  let totalProcessingTime = 0;
+
+  // Process each prompt
+  for (let i = 0; i < totalPrompts; i++) {
+    const prompt = prompts[i];
+    const batchIndex = i;
+    const promptStartTime = Date.now();
+
+    logger.debug(`\n🔄 Processing prompt ${i + 1}/${totalPrompts}: "${prompt.substring(0, 60)}${prompt.length > 60 ? '...' : ''}"`);
+
+    const progress = Math.floor(((i + 1) / totalPrompts) * 90);
+    job.progress(progress);
+
+    // Log prompt processing start
+    logPromptProcessing(i + 1, totalPrompts, prompt, { batchIndex });
+
+    try {
+      // Insert initial batch result
+      logDatabaseOperation('INSERT', 'workflow_batch_results', {
+        execution_id: executionId,
+        batch_index: batchIndex,
+        status: 'processing'
+      });
+
+      await supabaseAdmin
+        .from('workflow_batch_results')
+        .insert({
+          execution_id: executionId,
+          batch_index: batchIndex,
+          prompt_text: prompt,
+          status: 'processing'
+        });
+
+      // Generate image with Gemini
+      const startTime = Date.now();
+      logger.debug(`⏱️  Calling Gemini API...`);
+
+      const result = await geminiService.generateImage(prompt, {
+        referenceImages: referenceImagesBase64
+      });
+
+      const processingTime = Date.now() - startTime;
+      totalProcessingTime += processingTime;
+
+      logger.debug(`⏱️  Completed in ${(processingTime / 1000).toFixed(2)}s`);
+
+      if (result.success) {
+        logger.debug(`✅ Image generated successfully`);
+
+        // Upload to storage
+        const imageBuffer = Buffer.from(result.imageData, 'base64');
+        const fileName = `${executionId}/${batchIndex}_${Date.now()}.png`;
+
+        logStorageUpload('workflow-results', fileName, imageBuffer.length, {
+          contentType: result.mimeType || 'image/png'
+        });
+
+        const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+          .from('workflow-results')
+          .upload(fileName, imageBuffer, {
+            contentType: result.mimeType || 'image/png'
+          });
+
+        if (uploadError) {
+          throw new Error(`Storage upload failed: ${uploadError.message}`);
+        }
+
+        const { data: { publicUrl } } = supabaseAdmin.storage
+          .from('workflow-results')
+          .getPublicUrl(fileName);
+
+        logStorageSuccess(publicUrl, {
+          uploadTime: Date.now() - startTime
+        });
+
+        // Update batch result with success
+        logDatabaseOperation('UPDATE', 'workflow_batch_results', {
+          status: 'completed',
+          result_url: publicUrl
+        });
+
+        await supabaseAdmin
+          .from('workflow_batch_results')
+          .update({
+            status: 'completed',
+            result_url: publicUrl,
+            result_storage_path: fileName,
+            processing_time_ms: processingTime,
+            completed_at: new Date().toISOString()
+          })
+          .eq('execution_id', executionId)
+          .eq('batch_index', batchIndex);
+
+        successCount++;
+
+        const promptTotalTime = Date.now() - promptStartTime;
+        logSuccess(`Prompt ${i + 1}/${totalPrompts}`, {
+          processingTime: `${(processingTime / 1000).toFixed(2)}s`,
+          totalTime: `${(promptTotalTime / 1000).toFixed(2)}s`,
+          imageUrl: publicUrl
+        });
+
+      } else {
+        logger.debug(`❌ Image generation failed for prompt ${i + 1}`);
+
+        logError('IMAGE_GENERATION', result.error, {
+          executionId,
+          promptIndex: i + 1,
+          totalPrompts,
+          prompt,
+          processingTime
+        });
+
+        // Update batch result with failure
+        await supabaseAdmin
+          .from('workflow_batch_results')
+          .update({
+            status: 'failed',
+            error_message: result.error.message,
+            processing_time_ms: processingTime,
+            completed_at: new Date().toISOString()
+          })
+          .eq('execution_id', executionId)
+          .eq('batch_index', batchIndex);
+
+        failCount++;
+      }
+
+    } catch (error) {
+      logger.debug(`❌ Exception during prompt ${i + 1} processing`);
+
+      logError('PROMPT_PROCESSING', error, {
+        executionId,
+        promptIndex: i + 1,
+        totalPrompts,
+        batchIndex,
+        prompt,
+        apiKey: config.api_key_encrypted ? '***encrypted***' : 'missing'
+      });
+
+      logger.error('Batch result processing failed', { batchIndex, error: error.message });
+
+      try {
+        await supabaseAdmin
+          .from('workflow_batch_results')
+          .update({
+            status: 'failed',
+            error_message: error.message,
+            completed_at: new Date().toISOString()
+          })
+          .eq('execution_id', executionId)
+          .eq('batch_index', batchIndex);
+      } catch (dbError) {
+        logError('DATABASE_UPDATE_FAILED', dbError, {
+          executionId,
+          batchIndex,
+          originalError: error.message
+        });
+      }
+
+      failCount++;
+    }
+  }
+
+  job.progress(100);
+
+  // Calculate final statistics
+  const totalTime = Date.now() - workflowStartTime;
+  const avgTimePerPrompt = totalPrompts > 0 ? totalProcessingTime / totalPrompts : 0;
+
+  const completedAt = new Date().toISOString();
+  const { data: execution } = await supabaseAdmin
+    .from('workflow_executions')
+    .select('started_at')
+    .eq('id', executionId)
+    .single();
+
+  const durationSeconds = execution?.started_at
+    ? Math.floor((new Date(completedAt) - new Date(execution.started_at)) / 1000)
+    : null;
+
+  // Update execution status
+  logDatabaseOperation('UPDATE', 'workflow_executions', {
+    status: 'completed',
+    successful: successCount,
+    failed: failCount
+  });
+
+  await supabaseAdmin
+    .from('workflow_executions')
+    .update({
+      status: 'completed',
+      output_data: { successful: successCount, failed: failCount, total: totalPrompts },
+      completed_at: completedAt,
+      duration_seconds: durationSeconds
+    })
+    .eq('id', executionId);
+
+  // Log workflow completion
+  logWorkflowComplete(executionId, {
+    totalPrompts,
+    successful: successCount,
+    failed: failCount,
+    totalTime,
+    avgTimePerPrompt
+  });
+
+  logger.info('Workflow execution completed', {
+    executionId,
+    successCount,
+    failCount,
+    totalPrompts
+  });
+
+  return { success: true, successCount, failCount, totalPrompts };
+}
+
+/**
+ * Process standard workflow (placeholder for future workflows)
+ */
+async function processStandardWorkflow(job, executionId, inputData, config) {
+  // Placeholder for other workflow types
+  throw new Error('Standard workflow processing not implemented yet');
+}
+
+/**
+ * Main workflow processor - dispatches to specific handlers based on type
+ */
+workflowQueue.process(async (job) => {
   const { executionId, workflowId, clientId, inputData, config } = job.data;
 
   logger.info('Processing workflow execution', {
-    execution_id: executionId,
-    workflow_id: workflowId,
-    client_id: clientId
+    executionId,
+    workflowId,
+    workflowType: config.workflow_type || 'standard'
   });
 
   try {
-    // Update status to processing
+    logger.debug(`\n🎯 Main workflow processor started for execution: ${executionId}`);
+    logger.debug(`   Workflow type: ${config.workflow_type || 'standard'}`);
+    logger.debug(`   Workflow ID: ${workflowId}`);
+    logger.debug(`   Client ID: ${clientId}`);
+
     await supabaseAdmin
       .from('workflow_executions')
-      .update({ status: 'processing' })
+      .update({ status: 'processing', started_at: new Date().toISOString() })
       .eq('id', executionId);
 
-    logWorkflowExecution(executionId, workflowId, clientId, 'processing');
+    let result;
 
-    // Progress: 25%
-    job.progress(25);
+    // Dispatch to appropriate workflow handler based on type
+    if (config.workflow_type === 'nano_banana') {
+      result = await processNanoBananaWorkflow(job, executionId, inputData, config);
+    } else {
+      result = await processStandardWorkflow(job, executionId, inputData, config);
+    }
 
-    // Simulate workflow execution
-    // In production, this would call actual AI APIs (Midjourney, DALL-E, etc.)
-    const result = await executeWorkflowLogic(inputData, config, job);
-
-    // Progress: 90%
-    job.progress(90);
-
-    // Calculate duration
-    const { data: execution } = await supabaseAdmin
-      .from('workflow_executions')
-      .select('started_at')
-      .eq('id', executionId)
-      .single();
-
-    const startTime = new Date(execution.started_at);
-    const endTime = new Date();
-    const durationSeconds = Math.round((endTime - startTime) / 1000);
-
-    // Update execution with results
-    await supabaseAdmin
-      .from('workflow_executions')
-      .update({
-        status: 'completed',
-        output_data: result,
-        completed_at: endTime.toISOString(),
-        duration_seconds: durationSeconds
-      })
-      .eq('id', executionId);
-
-    logWorkflowExecution(executionId, workflowId, clientId, 'completed', {
-      duration_seconds: durationSeconds
-    });
-
-    // Progress: 100%
-    job.progress(100);
-
-    return {
-      success: true,
-      execution_id: executionId,
-      duration_seconds: durationSeconds
-    };
+    logger.info('Workflow execution completed', { executionId, result });
+    return result;
 
   } catch (error) {
-    logger.error('Workflow execution failed', {
-      execution_id: executionId,
-      workflow_id: workflowId,
-      error: error.message,
-      stack: error.stack
+    logger.debug(`\n❌ WORKFLOW EXECUTION FATAL ERROR`);
+    logger.debug(`   Execution ID: ${executionId}`);
+    logger.debug(`   Error: ${error.message}`);
+    logger.debug(`   Stack: ${error.stack}`);
+
+    logWorkflowFailed(executionId, error, {
+      totalPrompts: inputData?.prompts?.length || 0
     });
 
-    // Update execution with error
-    const { data: execution } = await supabaseAdmin
-      .from('workflow_executions')
-      .select('started_at, retry_count')
-      .eq('id', executionId)
-      .single();
+    logger.error('Workflow execution failed', { executionId, error: error.message });
 
-    const startTime = new Date(execution.started_at);
-    const endTime = new Date();
-    const durationSeconds = Math.round((endTime - startTime) / 1000);
-
-    await supabaseAdmin
-      .from('workflow_executions')
-      .update({
-        status: 'failed',
-        error_message: error.message,
-        error_stack_trace: error.stack,
-        completed_at: endTime.toISOString(),
-        duration_seconds: durationSeconds,
-        retry_count: (execution.retry_count || 0) + 1
-      })
-      .eq('id', executionId);
-
-    logWorkflowExecution(executionId, workflowId, clientId, 'failed', {
-      error: error.message,
-      retry_count: (execution.retry_count || 0) + 1
-    });
+    try {
+      await supabaseAdmin
+        .from('workflow_executions')
+        .update({
+          status: 'failed',
+          error_message: error.message,
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', executionId);
+    } catch (dbError) {
+      logger.error(`❌ Failed to update execution status in database:`, dbError);
+    }
 
     throw error;
   }
-}
-
-/**
- * Execute workflow logic (MOCK IMPLEMENTATION)
- * Replace this with actual AI API integrations
- */
-async function executeWorkflowLogic(inputData, config, job) {
-  // Simulate processing time
-  const processingTime = Math.random() * 5000 + 2000; // 2-7 seconds
-
-  await new Promise(resolve => setTimeout(resolve, processingTime / 2));
-  job.progress(50);
-
-  await new Promise(resolve => setTimeout(resolve, processingTime / 2));
-  job.progress(75);
-
-  // Mock output based on workflow type
-  const mockOutput = {
-    status: 'success',
-    processed_at: new Date().toISOString(),
-    input_received: inputData,
-    results: generateMockResults(inputData, config)
-  };
-
-  return mockOutput;
-}
-
-/**
- * Generate mock results based on input
- */
-function generateMockResults(inputData, config) {
-  // This is a mock - in production, return actual AI-generated content
-  const model = config?.model || 'unknown';
-
-  if (inputData.prompts && Array.isArray(inputData.prompts)) {
-    // Image generation workflow
-    return {
-      type: 'image_generation',
-      model,
-      images: inputData.prompts.map((prompt, index) => ({
-        id: `img_${Date.now()}_${index}`,
-        prompt,
-        url: `https://example.com/generated/image_${index}.png`,
-        thumbnail: `https://example.com/generated/thumb_${index}.png`,
-        metadata: {
-          resolution: config?.resolution || '1024x1024',
-          format: config?.output_format || 'png',
-          style: config?.style || 'default'
-        }
-      }))
-    };
-  }
-
-  // Generic workflow result
-  return {
-    type: 'generic',
-    model,
-    message: 'Workflow executed successfully',
-    data: inputData
-  };
-}
-
-/**
- * Worker processor
- */
-workflowQueue.process(async (job) => {
-  return await processWorkflow(job);
 });
 
-// Graceful shutdown
+workflowQueue.on('completed', (job, result) => {
+  logger.debug(`✅ Job ${job.id} completed:`, result);
+});
+
+workflowQueue.on('failed', (job, err) => {
+  logger.error(`❌ Job ${job.id} failed:`, err.message);
+});
+
 process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, closing worker gracefully');
+  logger.debug('SIGTERM received, closing worker...');
   await workflowQueue.close();
   process.exit(0);
 });
 
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, closing worker gracefully');
-  await workflowQueue.close();
-  process.exit(0);
-});
-
-logger.info('Workflow worker started and listening for jobs');
-
-module.exports = { processWorkflow };
+logger.debug('✅ Workflow worker ready');

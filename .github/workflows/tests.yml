@@ -1,0 +1,109 @@
+name: Tests
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [develop]
+
+jobs:
+  backend-tests:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run tests with coverage
+        working-directory: backend
+        run: npm test -- --coverage
+        env:
+          NODE_ENV: test
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+
+      - name: Check coverage thresholds
+        working-directory: backend
+        run: |
+          echo "Checking coverage thresholds..."
+          node -e "
+          const coverage = require('./coverage/coverage-summary.json');
+          const total = coverage.total;
+          const thresholds = { branches: 70, functions: 70, lines: 70, statements: 70 };
+          let failed = false;
+          Object.keys(thresholds).forEach(key => {
+            const actual = total[key].pct;
+            const required = thresholds[key];
+            if (actual < required) {
+              console.error(\`❌ Coverage for \${key}: \${actual}% (required: \${required}%)\`);
+              failed = true;
+            } else {
+              console.log(\`✅ Coverage for \${key}: \${actual}% (required: \${required}%)\`);
+            }
+          });
+          if (failed) process.exit(1);
+          "
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/coverage/coverage-final.json
+          flags: backend
+          name: backend-coverage
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run linter
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Run tests with coverage
+        working-directory: frontend
+        run: npm test -- --coverage
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./frontend/coverage/coverage-final.json
+          flags: frontend
+          name: frontend-coverage

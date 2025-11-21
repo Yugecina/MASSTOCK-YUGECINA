@@ -230,9 +230,11 @@ describe('AdminUserController', () => {
           success: true,
           data: expect.objectContaining({
             clients: mockClients,
-            total: 2,
-            limit: 50,
-            page: 1
+            pagination: expect.objectContaining({
+              total: 2,
+              limit: 50,
+              page: 1
+            })
           })
         })
       );

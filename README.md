@@ -95,7 +95,7 @@ MASSTOCK/
 
 ### Frontend
 - React 19 + Vite
-- TailwindCSS 4
+- **Pure CSS (No Tailwind)** - Custom Design System
 - Zustand (state management)
 - Vitest (tests)
 
@@ -148,27 +148,64 @@ Documentation interactive Swagger disponible à :
 http://localhost:3000/api-docs
 ```
 
-## Déploiement
+## Déploiement Production
 
-### Backend
+MasStock est déployé sur VPS avec Docker, SSL, CI/CD automatique et monitoring complet.
+
+### 🌐 URLs Production
+
+- **Frontend:** https://dorian-gonzalez.fr
+- **API Backend:** https://api.dorian-gonzalez.fr
+- **Health Check:** https://api.dorian-gonzalez.fr/health
+
+### 🚀 Quick Deploy
+
+Pour déployer sur votre VPS:
 
 ```bash
-cd backend
-npm run build           # Si build step requis
-npm start               # Production mode
+# 1. Configuration initiale (une seule fois)
+cd /opt/masstock
+git clone <repo-url> .
+node scripts/generate-secrets.js
+nano backend/.env.production  # Configurer les secrets
+sudo ./scripts/setup-ssl.sh   # Configurer SSL
+
+# 2. Build et déploiement
+docker-compose -f docker-compose.production.yml up -d --build
+
+# 3. Vérifier le déploiement
+./scripts/health-check.sh
 ```
 
-Voir [DEPLOYMENT.md](./backend/DEPLOYMENT.md) pour Render/Railway.
+### 📚 Documentation Déploiement
 
-### Frontend
+- **[Guide de Déploiement Complet](./docs/DEPLOYMENT.md)** - Guide étape par étape
+- **[Checklist Production](./docs/PRODUCTION_CHECKLIST.md)** - Vérification avant go-live
+
+### ✨ Features Production
+
+- ✅ **Zero Logs** - Aucun log en production (console vide)
+- ✅ **SSL/HTTPS** - Certificats Let's Encrypt auto-renouvelés
+- ✅ **CI/CD** - Déploiement automatique sur push `main`
+- ✅ **Docker** - Services isolés (API, Worker, Redis, Nginx)
+- ✅ **Monitoring** - Health checks automatiques (every 5min)
+- ✅ **Backup** - Backups quotidiens automatiques
+- ✅ **Rollback** - Restauration automatique en cas d'échec
+
+### 🔧 Commandes Utiles
 
 ```bash
-cd frontend
-npm run build          # Build pour production
-npm run preview        # Prévisualiser le build
+# Voir les logs
+docker-compose -f docker-compose.production.yml logs -f
 
-# Déployer sur Vercel
-vercel
+# Restart services
+docker-compose -f docker-compose.production.yml restart
+
+# Health check manuel
+./scripts/health-check.sh
+
+# Backup manuel
+./scripts/backup.sh
 ```
 
 ## Tests

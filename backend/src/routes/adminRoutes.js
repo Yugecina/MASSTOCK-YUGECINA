@@ -66,6 +66,29 @@ router.post('/users',
 );
 
 /**
+ * GET /api/v1/admin/users
+ * List all users with their client information
+ */
+router.get('/users',
+  query('page').optional().isInt({ min: 1 }).withMessage('Page must be >= 1'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1-100'),
+  query('offset').optional().isInt({ min: 0 }).withMessage('Offset must be >= 0'),
+  query('role').optional().isIn(['admin', 'user']).withMessage('Invalid role'),
+  query('client_role').optional().isIn(['owner', 'collaborator']).withMessage('Invalid client role'),
+  query('status').optional().isIn(['active', 'pending', 'suspended', 'deleted']).withMessage('Invalid status'),
+  query('search').optional().trim(),
+  query('sort').optional().isIn(['created_at', 'email', 'last_login']).withMessage('Invalid sort field'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminUserController.getUsers(req, res);
+  })
+);
+
+/**
  * GET /api/v1/admin/clients
  * List all clients with pagination, filtering, and search
  */

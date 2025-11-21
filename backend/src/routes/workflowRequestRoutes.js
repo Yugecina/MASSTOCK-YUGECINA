@@ -4,7 +4,7 @@
 
 const express = require('express');
 const { body, param } = require('express-validator');
-const { asyncHandler } = require('../middleware/errorHandler');
+const { asyncHandler, validate } = require('../middleware/errorHandler');
 const { authenticate, requireClient } = require('../middleware/auth');
 const workflowRequestsController = require('../controllers/workflowRequestsController');
 
@@ -22,6 +22,7 @@ router.post('/',
   body('use_case').optional().trim(),
   body('frequency').optional().isIn(['daily', 'weekly', 'monthly', 'sporadic']),
   body('budget').optional().isNumeric(),
+  validate,
   asyncHandler(workflowRequestsController.createWorkflowRequest)
 );
 
@@ -43,6 +44,7 @@ router.get('/:request_id',
   authenticate,
   requireClient,
   param('request_id').isUUID(),
+  validate,
   asyncHandler(workflowRequestsController.getWorkflowRequest)
 );
 
@@ -60,6 +62,7 @@ router.put('/:request_id',
   body('notes').optional().trim(),
   body('estimated_cost').optional().isNumeric(),
   body('estimated_dev_days').optional().isInt({ min: 0 }),
+  validate,
   asyncHandler(workflowRequestsController.updateWorkflowRequest)
 );
 

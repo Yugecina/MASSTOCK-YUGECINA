@@ -26,18 +26,24 @@ function getCleanAdminClient() {
  */
 async function authenticate(req, res, next) {
   try {
-    // Extract token from Authorization header
-    const authHeader = req.headers.authorization;
+    // Extract token from httpOnly cookie or fallback to Authorization header
+    let token = req.cookies?.access_token;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!token) {
+      // Fallback to Authorization header for backward compatibility
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        token = authHeader.substring(7); // Remove 'Bearer ' prefix
+      }
+    }
+
+    if (!token) {
       return res.status(401).json({
         success: false,
-        error: 'Missing or invalid authorization header',
+        error: 'Missing or invalid authorization token',
         code: 'UNAUTHORIZED'
       });
     }
-
-    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
 
     // Verify token with Supabase
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
@@ -85,12 +91,21 @@ async function authenticate(req, res, next) {
       });
     }
 
-    // Fetch client information
-    const { data: client, error: clientError } = await cleanAdmin
-      .from('clients')
-      .select('*')
-      .eq('user_id', dbUser.id)
-      .maybeSingle();
+    // Fetch client information using new structure (users.client_id -> clients.id)
+    let client = null;
+    if (dbUser.client_id) {
+      const { data: clientData, error: clientError } = await cleanAdmin
+        .from('clients')
+        .select('*')
+        .eq('id', dbUser.client_id)
+        .maybeSingle();
+
+      client = clientData;
+
+      if (clientError) {
+        logger.error('Failed to fetch client:', clientError);
+      }
+    }
 
     // Attach user and client to request
     req.user = dbUser;
@@ -171,16 +186,44 @@ async function optionalAuth(req, res, next) {
       return next();
     }
 
-    // Try to authenticate but don't fail
-    await authenticate(req, res, (err) => {
-      if (err) {
-        // Authentication failed but continue anyway
-        return next();
-      }
-      next();
-    });
+    const token = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+    // Verify token with Supabase (but don't fail if invalid)
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+
+    if (error || !user) {
+      // Invalid token but continue without authentication
+      return next();
+    }
+
+    // Fetch user from database using clean admin client
+    const cleanAdmin = getCleanAdminClient();
+    const { data: dbUser, error: dbError } = await cleanAdmin
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    if (dbError || !dbUser || dbUser.status !== 'active') {
+      // User not found or not active, continue without authentication
+      return next();
+    }
+
+    // Fetch client information
+    const { data: client } = await cleanAdmin
+      .from('clients')
+      .select('*')
+      .eq('user_id', dbUser.id)
+      .maybeSingle();
+
+    // Attach user and client to request
+    req.user = dbUser;
+    req.client = client || null;
+    req.token = token;
+
+    next();
   } catch (error) {
-    // Continue without authentication
+    // Continue without authentication on any error
     next();
   }
 }

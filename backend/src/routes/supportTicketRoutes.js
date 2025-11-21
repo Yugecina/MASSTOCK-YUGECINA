@@ -4,7 +4,7 @@
 
 const express = require('express');
 const { body, param } = require('express-validator');
-const { asyncHandler } = require('../middleware/errorHandler');
+const { asyncHandler, validate } = require('../middleware/errorHandler');
 const { authenticate, requireClient } = require('../middleware/auth');
 const supportTicketsController = require('../controllers/supportTicketsController');
 
@@ -21,6 +21,7 @@ router.post('/',
   body('description').trim().isLength({ min: 10 }),
   body('priority').optional().isIn(['urgent', 'high', 'medium', 'low']),
   body('workflow_execution_id').optional().isUUID(),
+  validate,
   asyncHandler(supportTicketsController.createTicket)
 );
 
@@ -40,6 +41,7 @@ router.get('/',
 router.get('/:ticket_id',
   authenticate,
   param('ticket_id').isUUID(),
+  validate,
   asyncHandler(supportTicketsController.getTicket)
 );
 
@@ -53,6 +55,7 @@ router.put('/:ticket_id',
   body('status').optional().isIn(['open', 'in_progress', 'resolved', 'closed']),
   body('assigned_to').optional().isUUID(),
   body('response').optional().trim(),
+  validate,
   asyncHandler(supportTicketsController.updateTicket)
 );
 

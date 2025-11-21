@@ -85,10 +85,35 @@ function validationErrorHandler(errors) {
   return new ApiError(400, 'Validation failed', 'VALIDATION_ERROR', formattedErrors);
 }
 
+/**
+ * Validation middleware
+ * Checks express-validator results and returns 400 if validation failed
+ */
+function validate(req, res, next) {
+  const { validationResult } = require('express-validator');
+  const errors = validationResult(req);
+
+  if (!errors.isEmpty()) {
+    return res.status(400).json({
+      success: false,
+      error: 'Validation failed',
+      code: 'VALIDATION_ERROR',
+      details: errors.array().map(err => ({
+        field: err.param,
+        message: err.msg,
+        value: err.value
+      }))
+    });
+  }
+
+  next();
+}
+
 module.exports = {
   ApiError,
   notFoundHandler,
   errorHandler,
   asyncHandler,
-  validationErrorHandler
+  validationErrorHandler,
+  validate
 };

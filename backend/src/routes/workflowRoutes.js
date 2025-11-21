@@ -4,12 +4,23 @@
 
 const express = require('express');
 const { body, param, query } = require('express-validator');
-const { asyncHandler } = require('../middleware/errorHandler');
+const { asyncHandler, validate } = require('../middleware/errorHandler');
 const { authenticate, requireClient } = require('../middleware/auth');
 const { executionLimiter } = require('../middleware/rateLimit');
+const { upload, handleUploadError } = require('../middleware/upload');
 const workflowsController = require('../controllers/workflowsController');
 
 const router = express.Router();
+
+/**
+ * GET /api/workflows/stats/dashboard
+ * Get dashboard stats
+ */
+router.get('/stats/dashboard',
+  authenticate,
+  requireClient,
+  asyncHandler(workflowsController.getDashboardStats)
+);
 
 /**
  * GET /api/workflows
@@ -29,19 +40,24 @@ router.get('/:workflow_id',
   authenticate,
   requireClient,
   param('workflow_id').isUUID(),
+  validate,
   asyncHandler(workflowsController.getWorkflow)
 );
 
 /**
  * POST /api/workflows/:workflow_id/execute
  * Execute workflow
+ * Supports both JSON and multipart/form-data (for workflows with file uploads like nano_banana)
  */
 router.post('/:workflow_id/execute',
   authenticate,
   requireClient,
   executionLimiter,
+  upload.array('reference_images', 3), // Optional file upload for workflows that need it
+  handleUploadError,
   param('workflow_id').isUUID(),
-  body('input_data').isObject(),
+  // Note: input_data validation removed to support both JSON and FormData
+  validate,
   asyncHandler(workflowsController.executeWorkflow)
 );
 
@@ -55,6 +71,7 @@ router.get('/:workflow_id/executions',
   param('workflow_id').isUUID(),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('offset').optional().isInt({ min: 0 }),
+  validate,
   asyncHandler(workflowsController.getWorkflowExecutions)
 );
 
@@ -66,6 +83,7 @@ router.get('/:workflow_id/stats',
   authenticate,
   requireClient,
   param('workflow_id').isUUID(),
+  validate,
   asyncHandler(workflowsController.getWorkflowStats)
 );
 
@@ -77,7 +95,20 @@ router.get('/executions/:execution_id',
   authenticate,
   requireClient,
   param('execution_id').isUUID(),
+  validate,
   asyncHandler(workflowsController.getExecution)
+);
+
+/**
+ * GET /api/executions/:execution_id/batch-results
+ * Get batch results for workflows with batch processing (e.g., nano_banana)
+ */
+router.get('/executions/:execution_id/batch-results',
+  authenticate,
+  requireClient,
+  param('execution_id').isUUID(),
+  validate,
+  asyncHandler(workflowsController.getExecutionBatchResults)
 );
 
 module.exports = router;

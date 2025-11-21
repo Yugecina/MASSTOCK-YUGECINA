@@ -22,7 +22,7 @@ async function runMigration(filePath) {
     // Migrations should be run via Supabase SQL Editor
     // This script is for reference and local testing
 
-    console.log(`
+    logger.debug(`
 ╔═══════════════════════════════════════════════════════════╗
 ║  Migration: ${fileName.padEnd(43)} ║
 ╚═══════════════════════════════════════════════════════════╝
@@ -55,7 +55,7 @@ async function runAllMigrations() {
   const migrationsDir = path.join(__dirname, '../../database/migrations');
   const files = fs.readdirSync(migrationsDir).sort();
 
-  console.log(`
+  logger.debug(`
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
 ║           MasStock Database Migration Tool                ║
@@ -66,10 +66,10 @@ Found ${files.length} migration files:
   `);
 
   files.forEach((file, index) => {
-    console.log(`  ${index + 1}. ${file}`);
+    logger.debug(`  ${index + 1}. ${file}`);
   });
 
-  console.log(`
+  logger.debug(`
 To apply these migrations:
 
 1. Open Supabase Dashboard: https://app.supabase.com
@@ -86,11 +86,11 @@ Press Ctrl+C to exit, or continue to see migration contents...
     if (file.endsWith('.sql')) {
       const filePath = path.join(migrationsDir, file);
       await runMigration(filePath);
-      console.log('\n' + '='.repeat(60) + '\n');
+      logger.debug('\n' + '='.repeat(60) + '\n');
     }
   }
 
-  console.log(`
+  logger.debug(`
 Migration guide complete!
 
 Next steps:

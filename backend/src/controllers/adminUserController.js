@@ -173,6 +173,87 @@ async function createUser(req, res) {
 }
 
 /**
+ * GET /api/v1/admin/users
+ * Get all users with their client information
+ */
+async function getUsers(req, res) {
+  const {
+    page = 1,
+    limit = 50,
+    offset,
+    role,
+    client_role,
+    status,
+    search,
+    sort = 'created_at'
+  } = req.query;
+
+  // Calculate offset from page if not provided directly
+  const pageNum = parseInt(page);
+  const limitNum = parseInt(limit);
+  const calculatedOffset = offset !== undefined ? parseInt(offset) : (pageNum - 1) * limitNum;
+
+  // Build query - select users with client info
+  let query = supabaseAdmin
+    .from('users')
+    .select(`
+      *,
+      client:clients!users_client_id_fkey(
+        id,
+        name,
+        company_name,
+        email,
+        plan,
+        status
+      )
+    `, { count: 'exact' });
+
+  // Apply filters
+  if (role) {
+    query = query.eq('role', role);
+  }
+
+  if (client_role) {
+    query = query.eq('client_role', client_role);
+  }
+
+  if (status) {
+    query = query.eq('status', status);
+  }
+
+  // Apply search (email only for users)
+  if (search) {
+    query = query.ilike('email', `%${search}%`);
+  }
+
+  // Apply sorting and pagination
+  query = query
+    .order(sort, { ascending: false })
+    .range(calculatedOffset, calculatedOffset + limitNum - 1);
+
+  const { data: users, error, count } = await query;
+
+  if (error) {
+    logger.error('Failed to fetch users:', error);
+    throw new ApiError(500, 'Failed to fetch users', 'DATABASE_ERROR');
+  }
+
+  res.json({
+    success: true,
+    data: {
+      users,
+      pagination: {
+        total: count,
+        limit: limitNum,
+        offset: calculatedOffset,
+        page: pageNum,
+        totalPages: Math.ceil(count / limitNum)
+      }
+    }
+  });
+}
+
+/**
  * GET /api/v1/admin/clients
  * Get all clients with filtering, pagination, and search
  */
@@ -192,10 +273,18 @@ async function getClients(req, res) {
   const limitNum = parseInt(limit);
   const calculatedOffset = offset !== undefined ? parseInt(offset) : (pageNum - 1) * limitNum;
 
-  // Build query - apply filters BEFORE pagination for better performance
+  // Build query - select clients with owner and users info
   let query = supabaseAdmin
     .from('clients')
-    .select('*', { count: 'exact' });
+    .select(`
+      *,
+      owner:users!clients_owner_id_fkey(
+        id,
+        email,
+        status,
+        created_at
+      )
+    `, { count: 'exact' });
 
   // Apply filters first
   if (status) {
@@ -219,18 +308,38 @@ async function getClients(req, res) {
   const { data: clients, error, count } = await query;
 
   if (error) {
+    logger.error('Failed to fetch clients:', error);
     throw new ApiError(500, 'Failed to fetch clients', 'DATABASE_ERROR');
   }
+
+  // For each client, get the count of users
+  const clientsWithUserCounts = await Promise.all(
+    clients.map(async (client) => {
+      const { count: usersCount } = await supabaseAdmin
+        .from('users')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', client.id);
+
+      return {
+        ...client,
+        users_count: usersCount || 0,
+        workflows_count: 0, // To be filled from workflows table if needed
+        executions_count: 0 // To be filled from executions table if needed
+      };
+    })
+  );
 
   res.json({
     success: true,
     data: {
-      clients,
-      total: count,
-      limit: limitNum,
-      offset: calculatedOffset,
-      page: pageNum,
-      totalPages: Math.ceil(count / limitNum)
+      clients: clientsWithUserCounts,
+      pagination: {
+        total: count,
+        limit: limitNum,
+        offset: calculatedOffset,
+        page: pageNum,
+        totalPages: Math.ceil(count / limitNum)
+      }
     }
   });
 }
@@ -439,6 +548,7 @@ async function deleteClient(req, res) {
 
 module.exports = {
   createUser,
+  getUsers,
   getClients,
   getClient,
   updateClient,
