@@ -1,0 +1,6 @@
+/* App styles - minimal overrides only, all main styles in global.css */
+
+#root {
+  width: 100%;
+  height: 100%;
+}

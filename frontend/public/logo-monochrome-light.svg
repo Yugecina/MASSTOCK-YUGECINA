@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- MASSTOCK Logo - "M Architectural" with Prism Effect -->
+  <!-- Monochrome Light Version: White (#FFFFFF) -->
+
+  <defs>
+    <!-- Filter for glow effect -->
+    <filter id="white-glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- "M" Shape - Architectural, layered effect -->
+
+  <!-- Layer 1 (Back) - White with reduced opacity -->
+  <path
+    d="M 40 140 L 40 60 L 70 90 L 100 60 L 130 90 L 160 60 L 160 140 L 140 140 L 140 100 L 100 140 L 60 100 L 60 140 Z"
+    fill="#FFFFFF"
+    opacity="0.5"
+    transform="translate(5, 5)"
+  />
+
+  <!-- Layer 2 (Middle) - White mid opacity -->
+  <path
+    d="M 40 140 L 40 60 L 70 90 L 100 60 L 130 90 L 160 60 L 160 140 L 140 140 L 140 100 L 100 140 L 60 100 L 60 140 Z"
+    fill="#FFFFFF"
+    opacity="0.8"
+    transform="translate(2.5, 2.5)"
+  />
+
+  <!-- Layer 3 (Front) - Full White -->
+  <path
+    d="M 40 140 L 40 60 L 70 90 L 100 60 L 130 90 L 160 60 L 160 140 L 140 140 L 140 100 L 100 140 L 60 100 L 60 140 Z"
+    fill="#FFFFFF"
+    filter="url(#white-glow)"
+  />
+
+  <!-- Accent highlight on top edge -->
+  <path
+    d="M 40 60 L 70 90 L 100 60 L 130 90 L 160 60"
+    stroke="#FFFFFF"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+    opacity="0.7"
+  />
+
+  <!-- Geometric accent lines -->
+  <line x1="60" y1="100" x2="60" y2="140" stroke="#FFFFFF" stroke-width="2" opacity="0.5"/>
+  <line x1="140" y1="100" x2="140" y2="140" stroke="#FFFFFF" stroke-width="2" opacity="0.5"/>
+</svg>

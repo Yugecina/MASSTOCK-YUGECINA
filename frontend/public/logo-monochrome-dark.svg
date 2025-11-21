@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- MASSTOCK Logo - Monochrome Dark Version -->
+  <!-- Single color: Deep Verdigris (for admin distinction) -->
+
+  <defs>
+    <!-- Subtle gradient for depth -->
+    <linearGradient id="dark-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E755E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2A9D8F;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Filter for subtle depth -->
+    <filter id="subtle-shadow">
+      <feGaussianBlur stdDeviation="2" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- "M" Shape - Architectural, layered effect -->
+
+  <!-- Layer 1 (Back) - Darker Verdigris -->
+  <path
+    d="M 40 140 L 40 60 L 70 90 L 100 60 L 130 90 L 160 60 L 160 140 L 140 140 L 140 100 L 100 140 L 60 100 L 60 140 Z"
+    fill="#1E755E"
+    opacity="0.4"
+    transform="translate(5, 5)"
+  />
+
+  <!-- Layer 2 (Middle) - Mid opacity -->
+  <path
+    d="M 40 140 L 40 60 L 70 90 L 100 60 L 130 90 L 160 60 L 160 140 L 140 140 L 140 100 L 100 140 L 60 100 L 60 140 Z"
+    fill="#2A9D8F"
+    opacity="0.7"
+    transform="translate(2.5, 2.5)"
+  />
+
+  <!-- Layer 3 (Front) - Full Verdigris -->
+  <path
+    d="M 40 140 L 40 60 L 70 90 L 100 60 L 130 90 L 160 60 L 160 140 L 140 140 L 140 100 L 100 140 L 60 100 L 60 140 Z"
+    fill="url(#dark-gradient)"
+    filter="url(#subtle-shadow)"
+  />
+
+  <!-- Accent highlight on top edge -->
+  <path
+    d="M 40 60 L 70 90 L 100 60 L 130 90 L 160 60"
+    stroke="#2A9D8F"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+    opacity="0.5"
+  />
+
+  <!-- Geometric accent lines -->
+  <line x1="60" y1="100" x2="60" y2="140" stroke="#1E755E" stroke-width="2" opacity="0.3"/>
+  <line x1="140" y1="100" x2="140" y2="140" stroke="#1E755E" stroke-width="2" opacity="0.3"/>
+</svg>

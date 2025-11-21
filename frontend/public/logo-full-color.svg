@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" fill="none">
+  <!-- MASSTOCK Logo - "M Architectural" with Mediterranean Palette -->
+  <!-- Full Color Version: Verdigris → Tuscan Sun → Burnt Peach Gradient -->
+
+  <!-- Gradient Definitions -->
+  <defs>
+    <!-- Main gradient: Verdigris to Tuscan Sun to Burnt Peach -->
+    <linearGradient id="main-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2A9D8F;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#E9C46A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E76F51;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Layer 1: Darker Verdigris -->
+    <linearGradient id="layer-1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1E755E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2A9D8F;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Layer 2: Mid Verdigris to Tuscan Sun -->
+    <linearGradient id="layer-2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2A9D8F;stop-opacity:0.9" />
+      <stop offset="100%" style="stop-color:#E9C46A;stop-opacity:0.9" />
+    </linearGradient>
+
+    <!-- Layer 3: Tuscan Sun to Burnt Peach -->
+    <linearGradient id="layer-3" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#53BEB1;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#E76F51;stop-opacity:0.8" />
+    </linearGradient>
+
+    <!-- Glow effect -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- "M" Shape - Architectural, layered effect -->
+
+  <!-- Layer 1 (Back) - Darkest Verdigris -->
+  <path
+    d="M 40 140 L 40 60 L 70 90 L 100 60 L 130 90 L 160 60 L 160 140 L 140 140 L 140 100 L 100 140 L 60 100 L 60 140 Z"
+    fill="url(#layer-1)"
+    opacity="0.6"
+    transform="translate(5, 5)"
+  />
+
+  <!-- Layer 2 (Middle) - Mid Verdigris to Tuscan Sun -->
+  <path
+    d="M 40 140 L 40 60 L 70 90 L 100 60 L 130 90 L 160 60 L 160 140 L 140 140 L 140 100 L 100 140 L 60 100 L 60 140 Z"
+    fill="url(#layer-2)"
+    opacity="0.8"
+    transform="translate(2.5, 2.5)"
+  />
+
+  <!-- Layer 3 (Front) - Mediterranean Gradient -->
+  <path
+    d="M 40 140 L 40 60 L 70 90 L 100 60 L 130 90 L 160 60 L 160 140 L 140 140 L 140 100 L 100 140 L 60 100 L 60 140 Z"
+    fill="url(#layer-3)"
+    filter="url(#glow)"
+  />
+
+  <!-- Accent highlight (Burnt Peach glow on top edge) -->
+  <path
+    d="M 40 60 L 70 90 L 100 60 L 130 90 L 160 60"
+    stroke="#E76F51"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    fill="none"
+    opacity="0.6"
+  />
+
+  <!-- Geometric accent lines (architectural detail) -->
+  <line x1="60" y1="100" x2="60" y2="140" stroke="url(#main-gradient)" stroke-width="2" opacity="0.4"/>
+  <line x1="140" y1="100" x2="140" y2="140" stroke="url(#main-gradient)" stroke-width="2" opacity="0.4"/>
+</svg>

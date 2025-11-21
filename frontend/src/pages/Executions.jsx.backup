@@ -1,0 +1,774 @@
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { ClientLayout } from '../components/layout/ClientLayout'
+import { Card } from '../components/ui/Card'
+import { Badge } from '../components/ui/Badge'
+import { Button } from '../components/ui/Button'
+import { Spinner } from '../components/ui/Spinner'
+import { workflowService } from '../services/workflows'
+import { BatchResultsView } from '../components/workflows/BatchResultsView'
+
+/**
+ * Executions Page - Enhanced UX Version
+ * View all workflow executions with improved filtering, visual hierarchy, and status indicators
+ */
+export function Executions() {
+  const navigate = useNavigate()
+  const [executions, setExecutions] = useState([])
+  const [workflows, setWorkflows] = useState([])
+  const [workflowsMap, setWorkflowsMap] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [selectedExecution, setSelectedExecution] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [workflowFilter, setWorkflowFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('newest')
+
+  useEffect(() => {
+    loadData()
+  }, [])
+
+  async function loadData() {
+    console.log('🔍 Executions.loadData: Starting data load...')
+
+    try {
+      setLoading(true)
+
+      // Get all workflows first
+      console.log('📡 Executions.loadData: Fetching workflows...')
+      const workflowsData = await workflowService.list()
+      const workflowsList = workflowsData.data?.workflows || workflowsData.workflows || []
+      setWorkflows(workflowsList)
+
+      // Create a map of workflow_id -> workflow for quick lookup
+      const wfMap = {}
+      workflowsList.forEach(wf => {
+        wfMap[wf.id] = wf
+      })
+      setWorkflowsMap(wfMap)
+
+      console.log('✅ Executions.loadData: Workflows loaded successfully', {
+        count: workflowsList.length,
+        workflows: workflowsList.map(w => ({
+          id: w.id,
+          name: w.name,
+          type: w.config?.workflow_type
+        }))
+      })
+
+      // Get executions for each workflow
+      console.log('📡 Executions.loadData: Fetching executions for all workflows...')
+      const allExecutions = []
+
+      for (const workflow of workflowsList) {
+        try {
+          console.log(`🔍 Executions.loadData: Fetching executions for workflow: ${workflow.name} (${workflow.id})`)
+          const response = await workflowService.getExecutions(workflow.id)
+
+          console.log(`📦 Executions.loadData: Response received for ${workflow.name}:`, {
+            status: response.status,
+            hasData: !!response.data,
+            dataKeys: response.data ? Object.keys(response.data) : [],
+            dataStructure: response.data
+          })
+
+          // Backend returns: { success: true, data: { executions, total, limit, offset } }
+          const execData = response.data.data || response.data
+          const executions = execData.executions || []
+
+          console.log(`✅ Executions.loadData: Found ${executions.length} execution(s) for ${workflow.name}`, {
+            executionIds: executions.map(e => e.id),
+            statuses: executions.map(e => e.status)
+          })
+
+          if (executions.length > 0) {
+            allExecutions.push(...executions.map(exec => ({
+              ...exec,
+              workflow_name: workflow.name,
+              workflow_type: workflow.config?.workflow_type || 'standard'
+            })))
+          }
+        } catch (err) {
+          console.error(`❌ Executions.loadData: Failed to fetch executions for ${workflow.name}:`, {
+            workflowId: workflow.id,
+            workflowName: workflow.name,
+            error: err,
+            message: err.message,
+            response: err.response?.data,
+            status: err.response?.status
+          })
+        }
+      }
+
+      // Sort by created_at descending (newest first)
+      allExecutions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      setExecutions(allExecutions)
+
+      console.log('✅ Executions.loadData: All data loaded successfully', {
+        totalExecutions: allExecutions.length,
+        totalWorkflows: workflowsList.length,
+        statusBreakdown: {
+          completed: allExecutions.filter(e => e.status === 'completed').length,
+          pending: allExecutions.filter(e => e.status === 'pending').length,
+          processing: allExecutions.filter(e => e.status === 'processing').length,
+          failed: allExecutions.filter(e => e.status === 'failed').length
+        }
+      })
+    } catch (err) {
+      console.error('❌ Executions.loadData: Critical error loading data:', {
+        error: err,
+        message: err.message,
+        stack: err.stack,
+        response: err.response?.data
+      })
+    } finally {
+      setLoading(false)
+      console.log('🏁 Executions.loadData: Data load complete')
+    }
+  }
+
+  async function viewExecutionDetails(executionId) {
+    console.log('🔍 Executions.viewExecutionDetails: Opening execution details', { executionId })
+
+    try {
+      console.log('📡 Executions.viewExecutionDetails: Fetching execution data...')
+      const data = await workflowService.getExecution(executionId)
+
+      console.log('📦 Executions.viewExecutionDetails: Execution details received:', {
+        status: data.status,
+        hasData: !!data.data,
+        dataKeys: data.data ? Object.keys(data.data) : [],
+        dataStructure: data.data
+      })
+
+      const executionData = data.data.data || data.data
+
+      console.log('✅ Executions.viewExecutionDetails: Setting selected execution:', {
+        id: executionData.id,
+        workflowId: executionData.workflow_id,
+        status: executionData.status,
+        hasInputData: !!executionData.input_data,
+        hasOutputData: !!executionData.output_data,
+        hasError: !!executionData.error_message,
+        progress: executionData.progress,
+        duration: executionData.duration_seconds
+      })
+
+      setSelectedExecution(executionData)
+    } catch (err) {
+      console.error('❌ Executions.viewExecutionDetails: Failed to load execution details:', {
+        executionId,
+        error: err,
+        message: err.message,
+        response: err.response?.data,
+        status: err.response?.status
+      })
+    }
+  }
+
+  // Apply filters and sorting
+  const filteredExecutions = executions
+    .filter(exec => {
+      if (statusFilter !== 'all' && exec.status !== statusFilter) return false
+      if (workflowFilter !== 'all' && exec.workflow_id !== workflowFilter) return false
+      return true
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.created_at) - new Date(a.created_at)
+        case 'oldest':
+          return new Date(a.created_at) - new Date(b.created_at)
+        case 'duration':
+          return (b.duration_seconds || 0) - (a.duration_seconds || 0)
+        default:
+          return 0
+      }
+    })
+
+  console.log('🔍 Executions.render: Current filters and results:', {
+    statusFilter,
+    workflowFilter,
+    sortBy,
+    totalExecutions: executions.length,
+    filteredCount: filteredExecutions.length
+  })
+
+  const statusCounts = {
+    all: executions.length,
+    completed: executions.filter(e => e.status === 'completed').length,
+    pending: executions.filter(e => e.status === 'pending').length,
+    processing: executions.filter(e => e.status === 'processing').length,
+    failed: executions.filter(e => e.status === 'failed').length,
+  }
+
+  // Status icon helper
+  const getStatusIcon = (status) => {
+    switch (status) {
+      case 'completed':
+        return (
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+          </svg>
+        )
+      case 'failed':
+        return (
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+          </svg>
+        )
+      case 'processing':
+        return (
+          <svg className="w-5 h-5 spinner" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+          </svg>
+        )
+      case 'pending':
+        return (
+          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+          </svg>
+        )
+      default:
+        return null
+    }
+  }
+
+  if (loading) {
+    console.log('⏳ Executions.render: Showing loading state')
+    return (
+      <ClientLayout>
+        <div className="flex flex-col justify-center items-center min-h-screen gap-4">
+          <Spinner size="lg" />
+          <p className="text-neutral-600">Loading executions...</p>
+        </div>
+      </ClientLayout>
+    )
+  }
+
+  return (
+    <ClientLayout>
+      <div className="space-y-8">
+        {/* Header Section - Enhanced spacing and hierarchy */}
+        <div className="flex flex-col gap-6">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-h1 font-bold mb-2 text-neutral-900">Workflow Executions</h1>
+              <p className="text-body text-neutral-600">
+                Monitor and review all your workflow execution history with detailed results and analytics
+              </p>
+            </div>
+            <div className="flex gap-3 flex-shrink-0">
+              <Button variant="secondary" size="md" onClick={() => navigate('/workflows')}>
+                Back to Workflows
+              </Button>
+              <Button variant="primary" size="md" onClick={() => loadData()}>
+                Refresh
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats Cards - Compact design with fixed icon sizes */}
+          <div className="grid grid-cols-4 md:grid-cols-5 gap-3">
+            <div
+              className={`p-4 rounded-lg cursor-pointer transition-all border ${
+                statusFilter === 'all'
+                  ? 'border-primary-main bg-primary-light shadow-sm'
+                  : 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm'
+              }`}
+              onClick={() => {
+                console.log('🔍 Executions: Status filter set to: all')
+                setStatusFilter('all')
+              }}
+            >
+              <div className="text-label text-neutral-600 mb-1">Total</div>
+              <div className="text-2xl font-bold text-neutral-900">{statusCounts.all}</div>
+            </div>
+
+            <div
+              className={`p-4 rounded-lg cursor-pointer transition-all border ${
+                statusFilter === 'completed'
+                  ? 'border-success-main bg-success-light shadow-sm'
+                  : 'border-neutral-200 bg-white hover:border-success-main hover:shadow-sm'
+              }`}
+              onClick={() => {
+                console.log('🔍 Executions: Status filter set to: completed')
+                setStatusFilter('completed')
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-success-dark" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <div className="text-label text-neutral-700">Completed</div>
+              </div>
+              <div className="text-2xl font-bold text-success-dark">{statusCounts.completed}</div>
+            </div>
+
+            <div
+              className={`p-4 rounded-lg cursor-pointer transition-all border ${
+                statusFilter === 'processing'
+                  ? 'border-warning-main bg-warning-light shadow-sm'
+                  : 'border-neutral-200 bg-white hover:border-warning-main hover:shadow-sm'
+              }`}
+              onClick={() => {
+                console.log('🔍 Executions: Status filter set to: processing')
+                setStatusFilter('processing')
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-warning-dark spinner" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                </svg>
+                <div className="text-label text-neutral-700">Processing</div>
+              </div>
+              <div className="text-2xl font-bold text-warning-dark">{statusCounts.processing}</div>
+            </div>
+
+            <div
+              className={`p-4 rounded-lg cursor-pointer transition-all border ${
+                statusFilter === 'pending'
+                  ? 'border-primary-main bg-primary-light shadow-sm'
+                  : 'border-neutral-200 bg-white hover:border-primary-main hover:shadow-sm'
+              }`}
+              onClick={() => {
+                console.log('🔍 Executions: Status filter set to: pending')
+                setStatusFilter('pending')
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-primary-dark" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                </svg>
+                <div className="text-label text-neutral-700">Pending</div>
+              </div>
+              <div className="text-2xl font-bold text-primary-dark">{statusCounts.pending}</div>
+            </div>
+
+            <div
+              className={`p-4 rounded-lg cursor-pointer transition-all border ${
+                statusFilter === 'failed'
+                  ? 'border-error-main bg-error-light shadow-sm'
+                  : 'border-neutral-200 bg-white hover:border-error-main hover:shadow-sm'
+              }`}
+              onClick={() => {
+                console.log('🔍 Executions: Status filter set to: failed')
+                setStatusFilter('failed')
+              }}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <svg className="w-4 h-4 text-error-dark" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+                <div className="text-label text-neutral-700">Failed</div>
+              </div>
+              <div className="text-2xl font-bold text-error-dark">{statusCounts.failed}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Filters Section - Simplified and cleaner */}
+        <Card>
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-h3 font-semibold text-neutral-900">Filters & Sorting</h3>
+              {(statusFilter !== 'all' || workflowFilter !== 'all' || sortBy !== 'newest') && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    setStatusFilter('all')
+                    setWorkflowFilter('all')
+                    setSortBy('newest')
+                    console.log('🔄 Executions: Filters cleared')
+                  }}
+                >
+                  Clear All
+                </Button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="input-group">
+                <label>Filter by Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => {
+                    setStatusFilter(e.target.value)
+                    console.log('🔍 Executions: Status filter changed to:', e.target.value)
+                  }}
+                >
+                  <option value="all">All Status</option>
+                  <option value="completed">Completed</option>
+                  <option value="processing">Processing</option>
+                  <option value="pending">Pending</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </div>
+
+              <div className="input-group">
+                <label>Filter by Workflow</label>
+                <select
+                  value={workflowFilter}
+                  onChange={(e) => {
+                    setWorkflowFilter(e.target.value)
+                    console.log('🔍 Executions: Workflow filter changed to:', e.target.value)
+                  }}
+                >
+                  <option value="all">All Workflows</option>
+                  {workflows.map(workflow => (
+                    <option key={workflow.id} value={workflow.id}>
+                      {workflow.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="input-group">
+                <label>Sort By</label>
+                <select
+                  value={sortBy}
+                  onChange={(e) => {
+                    setSortBy(e.target.value)
+                    console.log('🔍 Executions: Sort changed to:', e.target.value)
+                  }}
+                >
+                  <option value="newest">Newest First</option>
+                  <option value="oldest">Oldest First</option>
+                  <option value="duration">Longest Duration</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        {/* Executions List - Enhanced design with better spacing */}
+        <Card>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-h2 font-bold text-neutral-900">
+              Executions
+              <span className="text-body text-neutral-500 font-normal ml-2">
+                ({filteredExecutions.length} {filteredExecutions.length === 1 ? 'result' : 'results'})
+              </span>
+            </h2>
+          </div>
+
+          {filteredExecutions.length > 0 ? (
+            <div className="space-y-3">
+              {filteredExecutions.map((execution) => (
+                <div
+                  key={execution.id}
+                  className="flex items-center justify-between p-6 bg-neutral-50 rounded-lg hover:bg-neutral-100 cursor-pointer transition-all border border-neutral-200 hover:border-neutral-300 hover:shadow-sm"
+                  onClick={() => viewExecutionDetails(execution.id)}
+                >
+                  <div className="flex items-center gap-4 flex-1 min-w-0">
+                    {/* Status Icon */}
+                    <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                      execution.status === 'completed' ? 'bg-success-light text-success-dark' :
+                      execution.status === 'failed' ? 'bg-error-light text-error-dark' :
+                      execution.status === 'processing' ? 'bg-warning-light text-warning-dark' :
+                      'bg-primary-light text-primary-dark'
+                    }`}>
+                      {getStatusIcon(execution.status)}
+                    </div>
+
+                    {/* Execution Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className="font-semibold text-neutral-900 truncate">
+                          {execution.workflow_name}
+                        </h3>
+                        <Badge variant={
+                          execution.status === 'completed' ? 'success' :
+                          execution.status === 'failed' ? 'error' :
+                          execution.status === 'processing' ? 'warning' : 'neutral'
+                        }>
+                          {execution.status}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center gap-4 text-body-sm text-neutral-600">
+                        <span className="flex items-center gap-1">
+                          <svg className="w-4 h-4" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          {new Date(execution.created_at).toLocaleString()}
+                        </span>
+                        {execution.duration_seconds && (
+                          <span className="flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                            </svg>
+                            {execution.duration_seconds}s
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Arrow Icon */}
+                  <div className="flex-shrink-0 ml-4">
+                    <svg className="w-6 h-6 text-neutral-400" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                    </svg>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 text-neutral-600">
+              <div className="mb-4">
+                <svg className="w-20 h-20 mx-auto text-neutral-300" fill="none" strokeWidth={1.5} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                </svg>
+              </div>
+              <p className="text-h3 font-semibold mb-2">No executions found</p>
+              <p className="text-body-sm text-neutral-500 mb-6">
+                {statusFilter !== 'all' || workflowFilter !== 'all'
+                  ? 'Try adjusting your filters to see more results'
+                  : 'Execute a workflow to see results here'}
+              </p>
+              {(statusFilter !== 'all' || workflowFilter !== 'all') && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    setStatusFilter('all')
+                    setWorkflowFilter('all')
+                    console.log('🔄 Executions: Filters cleared from empty state')
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
+            </div>
+          )}
+        </Card>
+      </div>
+
+      {/* Execution Detail Modal - Enhanced design */}
+      {selectedExecution && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setSelectedExecution(null)
+            console.log('🔒 Executions: Modal closed')
+          }}
+        >
+          <div
+            className="modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div className="flex items-center gap-3">
+                <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center ${
+                  selectedExecution.status === 'completed' ? 'bg-success-light text-success-dark' :
+                  selectedExecution.status === 'failed' ? 'bg-error-light text-error-dark' :
+                  selectedExecution.status === 'processing' ? 'bg-warning-light text-warning-dark' :
+                  'bg-primary-light text-primary-dark'
+                }`}>
+                  {getStatusIcon(selectedExecution.status)}
+                </div>
+                <h2 className="text-h2 font-bold">Execution Details</h2>
+              </div>
+              <button
+                className="btn-icon"
+                onClick={() => {
+                  setSelectedExecution(null)
+                  console.log('🔒 Executions: Modal closed via button')
+                }}
+              >
+                <svg className="w-6 h-6" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <div className="space-y-6">
+                {/* Overview Grid - Compact layout with all key info */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className={`p-3 rounded-lg border ${
+                    selectedExecution.status === 'completed' ? 'bg-success-light border-success-main' :
+                    selectedExecution.status === 'failed' ? 'bg-error-light border-error-main' :
+                    selectedExecution.status === 'processing' ? 'bg-warning-light border-warning-main' :
+                    'bg-primary-light border-primary-main'
+                  }`}>
+                    <div className="text-label text-neutral-700 mb-1">Status</div>
+                    <div className={`text-lg font-bold ${
+                      selectedExecution.status === 'completed' ? 'text-success-dark' :
+                      selectedExecution.status === 'failed' ? 'text-error-dark' :
+                      selectedExecution.status === 'processing' ? 'text-warning-dark' :
+                      'text-primary-dark'
+                    }`}>
+                      {selectedExecution.status}
+                    </div>
+                  </div>
+
+                  {selectedExecution.duration_seconds && (
+                    <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                      <div className="text-label text-neutral-600 mb-1">Duration</div>
+                      <div className="text-lg font-bold text-neutral-900">
+                        {selectedExecution.duration_seconds}s
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedExecution.progress !== undefined && selectedExecution.progress !== null && (
+                    <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                      <div className="text-label text-neutral-600 mb-1">Progress</div>
+                      <div className="text-lg font-bold text-neutral-900">
+                        {selectedExecution.progress}%
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedExecution.retry_count > 0 && (
+                    <div className="p-3 bg-warning-light rounded-lg border border-warning-main">
+                      <div className="text-label text-neutral-700 mb-1">Retries</div>
+                      <div className="text-lg font-bold text-warning-dark">
+                        {selectedExecution.retry_count}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Progress Bar (if in progress) */}
+                {selectedExecution.progress !== undefined && selectedExecution.progress !== null && (
+                  <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-200">
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-body-sm text-neutral-600">Overall Progress</span>
+                      <span className="text-body-sm font-semibold text-neutral-900">
+                        {selectedExecution.progress}%
+                      </span>
+                    </div>
+                    <div className="progress-bar">
+                      <div
+                        className="progress-fill"
+                        style={{ width: `${selectedExecution.progress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Timing Info - Horizontal layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <svg className="w-4 h-4 text-neutral-500" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z" />
+                      </svg>
+                      <div className="text-label text-neutral-600">Started</div>
+                    </div>
+                    <div className="text-body-sm font-medium text-neutral-900">
+                      {selectedExecution.started_at
+                        ? new Date(selectedExecution.started_at).toLocaleString()
+                        : 'Not started yet'}
+                    </div>
+                  </div>
+                  <div className="p-3 bg-neutral-50 rounded-lg border border-neutral-200">
+                    <div className="flex items-center gap-2 mb-1">
+                      <svg className="w-4 h-4 text-neutral-500" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 7.5A2.25 2.25 0 017.5 5.25h9a2.25 2.25 0 012.25 2.25v9a2.25 2.25 0 01-2.25 2.25h-9a2.25 2.25 0 01-2.25-2.25v-9z" />
+                      </svg>
+                      <div className="text-label text-neutral-600">Completed</div>
+                    </div>
+                    <div className="text-body-sm font-medium text-neutral-900">
+                      {selectedExecution.completed_at
+                        ? new Date(selectedExecution.completed_at).toLocaleString()
+                        : 'Not completed'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Input Data */}
+                {selectedExecution.input_data && Object.keys(selectedExecution.input_data).length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="w-5 h-5 text-neutral-600" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <h3 className="text-h3 font-semibold text-neutral-900">Input Data</h3>
+                    </div>
+                    <pre className="code-block">
+                      {JSON.stringify(selectedExecution.input_data, null, 2)}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Batch Results for nano_banana workflows */}
+                {selectedExecution.workflow_id &&
+                 workflowsMap[selectedExecution.workflow_id]?.config?.workflow_type === 'nano_banana' &&
+                 selectedExecution.status === 'completed' && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="w-5 h-5 text-neutral-600" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+                      </svg>
+                      <h3 className="text-h3 font-semibold text-neutral-900">Batch Results</h3>
+                    </div>
+                    <BatchResultsView executionId={selectedExecution.id} />
+                  </div>
+                )}
+
+                {/* Output Data for standard workflows */}
+                {selectedExecution.output_data &&
+                 Object.keys(selectedExecution.output_data).length > 0 &&
+                 (!workflowsMap[selectedExecution.workflow_id] ||
+                  workflowsMap[selectedExecution.workflow_id]?.config?.workflow_type !== 'nano_banana') && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-3">
+                      <svg className="w-5 h-5 text-neutral-600" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <h3 className="text-h3 font-semibold text-neutral-900">Output Data</h3>
+                    </div>
+                    <pre className="code-block">
+                      {JSON.stringify(selectedExecution.output_data, null, 2)}
+                    </pre>
+                  </div>
+                )}
+
+                {/* Error Message */}
+                {selectedExecution.error_message && (
+                  <div className="bg-error-light border border-error-main p-4 rounded-lg">
+                    <div className="flex items-center gap-2 mb-2">
+                      <svg className="w-5 h-5 text-error-dark" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                      <h3 className="text-body font-semibold text-error-dark">Error Details</h3>
+                    </div>
+                    <div className="text-body-sm text-neutral-800 font-mono bg-white p-3 rounded border border-error-200">
+                      {selectedExecution.error_message}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setSelectedExecution(null)
+                  console.log('🔒 Executions: Modal closed from footer')
+                }}
+              >
+                Close
+              </Button>
+              {selectedExecution.workflow_id && (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    console.log('🔍 Executions: Navigating to workflow:', selectedExecution.workflow_id)
+                    setSelectedExecution(null)
+                    navigate(`/workflows/${selectedExecution.workflow_id}`)
+                  }}
+                >
+                  View Workflow
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </ClientLayout>
+  )
+}
