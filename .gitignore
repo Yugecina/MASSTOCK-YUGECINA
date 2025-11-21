@@ -24,7 +24,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-package-lock.json
+# Note: package-lock.json is now tracked for reproducible builds in Docker
 yarn.lock
 pnpm-lock.yaml
 
