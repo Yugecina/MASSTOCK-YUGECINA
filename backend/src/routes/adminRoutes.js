@@ -12,6 +12,7 @@ const adminController = require('../controllers/adminController');
 const adminUserController = require('../controllers/adminUserController');
 const adminWorkflowController = require('../controllers/adminWorkflowController');
 const analyticsController = require('../controllers/analyticsController');
+const supportTicketsController = require('../controllers/supportTicketsController');
 
 const router = express.Router();
 
@@ -419,6 +420,53 @@ router.get('/analytics/failures',
       throw validationErrorHandler(errors.array());
     }
     await analyticsController.getFailures(req, res);
+  })
+);
+
+/**
+ * SUPPORT TICKETS ENDPOINTS
+ */
+
+/**
+ * GET /api/v1/admin/tickets
+ * Get all support tickets
+ */
+router.get('/tickets',
+  asyncHandler(async (req, res, next) => {
+    await supportTicketsController.getTickets(req, res);
+  })
+);
+
+/**
+ * GET /api/v1/admin/tickets/:ticket_id
+ * Get single ticket details
+ */
+router.get('/tickets/:ticket_id',
+  param('ticket_id').isUUID().withMessage('Invalid ticket ID'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await supportTicketsController.getTicket(req, res);
+  })
+);
+
+/**
+ * PUT /api/v1/admin/tickets/:ticket_id
+ * Update ticket status (admin only)
+ */
+router.put('/tickets/:ticket_id',
+  param('ticket_id').isUUID().withMessage('Invalid ticket ID'),
+  body('status').optional().isIn(['open', 'in_progress', 'resolved', 'closed']).withMessage('Invalid status'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await supportTicketsController.updateTicket(req, res);
   })
 );
 

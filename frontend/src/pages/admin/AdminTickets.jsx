@@ -19,9 +19,13 @@ export function AdminTickets() {
     async function loadTickets() {
       try {
         logger.debug('💬 AdminTickets: Loading tickets...')
-        const data = await adminService.getTickets()
-        logger.debug('✅ AdminTickets: Data loaded:', data)
-        setTickets(data.tickets || [])
+        const response = await adminService.getTickets()
+        logger.debug('✅ AdminTickets: Response received:', {
+          response,
+          data: response.data,
+          tickets: response.data?.tickets
+        })
+        setTickets(response.data?.tickets || [])
       } catch (err) {
         logger.error('❌ AdminTickets: Failed to fetch tickets:', {
           error: err,
@@ -38,6 +42,8 @@ export function AdminTickets() {
 
   const getPriorityColor = (priority) => {
     switch (priority?.toLowerCase()) {
+      case 'urgent':
+        return { bg: '#fee2e2', color: '#991b1b' } // Red 100/800
       case 'high':
         return { bg: 'var(--error-light)', color: 'var(--error-dark)' }
       case 'medium':
@@ -50,9 +56,18 @@ export function AdminTickets() {
   }
 
   const getStatusColor = (status) => {
-    return status === 'open'
-      ? { bg: 'var(--indigo-50)', color: 'var(--indigo-600)' }
-      : { bg: 'var(--neutral-100)', color: 'var(--neutral-600)' }
+    switch (status?.toLowerCase()) {
+      case 'open':
+        return { bg: 'var(--indigo-50)', color: 'var(--indigo-600)' }
+      case 'in_progress':
+        return { bg: 'var(--warning-light)', color: 'var(--warning-dark)' }
+      case 'resolved':
+        return { bg: 'var(--success-light)', color: 'var(--success-dark)' }
+      case 'closed':
+        return { bg: 'var(--neutral-100)', color: 'var(--neutral-600)' }
+      default:
+        return { bg: 'var(--neutral-100)', color: 'var(--neutral-600)' }
+    }
   }
 
   return (
@@ -154,7 +169,7 @@ export function AdminTickets() {
                             fontWeight: 600
                           }}
                         >
-                          #{ticket.id}
+                          #{ticket.id.substring(0, 8)}
                         </span>
                         <h3
                           className="font-display"
@@ -217,7 +232,7 @@ export function AdminTickets() {
                           letterSpacing: '0.05em'
                         }}
                       >
-                        {ticket.status}
+                        {ticket.status.replace('_', ' ')}
                       </span>
 
                       {/* Priority Badge */}
@@ -238,13 +253,13 @@ export function AdminTickets() {
                       </span>
 
                       {/* Quick Resolve Button (Lime CTA) */}
-                      {ticket.status === 'open' && (
+                      {(ticket.status === 'open' || ticket.status === 'in_progress') && (
                         <button
                           className="btn btn-primary-lime"
                           style={{ padding: '8px 16px', fontSize: '13px' }}
-                          onClick={() => toast.success('Ticket resolved!')}
+                          onClick={() => toast.success('Resolve feature coming soon')}
                         >
-                          Resolve
+                          {ticket.status === 'open' ? 'Start' : 'Resolve'}
                         </button>
                       )}
                     </div>

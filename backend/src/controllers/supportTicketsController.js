@@ -86,7 +86,13 @@ async function getTickets(req, res) {
 
   let query = supabaseAdmin
     .from('support_tickets')
-    .select('*')
+    .select(`
+      *,
+      clients:client_id (
+        name,
+        company_name
+      )
+    `)
     .order('created_at', { ascending: false });
 
   // Filter by client if not admin
@@ -100,11 +106,17 @@ async function getTickets(req, res) {
     throw new ApiError(500, 'Failed to fetch support tickets', 'DATABASE_ERROR');
   }
 
+  // Transform tickets to include client_name
+  const transformedTickets = tickets?.map(ticket => ({
+    ...ticket,
+    client_name: ticket.clients?.company_name || ticket.clients?.name || 'Unknown Client'
+  })) || [];
+
   res.json({
     success: true,
     data: {
-      tickets,
-      total: tickets?.length || 0
+      tickets: transformedTickets,
+      total: transformedTickets.length
     }
   });
 }

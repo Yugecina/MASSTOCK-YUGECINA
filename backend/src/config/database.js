@@ -4,12 +4,11 @@
  */
 
 const { createClient } = require('@supabase/supabase-js');
+const { logger } = require('./logger');
 require('dotenv').config();
 
 // Validate required environment variables
 const requiredEnvVars = [
-const { logger } = require('../config/logger');
-
   'SUPABASE_URL',
   'SUPABASE_ANON_KEY',
   'SUPABASE_SERVICE_ROLE_KEY'

@@ -19,7 +19,7 @@ const mockSupabaseWorkflows = [
   { id: '780d84d4-d7a2-425e-9142-0e5dc12cecf3', client_id: 'a76e631c-4dc4-4abc-b759-9f7c225c142b', name: 'AI Avatar Generator', description: 'Generate professional AI avatars from photos', status: 'deployed', cost_per_execution: '18.00', revenue_per_execution: '300.00', created_at: '2025-11-16T12:13:13.238136Z' }
 ];
 
-const USE_MOCK = true; // Set to false when backend is ready
+const USE_MOCK = false; // Set to false when backend is ready
 
 export const adminWorkflowService = {
   /**

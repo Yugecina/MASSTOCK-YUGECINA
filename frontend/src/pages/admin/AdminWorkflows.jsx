@@ -23,9 +23,9 @@ export function AdminWorkflows() {
         logger.debug('✅ AdminWorkflows: Response received:', {
           response,
           data: response.data,
-          workflows: response.data?.data?.workflows
+          workflows: response.data?.workflows
         })
-        setWorkflows(response.data?.data?.workflows || [])
+        setWorkflows(response.data?.workflows || [])
       } catch (error) {
         logger.error('❌ AdminWorkflows: Failed to load workflows:', {
           error,
@@ -160,17 +160,17 @@ export function AdminWorkflows() {
                             fontSize: '11px',
                             fontWeight: 600,
                             borderRadius: '6px',
-                            background: workflow.type === 'nano_banana'
+                            background: workflow.config?.workflow_type === 'nano_banana'
                               ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
                               : 'var(--neutral-100)',
-                            color: workflow.type === 'nano_banana'
+                            color: workflow.config?.workflow_type === 'nano_banana'
                               ? 'white'
                               : 'var(--neutral-700)',
                             textTransform: 'uppercase',
                             letterSpacing: '0.05em'
                           }}
                         >
-                          {workflow.type || 'standard'}
+                          {workflow.config?.workflow_type || 'standard'}
                         </span>
                       </div>
 
@@ -236,7 +236,7 @@ export function AdminWorkflows() {
                           color: 'var(--text-primary)'
                         }}
                       >
-                        {workflow.executions_count || 0}
+                        {workflow.stats?.total_executions || 0}
                       </p>
                     </div>
                     <div>
@@ -261,7 +261,7 @@ export function AdminWorkflows() {
                           color: 'var(--success-main)'
                         }}
                       >
-                        {workflow.success_rate || 0}%
+                        {workflow.stats?.success_rate || 0}%
                       </p>
                     </div>
                     <div>
@@ -276,17 +276,17 @@ export function AdminWorkflows() {
                           fontWeight: 600
                         }}
                       >
-                        Avg Duration
+                        Revenue
                       </p>
                       <p
                         className="font-mono"
                         style={{
                           fontSize: '18px',
                           fontWeight: 700,
-                          color: 'var(--text-primary)'
+                          color: 'var(--success-main)'
                         }}
                       >
-                        {workflow.avg_duration || 'N/A'}
+                        ${workflow.stats?.revenue || '0.00'}
                       </p>
                     </div>
                   </div>

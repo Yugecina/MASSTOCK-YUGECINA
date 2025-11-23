@@ -5,7 +5,7 @@
 
 const { supabaseAdmin } = require('../config/database');
 const { createClient } = require('@supabase/supabase-js');
-const { logWorkflowExecution, logAudit } = require('../config/logger');
+const { logger, logWorkflowExecution, logAudit } = require('../config/logger');
 const { ApiError } = require('../middleware/errorHandler');
 const { addWorkflowJob } = require('../queues/workflowQueue');
 const { v4: uuidv4 } = require('uuid');

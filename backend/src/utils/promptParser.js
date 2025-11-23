@@ -1,7 +1,6 @@
-/**
 const { logger } = require('../config/logger');
 
-
+/**
  * Prompt Parser Utility
  *
  * Parses multiline prompt text for batch image generation.
