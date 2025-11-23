@@ -249,9 +249,9 @@ stop_existing_containers() {
         log_info "Stopping running containers..."
 
         if docker compose version &> /dev/null; then
-            docker compose -f docker-compose.production.yml down
+            docker compose --env-file backend/.env.production -f docker-compose.production.yml down
         else
-            docker-compose -f docker-compose.production.yml down
+            docker-compose --env-file backend/.env.production -f docker-compose.production.yml down
         fi
 
         log_success "Containers stopped"
@@ -270,11 +270,11 @@ start_containers() {
         return 0
     fi
 
-    # Start containers
+    # Start containers with env file
     if docker compose version &> /dev/null; then
-        local cmd="docker compose -f docker-compose.production.yml up -d"
+        local cmd="docker compose --env-file backend/.env.production -f docker-compose.production.yml up -d"
     else
-        local cmd="docker-compose -f docker-compose.production.yml up -d"
+        local cmd="docker-compose --env-file backend/.env.production -f docker-compose.production.yml up -d"
     fi
 
     if run_command "Starting containers" $cmd; then

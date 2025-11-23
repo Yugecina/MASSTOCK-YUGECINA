@@ -228,6 +228,9 @@ obtain_certificates() {
         log_warning "Using Let's Encrypt STAGING environment (test certificates)"
     fi
 
+    # Expand existing certificate if needed
+    certbot_cmd+=" --expand"
+
     # Non-interactive
     certbot_cmd+=" --non-interactive"
 
