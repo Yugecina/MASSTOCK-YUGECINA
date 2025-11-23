@@ -318,7 +318,7 @@ generate_frontend_env() {
         backup_file "$env_file"
     fi
 
-    local api_url=$(read_input "API URL (https://api.dorian-gonzalez.fr/api/v1):" "VITE_API_URL" "https://api.dorian-gonzalez.fr/api/v1")
+    local api_url=$(read_input "API URL (https://api.dorian-gonzalez.fr/api):" "VITE_API_URL" "https://api.dorian-gonzalez.fr/api")
     local vite_env="production"
 
     # Write .env file

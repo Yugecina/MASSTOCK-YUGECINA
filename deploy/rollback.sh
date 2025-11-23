@@ -309,7 +309,7 @@ rebuild_containers() {
         run_command "Installing dependencies" npm install
     fi
 
-    export VITE_API_URL="https://api.dorian-gonzalez.fr/api/v1"
+    export VITE_API_URL="https://api.dorian-gonzalez.fr/api"
     export VITE_ENV="production"
 
     if ! run_command "Building frontend" npm run build; then

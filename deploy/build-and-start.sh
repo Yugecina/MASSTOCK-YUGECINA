@@ -163,7 +163,7 @@ build_frontend() {
     fi
 
     # Set production env variables for build
-    export VITE_API_URL="https://api.dorian-gonzalez.fr/api/v1"
+    export VITE_API_URL="https://api.dorian-gonzalez.fr/api"
     export VITE_ENV="production"
     export VITE_LOG_LEVEL="none"
 
