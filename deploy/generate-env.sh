@@ -77,13 +77,15 @@ read_secret() {
     local value
 
     if [[ -n "$default" ]]; then
-        echo -e "${CYAN}$prompt${NC}"
-        echo -e "${YELLOW}[Press Enter to use existing: ${default:0:20}...]${NC}"
-        read -s value
+        # Show hint for existing value (to stderr to avoid capture)
+        echo -e "${YELLOW}[Press Enter to keep existing: ${default:0:20}...]${NC}" >&2
+        # Read silently with prompt
+        read -sp "$(echo -e ${CYAN}${prompt}${NC} )" value
+        echo "" >&2  # New line after hidden input
         value=${value:-$default}
     else
-        echo -e "${CYAN}$prompt${NC}"
-        read -s value
+        read -sp "$(echo -e ${CYAN}${prompt}${NC} )" value
+        echo "" >&2  # New line after hidden input
     fi
 
     echo "$value"
