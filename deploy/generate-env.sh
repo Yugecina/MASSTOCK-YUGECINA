@@ -96,12 +96,10 @@ read_input() {
     local value
 
     if [[ -n "$default" ]]; then
-        echo -e "${CYAN}$prompt${NC} ${YELLOW}[${default}]${NC}"
-        read value
+        read -p "$(echo -e ${CYAN}${prompt}${NC} ${YELLOW}[${default}]${NC} )" value
         value=${value:-$default}
     else
-        echo -e "${CYAN}$prompt${NC}"
-        read value
+        read -p "$(echo -e ${CYAN}${prompt}${NC} )" value
     fi
 
     echo "$value"
