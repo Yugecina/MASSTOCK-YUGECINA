@@ -158,10 +158,13 @@ generate_backend_env() {
     local supabase_url
     while true; do
         supabase_url=$(read_input "Supabase URL (https://xxxxx.supabase.co):" "SUPABASE_URL" "$SUPABASE_URL")
-        if validate_url "$supabase_url" && [[ "$supabase_url" =~ supabase\.co ]]; then
+        # Trim whitespace
+        supabase_url=$(echo "$supabase_url" | xargs)
+        if validate_url "$supabase_url" && [[ "$supabase_url" =~ supabase\.co$ ]]; then
             break
         else
             log_error "Invalid Supabase URL. Format: https://xxxxx.supabase.co"
+            log_debug "Received: '$supabase_url'"
         fi
     done
 
