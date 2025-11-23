@@ -15,20 +15,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Build Frontend
-        working-directory: frontend
-        run: |
-          echo "VITE_API_URL=https://api.dorian-gonzalez.fr/api/v1" > .env.production
-          echo "VITE_ENV=production" >> .env.production
-          echo "VITE_LOG_LEVEL=none" >> .env.production
-          npm ci
-          npm run build
-
       - name: Setup SSH
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -48,44 +34,19 @@ jobs:
         run: |
           echo "🚀 Deploying to production..."
 
-          # Create deployment script
-          cat > deploy.sh << 'EOF'
-          #!/bin/bash
-          set -e
+          ssh $VPS_USER@$VPS_HOST << 'ENDSSH'
+            set -e
 
-          DEPLOY_PATH=$1
-          BACKUP_DIR="${DEPLOY_PATH}/backups/$(date +%Y%m%d_%H%M%S)"
+            echo "📥 Pulling latest code..."
+            cd /opt/masstock
+            git fetch origin
+            git reset --hard origin/main
 
-          echo "📦 Creating backup..."
-          mkdir -p "$BACKUP_DIR"
-          if [ -f "${DEPLOY_PATH}/backend/.env.production" ]; then
-            cp "${DEPLOY_PATH}/backend/.env.production" "$BACKUP_DIR/"
-          fi
-          if [ -f "${DEPLOY_PATH}/docker-compose.production.yml" ]; then
-            cp "${DEPLOY_PATH}/docker-compose.production.yml" "$BACKUP_DIR/"
-          fi
+            echo "🏗️  Building and restarting services..."
+            ./deploy/build-and-start.sh --rebuild
 
-          echo "📥 Pulling latest code..."
-          cd "$DEPLOY_PATH"
-          git fetch origin
-          git reset --hard origin/main
-
-          echo "🏗️  Building and restarting services..."
-          docker-compose -f docker-compose.production.yml build
-          docker-compose -f docker-compose.production.yml up -d
-
-          echo "🧹 Cleaning up old Docker images..."
-          docker image prune -f
-
-          echo "✅ Deployment complete!"
-          EOF
-
-          # Make script executable and upload
-          chmod +x deploy.sh
-          scp deploy.sh $VPS_USER@$VPS_HOST:~/deploy.sh
-
-          # Execute deployment on VPS
-          ssh $VPS_USER@$VPS_HOST "bash ~/deploy.sh $DEPLOY_PATH"
+            echo "✅ Deployment complete!"
+          ENDSSH
 
       - name: Health Check
         env:
@@ -97,46 +58,43 @@ jobs:
           # Wait for services to start
           sleep 30
 
-          # Check API health
-          ssh $VPS_USER@$VPS_HOST "curl -f https://api.dorian-gonzalez.fr/health || exit 1"
+          ssh $VPS_USER@$VPS_HOST << 'ENDSSH'
+            set -e
 
-          # Check frontend
-          ssh $VPS_USER@$VPS_HOST "curl -f https://dorian-gonzalez.fr || exit 1"
+            echo "Checking API health..."
+            curl -f http://api.dorian-gonzalez.fr/health || exit 1
 
-          # Check Docker services
-          ssh $VPS_USER@$VPS_HOST "docker-compose -f /opt/masstock/docker-compose.production.yml ps | grep -E '(api|worker|redis)' | grep -v Exit || exit 1"
+            echo "Checking frontend..."
+            curl -f http://dorian-gonzalez.fr/health || exit 1
 
-          echo "✅ All health checks passed!"
+            echo "Checking Docker containers..."
+            docker ps | grep masstock_api || exit 1
+            docker ps | grep masstock_worker || exit 1
+            docker ps | grep masstock_redis || exit 1
+            docker ps | grep masstock_nginx || exit 1
+
+            echo "✅ All health checks passed!"
+          ENDSSH
 
       - name: Rollback on failure
         if: failure()
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
-          DEPLOY_PATH: /opt/masstock
         run: |
           echo "❌ Deployment failed! Rolling back..."
 
-          ssh $VPS_USER@$VPS_HOST << EOF
-            cd $DEPLOY_PATH
-            LATEST_BACKUP=\$(ls -t backups/ | head -1)
-            if [ -n "\$LATEST_BACKUP" ]; then
-              echo "📦 Restoring from backup: \$LATEST_BACKUP"
-              cp "backups/\$LATEST_BACKUP/.env.production" backend/.env.production
-              docker-compose -f docker-compose.production.yml restart
-              echo "✅ Rollback complete"
-            else
-              echo "⚠️  No backup found, manual intervention required"
-              exit 1
-            fi
-          EOF
+          ssh $VPS_USER@$VPS_HOST << 'ENDSSH'
+            cd /opt/masstock
+            ./deploy/rollback.sh
+          ENDSSH
 
       - name: Notify success
         if: success()
         run: |
           echo "🎉 Deployment successful!"
-          echo "Frontend: https://dorian-gonzalez.fr"
-          echo "Backend API: https://api.dorian-gonzalez.fr"
+          echo "Frontend: http://dorian-gonzalez.fr"
+          echo "Backend API: http://api.dorian-gonzalez.fr"
 
       - name: Notify failure
         if: failure()

@@ -2,7 +2,7 @@
 
 **Standard Operating Procedure for deploying MasStock to production VPS**
 
-Last updated: 2025-01-23
+Last updated: 2025-11-23
 
 ---
 
@@ -526,6 +526,92 @@ docker compose -f docker-compose.production.yml restart worker
 
 # If Redis has issues
 docker compose -f docker-compose.production.yml restart redis worker
+```
+
+#### 6. Port 8080 Already in Use
+
+**Symptom:** `failed to bind host port 0.0.0.0:8080/tcp: address already in use`
+
+**Diagnosis:**
+```bash
+# Find what's using port 8080
+sudo lsof -i :8080
+
+# Check for uvicorn/FastAPI services
+ps aux | grep uvicorn
+
+# List all running services
+sudo systemctl --type=service --state=running
+```
+
+**Common causes:**
+- `rag.service` (RAG API using uvicorn on port 8080)
+- `agent_api.service` (Agent D API)
+- Old MasStock containers not cleaned up
+
+**Fix:**
+```bash
+# Option 1: Stop conflicting systemd services
+sudo systemctl stop rag.service
+sudo systemctl disable rag.service
+
+sudo systemctl stop agent_api.service
+sudo systemctl disable agent_api.service
+
+# Option 2: Kill process directly (if not a service)
+sudo lsof -i :8080  # Get PID
+sudo kill -9 <PID>
+
+# Option 3: Let deployment script handle it automatically
+# The build-and-start.sh script now auto-kills port 8080 processes
+./deploy/build-and-start.sh
+```
+
+**Prevention:**
+The `free_required_ports()` function in `deploy/build-and-start.sh` now automatically kills processes using ports 8080 and 3000 before starting containers.
+
+#### 7. nginx Container Fails with SSL Certificate Error
+
+**Symptom:** `cannot load certificate "/etc/nginx/ssl/dorian-gonzalez.fr/fullchain.pem": No such file`
+
+**Cause:** Container nginx configuration references SSL certificates that don't exist yet.
+
+**Fix:**
+The container nginx should use HTTP-only config (VPS nginx handles SSL):
+```bash
+# The nginx/conf.d/masstock.conf should use:
+# - listen 80 default_server (not 443)
+# - server_name _ (catch-all, no domain filtering)
+# - No SSL certificate paths
+
+# If container nginx is misconfigured, rebuild:
+git pull origin main  # Ensure you have latest HTTP-only config
+docker compose -f docker-compose.production.yml build nginx
+docker compose -f docker-compose.production.yml up -d nginx
+```
+
+#### 8. Frontend Returns "Internal Server Error" (nginx VPS → Container Connection Reset)
+
+**Symptom:**
+- `curl http://localhost:8080/` works on VPS
+- `curl http://dorian-gonzalez.fr` returns "Internal Server Error"
+- nginx VPS logs: `recv() failed (104: Connection reset by peer)`
+
+**Cause:** Container nginx filters requests by `server_name` and rejects proxied requests from VPS nginx.
+
+**Fix:**
+Container nginx must use `server_name _` (catch-all) to accept all proxied requests:
+```bash
+# In nginx/conf.d/masstock.conf:
+server {
+    listen 80 default_server;
+    server_name _;  # Not specific domain!
+    # ...
+}
+
+# After fixing config:
+docker compose -f docker-compose.production.yml build nginx
+docker compose -f docker-compose.production.yml up -d nginx
 ```
 
 ### Emergency Procedures
