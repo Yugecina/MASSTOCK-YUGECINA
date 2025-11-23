@@ -191,13 +191,14 @@ generate_backend_env() {
         fi
     done
 
-    # Gemini API (optional)
+    # Gemini API (optional - clients provide their own)
     echo ""
-    log_info "🤖 GEMINI API CONFIGURATION (for AI workflows)"
-    log_info "Get from: https://ai.google.dev/gemini-api/docs/api-key"
+    log_info "🤖 GEMINI API CONFIGURATION"
+    log_warning "Note: Clients provide their own API keys in the interface"
+    log_info "Press Enter to skip (recommended for production)"
     echo ""
 
-    local gemini_api_key=$(read_secret "Gemini API Key (or press Enter to skip):" "GEMINI_API_KEY" "$GEMINI_API_KEY")
+    local gemini_api_key=$(read_secret "Server Gemini API Key (optional, press Enter to skip):" "GEMINI_API_KEY" "$GEMINI_API_KEY")
     echo ""
 
     # Auto-generated secrets
