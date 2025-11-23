@@ -474,7 +474,7 @@ main() {
     parse_master_args "$@"
 
     # Check if running as root
-    if [[ $EUID -ne 0 ]] && [[ $SKIP_NGINX -eq 0 ]] || [[ $SKIP_SSL -eq 0 ]]; then
+    if [[ $EUID -ne 0 ]] && ( [[ $SKIP_NGINX -eq 0 ]] || [[ $SKIP_SSL -eq 0 ]] ); then
         log_warning "This script requires sudo for nginx and SSL setup"
         log_info "Please run with: sudo $0 $*"
         exit 1
