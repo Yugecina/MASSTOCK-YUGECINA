@@ -349,8 +349,8 @@ wait_for_containers() {
             local containers=$(docker ps --filter "name=masstock" --format "{{.Names}}" 2>/dev/null || echo "")
         fi
 
-        # Check each critical container
-        for container in masstock_redis masstock_api masstock_worker masstock_nginx; do
+        # Check each critical container (excluding worker - it has no health check)
+        for container in masstock_redis masstock_api masstock_nginx; do
             if docker ps --filter "name=$container" --filter "status=running" | grep -q "$container"; then
                 # Check health status
                 local health=$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "none")
@@ -366,6 +366,14 @@ wait_for_containers() {
                 unhealthy_count=$((unhealthy_count + 1))
             fi
         done
+
+        # Special check for worker: just verify it's running (no health check needed)
+        if docker ps --filter "name=masstock_worker" --filter "status=running" | grep -q "masstock_worker"; then
+            log_debug "masstock_worker is running (no health check)"
+        else
+            log_warning "masstock_worker is not running"
+            unhealthy_count=$((unhealthy_count + 1))
+        fi
 
         if [[ $unhealthy_count -eq 0 ]]; then
             log_success "All containers are healthy!"
