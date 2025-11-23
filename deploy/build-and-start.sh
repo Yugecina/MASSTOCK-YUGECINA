@@ -236,6 +236,43 @@ build_docker_images() {
 # CONTAINER MANAGEMENT
 #####################################################################
 
+free_required_ports() {
+    log_step "Checking and freeing required ports..."
+
+    if [[ "${DRY_RUN:-0}" == "1" ]]; then
+        log_warning "[DRY RUN] Would check ports"
+        return 0
+    fi
+
+    # Ports needed by MasStock containers
+    local ports=(8080 3000)
+
+    for port in "${ports[@]}"; do
+        log_debug "Checking port $port..."
+
+        # Check if port is in use
+        local pid=$(lsof -ti :$port 2>/dev/null)
+
+        if [[ -n "$pid" ]]; then
+            local process_info=$(ps -p $pid -o comm= 2>/dev/null || echo "unknown")
+            log_warning "Port $port is in use by PID $pid ($process_info)"
+
+            # Kill the process using the port
+            log_info "Killing process $pid to free port $port..."
+            if kill -9 $pid 2>/dev/null; then
+                log_success "Port $port freed (killed PID $pid)"
+                sleep 1  # Wait for port to be fully released
+            else
+                log_warning "Could not kill PID $pid (may require sudo)"
+            fi
+        else
+            log_debug "Port $port is available"
+        fi
+    done
+
+    log_success "Port check complete"
+}
+
 stop_existing_containers() {
     log_step "Stopping existing containers..."
 
@@ -504,6 +541,9 @@ main() {
 
     # Stop existing containers
     stop_existing_containers
+
+    # Free required ports (kill processes using 8080, 3000)
+    free_required_ports
 
     # Start containers
     start_containers
