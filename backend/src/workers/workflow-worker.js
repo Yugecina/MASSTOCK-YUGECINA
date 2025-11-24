@@ -1,8 +1,11 @@
+const pLimitModule = require('p-limit');
+const pLimit = pLimitModule.default || pLimitModule;
 const { workflowQueue } = require('../queues/workflowQueue');
 const { supabaseAdmin } = require('../config/database');
 const { createGeminiImageService } = require('../services/geminiImageService');
 const { decryptApiKey } = require('../utils/encryption');
 const { logger } = require('../config/logger');
+const apiRateLimiter = require('../utils/apiRateLimiter');
 const {
   logWorkflowStart,
   logPromptProcessing,
@@ -40,6 +43,11 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
     referenceImageCount: referenceImagesBase64.length
   });
 
+  // Declare variables that need to be accessible in the for-loop
+  let geminiService;
+  let aspectRatio;
+  let resolution;
+
   // Validate and decrypt API key
   try {
     if (!config.api_key_encrypted) {
@@ -64,11 +72,22 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
       decryptedKeyLength: decryptedApiKey?.length
     });
 
-    var geminiService = createGeminiImageService(decryptedApiKey);
+    geminiService = createGeminiImageService(decryptedApiKey);
 
-    if (config.model) {
-      geminiService.setModel(config.model);
-    }
+    // Set model with fallback
+    const model = config.model || 'gemini-2.5-flash-image';
+    geminiService.setModel(model);
+
+    // Get aspect ratio and resolution with fallbacks
+    aspectRatio = config.aspect_ratio || '1:1';
+    resolution = config.resolution || '1K';
+
+    logger.info('🎨 Nano Banana Config:', {
+      model,
+      aspectRatio,
+      resolution,
+      promptCount: prompts.length
+    });
   } catch (error) {
     logDecryption(false, { error: error.message });
     logError('API_KEY_DECRYPTION', error, {
@@ -79,23 +98,28 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
     throw error;
   }
 
-  let successCount = 0;
-  let failCount = 0;
-  let totalProcessingTime = 0;
+  // Configure concurrency for prompt processing
+  const PROMPT_CONCURRENCY = parseInt(process.env.PROMPT_CONCURRENCY || '5', 10);
+  const limit = pLimit(PROMPT_CONCURRENCY);
 
-  // Process each prompt
-  for (let i = 0; i < totalPrompts; i++) {
-    const prompt = prompts[i];
-    const batchIndex = i;
+  logger.debug(`🔧 Prompt concurrency set to: ${PROMPT_CONCURRENCY} parallel prompts`);
+  logger.debug(`📊 Rate limiter stats: ${JSON.stringify(apiRateLimiter.getStats())}`);
+
+  /**
+   * Process a single prompt with Gemini API
+   * Includes rate limiting, error handling, and database updates
+   */
+  const processSinglePrompt = async (prompt, batchIndex, promptIndex) => {
     const promptStartTime = Date.now();
 
-    logger.debug(`\n🔄 Processing prompt ${i + 1}/${totalPrompts}: "${prompt.substring(0, 60)}${prompt.length > 60 ? '...' : ''}"`);
+    logger.debug(`\n🔄 Processing prompt ${promptIndex + 1}/${totalPrompts}: "${prompt.substring(0, 60)}${prompt.length > 60 ? '...' : ''}"`);
 
-    const progress = Math.floor(((i + 1) / totalPrompts) * 90);
+    // Update job progress (approximate based on started prompts)
+    const progress = Math.floor(((promptIndex + 1) / totalPrompts) * 90);
     job.progress(progress);
 
     // Log prompt processing start
-    logPromptProcessing(i + 1, totalPrompts, prompt, { batchIndex });
+    logPromptProcessing(promptIndex + 1, totalPrompts, prompt, { batchIndex });
 
     try {
       // Insert initial batch result
@@ -114,18 +138,25 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
           status: 'processing'
         });
 
+      // Acquire rate limiter slot before calling API
+      logger.debug(`🚦 Acquiring rate limiter slot... (Queue: ${apiRateLimiter.getStats().queuedRequests})`);
+      await apiRateLimiter.acquire();
+      logger.debug(`✅ Rate limiter slot acquired`);
+
       // Generate image with Gemini
       const startTime = Date.now();
       logger.debug(`⏱️  Calling Gemini API...`);
 
       const result = await geminiService.generateImage(prompt, {
-        referenceImages: referenceImagesBase64
+        referenceImages: referenceImagesBase64,
+        aspectRatio: aspectRatio,
+        imageSize: resolution
       });
 
       const processingTime = Date.now() - startTime;
-      totalProcessingTime += processingTime;
 
       logger.debug(`⏱️  Completed in ${(processingTime / 1000).toFixed(2)}s`);
+      logger.debug(`📊 Rate limiter stats: ${JSON.stringify(apiRateLimiter.getStats())}`);
 
       if (result.success) {
         logger.debug(`✅ Image generated successfully`);
@@ -174,21 +205,21 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
           .eq('execution_id', executionId)
           .eq('batch_index', batchIndex);
 
-        successCount++;
-
         const promptTotalTime = Date.now() - promptStartTime;
-        logSuccess(`Prompt ${i + 1}/${totalPrompts}`, {
+        logSuccess(`Prompt ${promptIndex + 1}/${totalPrompts}`, {
           processingTime: `${(processingTime / 1000).toFixed(2)}s`,
           totalTime: `${(promptTotalTime / 1000).toFixed(2)}s`,
           imageUrl: publicUrl
         });
 
+        return { success: true, processingTime, publicUrl };
+
       } else {
-        logger.debug(`❌ Image generation failed for prompt ${i + 1}`);
+        logger.debug(`❌ Image generation failed for prompt ${promptIndex + 1}`);
 
         logError('IMAGE_GENERATION', result.error, {
           executionId,
-          promptIndex: i + 1,
+          promptIndex: promptIndex + 1,
           totalPrompts,
           prompt,
           processingTime
@@ -206,15 +237,15 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
           .eq('execution_id', executionId)
           .eq('batch_index', batchIndex);
 
-        failCount++;
+        return { success: false, processingTime, error: result.error };
       }
 
     } catch (error) {
-      logger.debug(`❌ Exception during prompt ${i + 1} processing`);
+      logger.debug(`❌ Exception during prompt ${promptIndex + 1} processing`);
 
       logError('PROMPT_PROCESSING', error, {
         executionId,
-        promptIndex: i + 1,
+        promptIndex: promptIndex + 1,
         totalPrompts,
         batchIndex,
         prompt,
@@ -241,9 +272,40 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
         });
       }
 
+      return { success: false, processingTime: 0, error };
+    }
+  };
+
+  // Process all prompts in parallel with concurrency control
+  logger.debug(`\n🚀 Starting parallel processing of ${totalPrompts} prompts with concurrency ${PROMPT_CONCURRENCY}`);
+
+  const promptPromises = prompts.map((prompt, index) =>
+    limit(() => processSinglePrompt(prompt, index, index))
+  );
+
+  const results = await Promise.allSettled(promptPromises);
+
+  // Aggregate results
+  let successCount = 0;
+  let failCount = 0;
+  let totalProcessingTime = 0;
+
+  results.forEach((result, index) => {
+    if (result.status === 'fulfilled') {
+      const value = result.value;
+      if (value.success) {
+        successCount++;
+        totalProcessingTime += value.processingTime;
+      } else {
+        failCount++;
+        totalProcessingTime += value.processingTime;
+      }
+    } else {
+      // Promise was rejected (shouldn't happen as we catch errors in processSinglePrompt)
+      logger.error(`Prompt ${index + 1} promise rejected unexpectedly:`, result.reason);
       failCount++;
     }
-  }
+  });
 
   job.progress(100);
 
@@ -308,8 +370,14 @@ async function processStandardWorkflow(job, executionId, inputData, config) {
 
 /**
  * Main workflow processor - dispatches to specific handlers based on type
+ *
+ * Concurrency: Process multiple workflow executions in parallel
+ * Configured via WORKER_CONCURRENCY env var (default: 3)
  */
-workflowQueue.process(async (job) => {
+const WORKER_CONCURRENCY = parseInt(process.env.WORKER_CONCURRENCY || '3', 10);
+logger.info(`🔧 Worker concurrency set to: ${WORKER_CONCURRENCY} parallel executions`);
+
+workflowQueue.process(WORKER_CONCURRENCY, async (job) => {
   const { executionId, workflowId, clientId, inputData, config } = job.data;
 
   logger.info('Processing workflow execution', {

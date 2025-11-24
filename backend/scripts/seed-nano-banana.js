@@ -1,13 +1,13 @@
 /**
- * Seed Nano Banana Workflow Script
- * Creates the "Batch Nano Banana" workflow for Estee client
+ * Seed Image Factory Workflow Script
+ * Creates the "Image Factory" workflow for Estee client
  */
 
 const { supabaseAdmin } = require('../src/config/database');
 require('dotenv').config();
 
 async function seedNanoBananaWorkflow() {
-  console.log('Starting Nano Banana workflow seeding...\n');
+  console.log('Starting Image Factory workflow seeding...\n');
 
   try {
     // Step 1: Find Estee client
@@ -59,7 +59,7 @@ async function seedNanoBananaWorkflow() {
       .from('workflows')
       .select('id, name, status, client_id')
       .eq('client_id', esteeClient.id)
-      .eq('name', 'Batch Nano Banana');
+      .eq('name', 'Image Factory');
 
     if (workflowCheckError) {
       throw new Error(`Error checking workflows: ${workflowCheckError.message}`);
@@ -100,22 +100,51 @@ async function seedNanoBananaWorkflow() {
     console.log('✓ Workflow does not exist. Proceeding with creation...\n');
 
     // Step 3: Create the workflow
-    console.log('Step 3: Creating Batch Nano Banana workflow...');
+    console.log('Step 3: Creating Image Factory workflow...');
 
     const workflowData = {
       client_id: esteeClient.id,
-      name: 'Batch Nano Banana',
-      description: 'AI image generation using Google Gemini 2.5 Flash Image API. Generate multiple images from text prompts with optional reference images. Supports batch processing up to 100 images per execution.',
+      name: 'Image Factory',
+      description: 'Transformez vos idées en images. Production en masse jusqu\'à 10 000 générations par batch.',
       status: 'deployed',
       config: {
         workflow_type: 'nano_banana',
-        model: 'gemini-2.5-flash-image',
         api_provider: 'google_gemini',
-        max_prompts: 100,
+        available_models: ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'],
+        default_model: 'gemini-2.5-flash-image',
+        max_prompts: 10000,
         max_reference_images: 3,
-        cost_per_image: 0.039,
         supported_formats: ['png', 'jpg', 'webp'],
-        aspect_ratios: ['1:1', '16:9', '9:16', '4:3', '3:4'],
+        aspect_ratios: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
+        default_aspect_ratio: '1:1',
+        available_resolutions: {
+          flash: ['1K'],
+          pro: ['1K', '2K', '4K']
+        },
+        default_resolution: {
+          flash: '1K',
+          pro: '1K'
+        },
+        pricing: {
+          flash: {
+            cost_per_image: 0.039,
+            revenue_per_image: 0.10
+          },
+          pro: {
+            '1K': {
+              cost_per_image: 0.03633,
+              revenue_per_image: 0.10
+            },
+            '2K': {
+              cost_per_image: 0.03633,
+              revenue_per_image: 0.10
+            },
+            '4K': {
+              cost_per_image: 0.06,
+              revenue_per_image: 0.15
+            }
+          }
+        },
         requires_api_key: true,
         api_key_storage: 'encrypted_ephemeral'
       },
@@ -142,7 +171,7 @@ async function seedNanoBananaWorkflow() {
     const { data: verifyWorkflow, error: verifyError } = await supabaseAdmin
       .from('workflows')
       .select('id, name, client_id, status, config, cost_per_execution, revenue_per_execution')
-      .eq('name', 'Batch Nano Banana')
+      .eq('name', 'Image Factory')
       .eq('client_id', esteeClient.id)
       .single();
 
@@ -160,12 +189,12 @@ async function seedNanoBananaWorkflow() {
     console.log(`  - Revenue per Execution: $${verifyWorkflow.revenue_per_execution}\n`);
 
     console.log('═'.repeat(60));
-    console.log('SUCCESS! Batch Nano Banana workflow has been created.');
+    console.log('SUCCESS! Image Factory workflow has been created.');
     console.log('═'.repeat(60));
     console.log('\nNext steps:');
     console.log('1. Log in as Estee user: contact@estee-agency.com');
     console.log('2. Navigate to Workflows page');
-    console.log('3. Verify "Batch Nano Banana" appears in the list');
+    console.log('3. Verify "Image Factory" appears in the list');
     console.log('4. Admin should also see it in Admin > Workflows\n');
 
   } catch (error) {

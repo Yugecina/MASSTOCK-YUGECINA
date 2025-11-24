@@ -44,24 +44,23 @@ async function getWorkflows(req, res) {
   // Use a fresh admin client to avoid auth context issues
   const admin = getCleanAdmin();
 
-  const { data: workflows, error } = await admin
-    .from('workflows')
-    .select('*')
-    .eq('client_id', clientId)
-    .order('created_at', { ascending: false });
+  // Fetch workflows with execution count using raw SQL
+  const { data: workflows, error } = await admin.rpc('get_workflows_with_execution_count', {
+    p_client_id: clientId
+  });
 
   if (error) {
     logger.error('❌ Workflows query error:', error);
     throw new ApiError(500, `Failed to fetch workflows: ${error.message}`, 'DATABASE_ERROR');
   }
 
-  logger.debug(`✅ Found ${workflows.length} workflows for client ${clientId}`);
+  logger.debug(`✅ Found ${workflows?.length || 0} workflows for client ${clientId}`);
 
   res.json({
     success: true,
     data: {
-      workflows,
-      total: workflows.length
+      workflows: workflows || [],
+      total: workflows?.length || 0
     }
   });
 }
@@ -154,10 +153,24 @@ async function executeWorkflow(req, res) {
     const api_key = req.body.api_key || process.env.DEFAULT_GEMINI_API_KEY;
     const files = req.files || [];
 
+    // NEW: Get model, aspect_ratio, and resolution with defaults
+    const model = req.body.model || workflow.config.default_model || 'gemini-2.5-flash-image';
+    const aspect_ratio = req.body.aspect_ratio || workflow.config.default_aspect_ratio || '1:1';
+
+    // Determine resolution default based on model type
+    const isProModel = model === 'gemini-3-pro-image-preview';
+    const defaultResolution = isProModel
+      ? (workflow.config.default_resolution?.pro || '1K')
+      : (workflow.config.default_resolution?.flash || '1K');
+    const resolution = req.body.resolution || defaultResolution;
+
     logger.debug('📥 Received workflow execution request:', {
       hasPromptsText: !!req.body.prompts_text,
       hasApiKey: !!req.body.api_key,
       filesCount: files.length,
+      model,
+      aspectRatio: aspect_ratio,
+      resolution,
       usingDefaultPrompt: !req.body.prompts_text && !!process.env.DEFAULT_NANO_BANANA_PROMPT,
       usingDefaultApiKey: !req.body.api_key && !!process.env.DEFAULT_GEMINI_API_KEY
     });
@@ -169,6 +182,26 @@ async function executeWorkflow(req, res) {
 
     if (!api_key) {
       throw new ApiError(400, 'api_key is required and no default is configured', 'MISSING_API_KEY');
+    }
+
+    // NEW: Validate model
+    const validModels = workflow.config.available_models || ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
+    if (!validModels.includes(model)) {
+      throw new ApiError(400, `Invalid model. Must be one of: ${validModels.join(', ')}`, 'INVALID_MODEL');
+    }
+
+    // NEW: Validate aspect ratio
+    const validRatios = workflow.config.aspect_ratios || ['1:1', '16:9', '9:16', '4:3', '3:4'];
+    if (!validRatios.includes(aspect_ratio)) {
+      throw new ApiError(400, `Invalid aspect ratio. Must be one of: ${validRatios.join(', ')}`, 'INVALID_ASPECT_RATIO');
+    }
+
+    // NEW: Validate resolution for Pro model
+    if (isProModel) {
+      const validResolutions = workflow.config.available_resolutions?.pro || ['1K', '2K', '4K'];
+      if (!validResolutions.includes(resolution)) {
+        throw new ApiError(400, `Invalid resolution for Pro model. Must be one of: ${validResolutions.join(', ')}`, 'INVALID_RESOLUTION');
+      }
     }
 
     // Parse and validate prompts
@@ -188,13 +221,47 @@ async function executeWorkflow(req, res) {
       throw new ApiError(400, `Maximum ${workflow.config.max_reference_images || 3} reference images allowed`, 'TOO_MANY_FILES');
     }
 
+    // NEW: Calculate dynamic pricing based on model and resolution
+    const calculateDynamicPricing = (model, resolution, imageCount, pricingConfig) => {
+      let costPerImage, revenuePerImage;
+
+      if (model === 'gemini-2.5-flash-image') {
+        costPerImage = pricingConfig.flash.cost_per_image;
+        revenuePerImage = pricingConfig.flash.revenue_per_image;
+      } else {
+        // gemini-3-pro-image-preview
+        costPerImage = pricingConfig.pro[resolution].cost_per_image;
+        revenuePerImage = pricingConfig.pro[resolution].revenue_per_image;
+      }
+
+      const totalCost = costPerImage * imageCount;
+      const totalRevenue = revenuePerImage * imageCount;
+      const profit = totalRevenue - totalCost;
+
+      return {
+        cost_per_image_eur: costPerImage,
+        total_cost_eur: totalCost,
+        total_revenue_eur: totalRevenue,
+        profit_eur: profit,
+        image_count: imageCount
+      };
+    };
+
+    const pricing = calculateDynamicPricing(model, resolution, prompts.length, workflow.config.pricing);
+
+    logger.info('💰 Dynamic pricing calculated:', pricing);
+
     // Encrypt API key
     const encryptedApiKey = encryptApiKey(api_key);
 
-    // Update workflow config with encrypted API key (ephemeral for this execution)
+    // Update workflow config with encrypted API key and new params (ephemeral for this execution)
     updatedConfig = {
       ...workflow.config,
-      api_key_encrypted: encryptedApiKey
+      api_key_encrypted: encryptedApiKey,
+      model: model,
+      aspect_ratio: aspect_ratio,
+      resolution: resolution,
+      pricing_details: pricing
     };
 
     // Update workflow with encrypted key
@@ -207,7 +274,11 @@ async function executeWorkflow(req, res) {
     input_data = {
       prompts,
       reference_images: referenceImages,
-      total_prompts: prompts.length
+      total_prompts: prompts.length,
+      model: model,
+      aspect_ratio: aspect_ratio,
+      resolution: resolution,
+      pricing_details: pricing
     };
   } else {
     // Standard workflow: JSON input

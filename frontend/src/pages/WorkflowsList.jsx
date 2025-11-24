@@ -86,48 +86,46 @@ export function WorkflowsList() {
           gap: '16px',
           alignItems: 'center',
           justifyContent: 'space-between',
-          marginBottom: '32px',
-          flexWrap: 'wrap'
+          marginBottom: '32px'
         }}>
           {/* Search */}
-          <div style={{ flex: 1, minWidth: '300px', maxWidth: '400px' }}>
-            <div style={{ position: 'relative' }}>
-              <svg
-                style={{
-                  position: 'absolute',
-                  left: '16px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  width: '20px',
-                  height: '20px',
-                  color: 'var(--neutral-400)',
-                  pointerEvents: 'none'
-                }}
-                fill="none"
-                strokeWidth={2}
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
-                />
-              </svg>
-              <input
-                type="text"
-                placeholder="Search workflows..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="input-field"
-                style={{
-                  width: '100%',
-                  paddingLeft: '48px',
-                  paddingRight: '16px',
-                  fontSize: '14px'
-                }}
+          <div style={{ flex: '0 1 400px', position: 'relative' }}>
+            <svg
+              style={{
+                position: 'absolute',
+                left: '16px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                width: '20px',
+                height: '20px',
+                color: 'var(--neutral-400)',
+                pointerEvents: 'none',
+                zIndex: 1
+              }}
+              fill="none"
+              strokeWidth={2}
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"
               />
-            </div>
+            </svg>
+            <input
+              type="text"
+              placeholder="Search workflows..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="input-field"
+              style={{
+                width: '100%',
+                paddingLeft: '48px',
+                paddingRight: '16px',
+                fontSize: '14px'
+              }}
+            />
           </div>
 
           {/* Sort */}
@@ -140,7 +138,9 @@ export function WorkflowsList() {
               fontSize: '14px',
               fontWeight: 500,
               color: 'var(--text-primary)',
-              cursor: 'pointer'
+              cursor: 'pointer',
+              width: '200px',
+              flexShrink: 0
             }}
           >
             <option value="popular">Most Popular</option>
@@ -225,7 +225,7 @@ export function WorkflowsList() {
                       background: getWorkflowGradient(index)
                     }}
                   >
-                    {getWorkflowIcon(index)}
+                    {getWorkflowIcon(workflow.name, index)}
                   </div>
                   <span
                     className="badge"
@@ -234,15 +234,15 @@ export function WorkflowsList() {
                       fontSize: '12px',
                       fontWeight: 500,
                       borderRadius: '6px',
-                      background: workflow.status === 'active'
+                      background: workflow.status === 'deployed'
                         ? 'var(--success-light)'
                         : 'var(--neutral-100)',
-                      color: workflow.status === 'active'
+                      color: workflow.status === 'deployed'
                         ? 'var(--success-dark)'
                         : 'var(--neutral-600)'
                     }}
                   >
-                    {workflow.status === 'active' ? 'Active' : 'Inactive'}
+                    {workflow.status === 'deployed' ? 'Active' : 'Inactive'}
                   </span>
                 </div>
 
@@ -318,7 +318,29 @@ export function WorkflowsList() {
   )
 }
 
-function getWorkflowIcon(index) {
+function getWorkflowIcon(workflowName, index) {
+  // Custom SVG icon for Image Factory - Apple style minimalist
+  if (workflowName === 'Image Factory') {
+    return (
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="white"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {/* Mountain/landscape icon */}
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <path d="M21 15l-5-5L5 21" />
+      </svg>
+    )
+  }
+
+  // Fallback to emoji icons for other workflows
   const icons = ['📊', '📈', '📉', '💼', '📋', '⚡', '🚀', '💰', '📄', '🔧']
   return icons[index % icons.length]
 }

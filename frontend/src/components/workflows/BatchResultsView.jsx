@@ -8,13 +8,14 @@ import logger from '@/utils/logger';
  * BatchResultsView Component
  * Displays batch results for workflows with batch processing (e.g., nano_banana)
  *
- * UX Improvements (Iteration 2):
- * - Results filtering (All/Success/Failed)
- * - Results sorting (By Index/Time/Status)
- * - Batch download actions
- * - Individual download buttons
- * - Copy URL functionality
- * - Mobile responsive stats grid
+ * UX Improvements (Iteration 3):
+ * - Success banner
+ * - Compact inline stats cards
+ * - Styled filter buttons
+ * - Grid size control (1-5 columns)
+ * - Responsive image grid (2 columns default)
+ * - Fixed image buttons layout
+ * - Fixed status badge display
  */
 export function BatchResultsView({ executionId }) {
   const [data, setData] = useState(null);
@@ -22,6 +23,7 @@ export function BatchResultsView({ executionId }) {
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('all'); // all, success, failed
   const [sortBy, setSortBy] = useState('index'); // index, time, status
+  const [gridColumns, setGridColumns] = useState(2); // 1-5 columns
   const [copyFeedback, setCopyFeedback] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -300,117 +302,477 @@ export function BatchResultsView({ executionId }) {
   const failedCount = results.filter(r => r.status === 'failed').length;
 
   return (
-    <div className="space-y-lg">
-      {/* Stats Summary - Mobile Responsive */}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      {/* Production Statistics Panel */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-md">
-          <div className="bg-white border border-neutral-200 rounded-lg p-4">
-            <div className="text-sm text-neutral-500 mb-1">Total</div>
-            <div className="text-h2 font-bold text-neutral-900">{stats.total_prompts || 0}</div>
+        <div style={{
+          background: 'white',
+          borderRadius: '12px',
+          border: '2px solid var(--neutral-200)',
+          padding: '24px',
+          position: 'relative'
+        }}>
+          {/* Corner Accent */}
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: '80px',
+            height: '80px',
+            background: 'linear-gradient(135deg, transparent 50%, var(--primary-50) 50%)',
+            pointerEvents: 'none'
+          }} />
+
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '20px',
+            flexWrap: 'wrap',
+            gap: '12px',
+            position: 'relative',
+            zIndex: 1
+          }}>
+            <h3 style={{
+              fontSize: '16px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              letterSpacing: '0.05em',
+              textTransform: 'uppercase'
+            }}>
+              Production Batch Statistics
+            </h3>
+            <div style={{
+              padding: '4px 12px',
+              background: 'var(--primary-50)',
+              border: '1px solid var(--primary-200)',
+              borderRadius: '4px',
+              fontSize: '11px',
+              fontWeight: 600,
+              color: 'var(--primary-700)',
+              letterSpacing: '0.05em',
+              whiteSpace: 'nowrap'
+            }}>
+              BATCH #{executionId.slice(0, 8).toUpperCase()}
+            </div>
           </div>
-          <div className="bg-white border border-neutral-200 rounded-lg p-4">
-            <div className="text-sm text-neutral-500 mb-1">Successful</div>
-            <div className="text-h2 font-bold text-success-dark">{stats.successful || 0}</div>
-          </div>
-          <div className="bg-white border border-neutral-200 rounded-lg p-4">
-            <div className="text-sm text-neutral-500 mb-1">Failed</div>
-            <div className="text-h2 font-bold text-error-dark">{stats.failed || 0}</div>
-          </div>
-          <div className="bg-white border border-neutral-200 rounded-lg p-4">
-            <div className="text-sm text-neutral-500 mb-1">Total Cost</div>
-            <div className="text-h2 font-bold text-primary-main">${stats.total_cost || '0.00'}</div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: '16px'
+          }}>
+            {/* Total Output */}
+            <div style={{
+              padding: '16px',
+              background: 'var(--neutral-50)',
+              borderLeft: '4px solid var(--neutral-400)',
+              borderRadius: '4px'
+            }}>
+              <div style={{
+                fontSize: '10px',
+                color: 'var(--neutral-600)',
+                fontWeight: 600,
+                marginBottom: '8px',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase'
+              }}>
+                Total Output
+              </div>
+              <div style={{
+                fontSize: '28px',
+                fontWeight: 700,
+                color: 'var(--text-primary)',
+                fontFamily: 'var(--font-mono)',
+                lineHeight: 1
+              }}>
+                {stats.total_prompts || 0}
+              </div>
+              <div style={{
+                fontSize: '11px',
+                color: 'var(--neutral-600)',
+                marginTop: '4px'
+              }}>
+                units produced
+              </div>
+            </div>
+
+            {/* Quality Approved */}
+            <div style={{
+              padding: '16px',
+              background: 'var(--success-bg)',
+              borderLeft: '4px solid var(--success-main)',
+              borderRadius: '4px'
+            }}>
+              <div style={{
+                fontSize: '10px',
+                color: 'var(--success-dark)',
+                fontWeight: 600,
+                marginBottom: '8px',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase'
+              }}>
+                Quality Approved
+              </div>
+              <div style={{
+                fontSize: '28px',
+                fontWeight: 700,
+                color: 'var(--success-main)',
+                fontFamily: 'var(--font-mono)',
+                lineHeight: 1
+              }}>
+                {stats.successful || 0}
+              </div>
+              <div style={{
+                fontSize: '11px',
+                color: 'var(--success-dark)',
+                marginTop: '4px'
+              }}>
+                ✓ passed inspection
+              </div>
+            </div>
+
+            {/* Defects */}
+            {stats.failed > 0 && (
+              <div style={{
+                padding: '16px',
+                background: 'var(--error-bg)',
+                borderLeft: '4px solid var(--error-main)',
+                borderRadius: '4px'
+              }}>
+                <div style={{
+                  fontSize: '10px',
+                  color: 'var(--error-dark)',
+                  fontWeight: 600,
+                  marginBottom: '8px',
+                  letterSpacing: '0.1em',
+                  textTransform: 'uppercase'
+                }}>
+                  Defects
+                </div>
+                <div style={{
+                  fontSize: '28px',
+                  fontWeight: 700,
+                  color: 'var(--error-main)',
+                  fontFamily: 'var(--font-mono)',
+                  lineHeight: 1
+                }}>
+                  {stats.failed || 0}
+                </div>
+                <div style={{
+                  fontSize: '11px',
+                  color: 'var(--error-dark)',
+                  marginTop: '4px'
+                }}>
+                  ✗ rejected
+                </div>
+              </div>
+            )}
+
+            {/* Production Cost */}
+            <div style={{
+              padding: '16px',
+              background: 'var(--secondary-50)',
+              borderLeft: '4px solid var(--secondary-500)',
+              borderRadius: '4px'
+            }}>
+              <div style={{
+                fontSize: '10px',
+                color: 'var(--secondary-700)',
+                fontWeight: 600,
+                marginBottom: '8px',
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase'
+              }}>
+                Production Cost
+              </div>
+              <div style={{
+                fontSize: '28px',
+                fontWeight: 700,
+                color: 'var(--secondary-600)',
+                fontFamily: 'var(--font-mono)',
+                lineHeight: 1
+              }}>
+                ${stats.total_cost || '0.00'}
+              </div>
+              <div style={{
+                fontSize: '11px',
+                color: 'var(--secondary-700)',
+                marginTop: '4px'
+              }}>
+                total batch cost
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Filters and Actions Bar */}
-      <div className="bg-white border border-neutral-200 rounded-lg p-4">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          {/* Filter Buttons */}
-          <div className="flex gap-2 flex-wrap">
-            <button
-              onClick={() => setFilter('all')}
-              className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                filter === 'all'
-                  ? 'bg-primary-main text-white'
-                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-              }`}
-            >
-              All ({results.length})
-            </button>
-            <button
-              onClick={() => setFilter('success')}
-              className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                filter === 'success'
-                  ? 'bg-success-main text-white'
-                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-              }`}
-            >
-              Success ({successCount})
-            </button>
-            <button
-              onClick={() => setFilter('failed')}
-              className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                filter === 'failed'
-                  ? 'bg-error-main text-white'
-                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-              }`}
-            >
-              Failed ({failedCount})
-            </button>
+      {/* Control Panel - Mediterranean Light */}
+      <div style={{
+        background: 'white',
+        borderRadius: '12px',
+        padding: '20px 24px',
+        border: '2px solid var(--neutral-200)',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+      }}>
+        <div style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '16px'
+        }}>
+          {/* Filter Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            <span style={{
+              fontSize: '11px',
+              color: 'var(--text-tertiary)',
+              fontWeight: 600,
+              letterSpacing: '0.1em',
+              textTransform: 'uppercase'
+            }}>
+              FILTER:
+            </span>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setFilter('all')}
+                style={{
+                  padding: '8px 16px',
+                  background: filter === 'all' ? 'var(--primary-500)' : 'white',
+                  border: `2px solid ${filter === 'all' ? 'var(--primary-500)' : 'var(--neutral-300)'}`,
+                  borderRadius: '6px',
+                  color: filter === 'all' ? 'white' : 'var(--text-secondary)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  fontFamily: 'var(--font-mono)'
+                }}
+                onMouseEnter={(e) => {
+                  if (filter !== 'all') {
+                    e.currentTarget.style.borderColor = 'var(--primary-500)';
+                    e.currentTarget.style.color = 'var(--primary-500)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (filter !== 'all') {
+                    e.currentTarget.style.borderColor = 'var(--neutral-300)';
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                  }
+                }}
+              >
+                ALL ({results.length})
+              </button>
+              <button
+                onClick={() => setFilter('success')}
+                style={{
+                  padding: '8px 16px',
+                  background: filter === 'success' ? 'var(--success-main)' : 'white',
+                  border: `2px solid ${filter === 'success' ? 'var(--success-main)' : 'var(--neutral-300)'}`,
+                  borderRadius: '6px',
+                  color: filter === 'success' ? 'white' : 'var(--text-secondary)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  fontFamily: 'var(--font-mono)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onMouseEnter={(e) => {
+                  if (filter !== 'success') {
+                    e.currentTarget.style.borderColor = 'var(--success-main)';
+                    e.currentTarget.style.color = 'var(--success-main)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (filter !== 'success') {
+                    e.currentTarget.style.borderColor = 'var(--neutral-300)';
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                  }
+                }}
+              >
+                <span>✓</span> {successCount}
+              </button>
+              <button
+                onClick={() => setFilter('failed')}
+                style={{
+                  padding: '8px 16px',
+                  background: filter === 'failed' ? 'var(--error-main)' : 'white',
+                  border: `2px solid ${filter === 'failed' ? 'var(--error-main)' : 'var(--neutral-300)'}`,
+                  borderRadius: '6px',
+                  color: filter === 'failed' ? 'white' : 'var(--text-secondary)',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  fontFamily: 'var(--font-mono)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+                onMouseEnter={(e) => {
+                  if (filter !== 'failed') {
+                    e.currentTarget.style.borderColor = 'var(--error-main)';
+                    e.currentTarget.style.color = 'var(--error-main)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (filter !== 'failed') {
+                    e.currentTarget.style.borderColor = 'var(--neutral-300)';
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                  }
+                }}
+              >
+                <span>✗</span> {failedCount}
+              </button>
+            </div>
           </div>
 
-          {/* Sort Dropdown and Actions */}
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* View Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+            {/* Grid Size */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{
+                fontSize: '11px',
+                color: 'var(--text-tertiary)',
+                fontWeight: 600,
+                letterSpacing: '0.05em'
+              }}>
+                GRID:
+              </span>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                {[1, 2, 3, 4, 5].map(cols => (
+                  <button
+                    key={cols}
+                    onClick={() => setGridColumns(cols)}
+                    style={{
+                      width: '36px',
+                      height: '36px',
+                      background: gridColumns === cols ? 'var(--primary-500)' : 'white',
+                      border: `2px solid ${gridColumns === cols ? 'var(--primary-500)' : 'var(--neutral-300)'}`,
+                      borderRadius: '6px',
+                      color: gridColumns === cols ? 'white' : 'var(--text-secondary)',
+                      fontSize: '13px',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.2s ease',
+                      fontFamily: 'var(--font-mono)'
+                    }}
+                    title={`${cols} column${cols !== 1 ? 's' : ''}`}
+                    onMouseEnter={(e) => {
+                      if (gridColumns !== cols) {
+                        e.currentTarget.style.borderColor = 'var(--primary-500)';
+                        e.currentTarget.style.color = 'var(--primary-500)';
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (gridColumns !== cols) {
+                        e.currentTarget.style.borderColor = 'var(--neutral-300)';
+                        e.currentTarget.style.color = 'var(--text-secondary)';
+                      }
+                    }}
+                  >
+                    {cols}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sort */}
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
-              className="px-3 py-1 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-main"
+              style={{
+                padding: '8px 12px',
+                background: 'white',
+                border: '2px solid var(--neutral-300)',
+                borderRadius: '6px',
+                color: 'var(--text-primary)',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                fontFamily: 'var(--font-mono)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--primary-500)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--neutral-300)';
+              }}
             >
-              <option value="index">Sort by Index</option>
-              <option value="time">Sort by Time</option>
-              <option value="status">Sort by Status</option>
+              <option value="index">INDEX</option>
+              <option value="time">TIME</option>
+              <option value="status">STATUS</option>
             </select>
 
+            {/* Download All */}
             <button
               onClick={handleDownloadAll}
               disabled={successCount === 0 || isDownloading}
-              className="px-3 py-1 text-sm bg-primary-main text-white rounded-lg hover:bg-primary-hover disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-              title="Download all successful images as ZIP"
+              style={{
+                padding: '10px 20px',
+                background: successCount === 0 || isDownloading ? 'var(--neutral-300)' : 'var(--primary-500)',
+                border: 'none',
+                borderRadius: '6px',
+                color: 'white',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: successCount === 0 || isDownloading ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s ease',
+                letterSpacing: '0.05em',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: successCount === 0 || isDownloading ? 'none' : '0 2px 8px rgba(42, 157, 143, 0.2)'
+              }}
+              onMouseEnter={(e) => {
+                if (successCount > 0 && !isDownloading) {
+                  e.currentTarget.style.background = 'var(--primary-600)';
+                  e.currentTarget.style.transform = 'translateY(-1px)';
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(42, 157, 143, 0.3)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (successCount > 0 && !isDownloading) {
+                  e.currentTarget.style.background = 'var(--primary-500)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(42, 157, 143, 0.2)';
+                }
+              }}
             >
-              {isDownloading ? (
-                <>
-                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Creating ZIP...
-                </>
-              ) : (
-                'Download All'
-              )}
+              <svg style={{ width: '16px', height: '16px' }} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+              </svg>
+              {isDownloading ? 'CREATING ZIP...' : 'DOWNLOAD ALL'}
             </button>
-
-            {failedCount > 0 && (
-              <button
-                onClick={handleRegenerateFailures}
-                className="px-3 py-1 text-sm bg-warning-main text-white rounded-lg hover:bg-warning-dark transition-colors"
-                title="Regenerate only failed images"
-              >
-                Regenerate Failures
-              </button>
-            )}
           </div>
         </div>
 
-        {/* Results Count */}
-        <div className="mt-2 text-xs text-neutral-500">
-          Showing {sortedResults.length} of {results.length} results
+        {/* Results Counter */}
+        <div style={{
+          marginTop: '16px',
+          paddingTop: '16px',
+          borderTop: '1px solid var(--neutral-200)',
+          fontSize: '11px',
+          color: 'var(--text-tertiary)',
+          fontFamily: 'var(--font-mono)',
+          letterSpacing: '0.05em'
+        }}>
+          SHOWING {sortedResults.length} OF {results.length} UNITS
         </div>
       </div>
 
-      {/* Results Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md">
+      {/* Production Output Grid */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: `repeat(${gridColumns}, minmax(0, 1fr))`,
+          gap: '20px'
+        }}
+      >
         {sortedResults.map((result, index) => {
           logger.debug(`🖼️ BatchResultsView: Rendering result ${index}:`, {
             id: result.id,
@@ -423,123 +785,294 @@ export function BatchResultsView({ executionId }) {
           return (
             <div
               key={result.id || index}
-              className="bg-white border border-neutral-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow"
+              style={{
+                background: 'white',
+                border: '2px solid var(--neutral-200)',
+                borderRadius: '8px',
+                overflow: 'hidden',
+                position: 'relative',
+                transition: 'all 0.2s ease',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 8px 16px rgba(0,0,0,0.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+              }}
             >
-              {/* Image */}
+              {/* Unit Number Badge */}
+              <div style={{
+                position: 'absolute',
+                top: '12px',
+                left: '12px',
+                background: 'var(--neutral-900)',
+                color: 'white',
+                padding: '4px 12px',
+                borderRadius: '4px',
+                fontSize: '11px',
+                fontWeight: 700,
+                fontFamily: 'var(--font-mono)',
+                letterSpacing: '0.05em',
+                zIndex: 10,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+              }}>
+                #{result.batch_index}
+              </div>
+
+              {/* Status Badge */}
+              <div style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                background: result.status === 'completed' ? 'var(--success-main)' : result.status === 'failed' ? 'var(--error-main)' : 'var(--warning-main)',
+                color: 'white',
+                padding: '4px 10px',
+                borderRadius: '4px',
+                fontSize: '10px',
+                fontWeight: 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                zIndex: 10,
+                boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+              }}>
+                {result.status === 'completed' ? 'completed' : result.status === 'failed' ? 'failed' : 'processing'}
+              </div>
+
+              {/* Image Container */}
               {result.status === 'completed' && result.result_url ? (
-                <div className="relative">
+                <div style={{
+                  position: 'relative',
+                  aspectRatio: '1',
+                  background: 'var(--neutral-100)'
+                }}>
                   <img
                     src={result.result_url}
-                    alt={`Result ${result.batch_index}`}
-                    className="w-full h-48 object-cover"
+                    alt={`Unit ${result.batch_index}`}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      display: 'block'
+                    }}
                     onLoad={() => logger.debug(`✅ Image loaded: ${result.result_url}`)}
                     onError={(e) => logger.error(`❌ Image failed to load: ${result.result_url}`, e)}
                   />
-                  {/* Quick Actions Overlay */}
-                  <div className="absolute top-2 right-2 flex gap-1">
-                    <button
-                      onClick={() => handleCopyUrl(result.result_url, result.batch_index)}
-                      className="bg-white/90 hover:bg-white p-2 rounded-lg shadow-md transition-colors"
-                      title="Copy image URL"
-                    >
-                      {copyFeedback === result.batch_index ? (
-                        <svg className="w-4 h-4 text-success-main" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                        </svg>
-                      ) : (
-                        <svg className="w-4 h-4 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
+
+                  {/* Copy URL Overlay */}
+                  <button
+                    onClick={() => handleCopyUrl(result.result_url, result.batch_index)}
+                    style={{
+                      position: 'absolute',
+                      bottom: '12px',
+                      right: '12px',
+                      width: '36px',
+                      height: '36px',
+                      background: copyFeedback === result.batch_index ? 'var(--success-main)' : 'rgba(0, 0, 0, 0.7)',
+                      backdropFilter: 'blur(8px)',
+                      border: 'none',
+                      borderRadius: '6px',
+                      color: 'white',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      transition: 'all 0.2s ease',
+                      zIndex: 5
+                    }}
+                    title="Copy URL"
+                  >
+                    {copyFeedback === result.batch_index ? (
+                      <svg style={{ width: '18px', height: '18px' }} fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    ) : (
+                      <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
                 </div>
               ) : (
-                <div className="w-full h-48 bg-neutral-100 flex items-center justify-center">
+                <div style={{
+                  aspectRatio: '1',
+                  background: 'var(--neutral-100)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}>
                   {result.status === 'failed' ? (
-                    <div className="text-center">
-                      <svg className="w-12 h-12 text-error-main mx-auto mb-2" fill="currentColor" viewBox="0 0 20 20">
+                    <div style={{ textAlign: 'center', padding: '20px' }}>
+                      <svg style={{ width: '48px', height: '48px', color: 'var(--error-main)', marginBottom: '12px' }} fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                       </svg>
-                      <span className="text-error-main text-sm">Failed</span>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: 'var(--error-dark)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Production Failed
+                      </div>
                     </div>
                   ) : result.status === 'processing' ? (
-                    <div className="text-center">
-                      <div className="spinner mb-2"></div>
-                      <span className="text-neutral-500 text-sm">Processing...</span>
+                    <div style={{ textAlign: 'center' }}>
+                      <div className="spinner" style={{ marginBottom: '12px' }}></div>
+                      <div style={{
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        color: 'var(--neutral-600)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.05em'
+                      }}>
+                        Processing...
+                      </div>
                     </div>
                   ) : (
-                    <span className="text-neutral-400">Pending</span>
+                    <div style={{
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      color: 'var(--neutral-400)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.05em'
+                    }}>
+                      Pending
+                    </div>
                   )}
                 </div>
               )}
 
-              {/* Details */}
-              <div className="p-4">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-neutral-500">
-                    #{result.batch_index}
-                  </span>
-                  <span
-                    className={`px-2 py-1 text-xs font-medium rounded ${
-                      result.status === 'completed'
-                        ? 'bg-success-light text-success-dark'
-                        : result.status === 'failed'
-                        ? 'bg-error-light text-error-dark'
-                        : result.status === 'processing'
-                        ? 'bg-warning-light text-warning-dark'
-                        : 'bg-neutral-100 text-neutral-600'
-                    }`}
-                  >
-                    {result.status}
-                  </span>
+              {/* Details Panel */}
+              <div style={{
+                padding: '16px',
+                background: 'var(--neutral-50)',
+                borderTop: '1px solid var(--neutral-200)'
+              }}>
+                {/* Prompt Text */}
+                <div style={{
+                  fontSize: '12px',
+                  color: 'var(--text-secondary)',
+                  lineHeight: 1.5,
+                  marginBottom: '12px',
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  minHeight: '36px'
+                }}>
+                  {result.prompt_text}
                 </div>
 
-                {/* Prompt */}
-                <p className="text-xs text-neutral-600 line-clamp-2 mb-2">
-                  {result.prompt_text}
-                </p>
-
-                {/* Error Message */}
-                {result.error_message && (
-                  <div className="text-xs text-error-main mt-2 bg-error-light p-2 rounded">
-                    <p className="font-semibold mb-1">Error:</p>
-                    <p>{result.error_message}</p>
+                {/* Technical Specs */}
+                {result.processing_time_ms && result.status === 'completed' && (
+                  <div style={{
+                    fontSize: '10px',
+                    color: 'var(--neutral-500)',
+                    fontFamily: 'var(--font-mono)',
+                    marginBottom: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}>
+                    <svg style={{ width: '12px', height: '12px' }} fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                    </svg>
+                    CYCLE TIME: {(result.processing_time_ms / 1000).toFixed(2)}s
                   </div>
                 )}
 
-                {/* Processing Time */}
-                {result.processing_time_ms && (
-                  <p className="text-xs text-neutral-400 mt-2">
-                    Processing time: {(result.processing_time_ms / 1000).toFixed(2)}s
-                  </p>
+                {/* Error Details */}
+                {result.error_message && (
+                  <div style={{
+                    padding: '10px',
+                    background: 'var(--error-light)',
+                    border: '1px solid var(--error-main)',
+                    borderRadius: '4px',
+                    marginBottom: '12px'
+                  }}>
+                    <div style={{
+                      fontSize: '10px',
+                      fontWeight: 600,
+                      color: 'var(--error-dark)',
+                      marginBottom: '4px',
+                      letterSpacing: '0.05em',
+                      textTransform: 'uppercase'
+                    }}>
+                      Error Log:
+                    </div>
+                    <div style={{
+                      fontSize: '11px',
+                      color: 'var(--error-dark)',
+                      lineHeight: 1.4
+                    }}>
+                      {result.error_message}
+                    </div>
+                  </div>
                 )}
 
-                {/* Action Buttons */}
-                <div className="flex gap-2 mt-3">
-                  {result.result_url && (
-                    <>
-                      <a
-                        href={result.result_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex-1 btn btn-sm btn-primary text-center"
-                      >
-                        View Full Size
-                      </a>
-                      <button
-                        onClick={() => handleDownload(result.result_url, `image_${result.batch_index}.png`)}
-                        className="btn btn-sm btn-secondary"
-                        title="Download image"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                      </button>
-                    </>
-                  )}
-                </div>
+                {/* Action Controls */}
+                {result.result_url && (
+                  <div style={{
+                    display: 'flex',
+                    gap: '8px'
+                  }}>
+                    <a
+                      href={result.result_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        flex: 1,
+                        padding: '10px 16px',
+                        background: 'var(--primary-500)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        fontSize: '12px',
+                        fontWeight: 600,
+                        textAlign: 'center',
+                        textDecoration: 'none',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                        letterSpacing: '0.02em',
+                        display: 'block'
+                      }}
+                    >
+                      View Full Size
+                    </a>
+                    <button
+                      onClick={() => handleDownload(result.result_url, `image_${result.batch_index}.png`)}
+                      style={{
+                        width: '40px',
+                        height: '40px',
+                        background: 'white',
+                        border: '2px solid var(--neutral-300)',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        transition: 'all 0.2s ease',
+                        color: 'var(--text-secondary)'
+                      }}
+                      title="Download"
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--primary-500)';
+                        e.currentTarget.style.color = 'var(--primary-500)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--neutral-300)';
+                        e.currentTarget.style.color = 'var(--text-secondary)';
+                      }}
+                    >
+                      <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           );

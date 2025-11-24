@@ -1,8 +1,8 @@
 # MasStock - Project Architecture
 
-**Last Updated:** 2025-11-23
+**Last Updated:** 2025-11-24
 **Status:** Production-Ready
-**Version:** 1.0.0
+**Version:** 2.0.0 (Async Workers)
 
 ## 📋 Table of Contents
 
@@ -268,12 +268,19 @@ Define API endpoints (all prefixed with `/api/v1/`):
 
 - `geminiImageService.js` - Google Gemini API integration for image generation
 
-#### 5. **Queues & Workers** (`backend/src/queues/`, `backend/src/workers/`)
+#### 5. **Queues & Workers** (`backend/src/queues/`, `backend/src/workers/`) ⭐ v2.0 Async
 
-- `workflowQueue.js` - Bull queue for background jobs
-- `workflow-worker.js` - Processes workflow executions
-  - `processNanoBananaWorkflow()` - Batch image generation
+**Async Parallel Processing Architecture:**
+
+- `workflowQueue.js` - Bull queue for background jobs (Redis-backed)
+- `workflow-worker.js` - **Async worker pool** (v2.0)
+  - **Worker concurrency:** 3 parallel executions (configurable via `WORKER_CONCURRENCY`)
+  - **Prompt concurrency:** 5 parallel prompts per execution (via `PROMPT_CONCURRENCY`)
+  - `processNanoBananaWorkflow()` - Batch image generation with parallel processing
   - `processStandardWorkflow()` - Placeholder for future workflows
+  - **Performance:** 15x faster than sequential processing (v1.x)
+
+**See:** [Async Workers Documentation](./async_workers.md) for complete details
 
 #### 6. **Configuration** (`backend/src/config/`)
 
@@ -286,6 +293,11 @@ Define API endpoints (all prefixed with `/api/v1/`):
 - `encryption.js` - Encrypt/decrypt API keys (AES-256-CBC)
 - `workflowLogger.js` - Structured workflow logging
 - `promptParser.js` - Parse workflow prompts
+- `apiRateLimiter.js` - **Global API rate limiter** (v2.0)
+  - Sliding window algorithm (15 req/min for Gemini Free tier)
+  - Automatic request queuing when limit hit
+  - Real-time statistics and monitoring
+  - Shared singleton across all worker processes
 
 ### Frontend Components
 

@@ -1,6 +1,6 @@
 # MasStock Documentation
 
-**Last Updated:** 2025-11-23
+**Last Updated:** 2025-11-24
 
 Welcome to the MasStock documentation hub. This folder contains all technical documentation for developers working on the MasStock platform.
 
@@ -13,13 +13,15 @@ Welcome to the MasStock documentation hub. This folder contains all technical do
 ├── README.md                    # This file - documentation index
 ├── system/                      # System & architecture documentation
 │   ├── project_architecture.md  # Complete system architecture
-│   └── database_schema.md       # Database schema & tables
+│   ├── database_schema.md       # Database schema & tables
+│   └── async_workers.md         # ⭐ Async workers & concurrency (v2.0)
 ├── SOP/                         # Standard Operating Procedures
 │   ├── add_migration.md         # How to add database migrations
 │   ├── add_route.md             # How to add API endpoints
-│   └── add_component.md         # How to add React components
+│   ├── add_component.md         # How to add React components
+│   └── deployment.md            # Production deployment
 └── tasks/                       # Feature PRDs & implementation plans
-    └── (feature-specific docs)
+    └── image_factory_workflow.md  # Nano Banana workflow guide
 ```
 
 ---
@@ -99,6 +101,26 @@ Welcome to the MasStock documentation hub. This folder contains all technical do
   - Debugging data access issues
   - Understanding multi-tenant isolation
 
+### [Async Workers & Concurrency](./system/async_workers.md) ⭐ NEW (v2.0)
+
+**Complete guide to parallel workflow processing:**
+
+- **What it covers:**
+  - Two-level concurrency architecture (execution + prompt)
+  - Global API rate limiter (sliding window algorithm)
+  - Configuration and tuning guidelines
+  - Performance benchmarks (15x faster than v1.x)
+  - Monitoring and debugging techniques
+  - Troubleshooting common issues
+  - Environment variable reference
+
+- **When to read:**
+  - Understanding worker performance
+  - Tuning concurrency settings
+  - Debugging rate limit issues
+  - Optimizing workflow throughput
+  - Before scaling to production
+
 ---
 
 ## 🛠️ Standard Operating Procedures (SOPs)
@@ -168,11 +190,33 @@ The `tasks/` folder contains feature-specific documentation:
 - **Implementation Plans**: Technical breakdown of features
 - **Architecture Decisions**: Design choices and rationale
 
-**Example tasks:**
-- User authentication system
-- Workflow execution engine
-- Admin dashboard analytics
-- Nano Banana integration
+**Available Task Docs:**
+
+### [Image Factory Workflow](./tasks/image_factory_workflow.md) ⭐
+
+**Complete guide to the Nano Banana workflow:**
+
+- **What it covers:**
+  - Architecture and component flow
+  - Technical specifications (models, formats, limits)
+  - Configuration (workflow config, runtime params)
+  - API integration (Gemini API, MasStock endpoints)
+  - Error handling and retry logic
+  - Performance optimization
+  - Testing and verification procedures
+  - Troubleshooting common issues
+  - Recent updates (v1.2: timeout fixes, scope fixes)
+
+- **When to read:**
+  - Working on workflow execution features
+  - Debugging image generation issues
+  - Understanding timeout/retry behavior
+  - Adding new AI integrations
+  - Performance optimization
+
+**Other tasks:**
+- User authentication system (planned)
+- Admin dashboard analytics (planned)
 
 ---
 
@@ -183,6 +227,7 @@ The `tasks/` folder contains feature-specific documentation:
 **Understand the system:**
 - Overall architecture → [project_architecture.md](./system/project_architecture.md)
 - Database structure → [database_schema.md](./system/database_schema.md)
+- Worker performance → [async_workers.md](./system/async_workers.md) ⭐ NEW
 - Development workflow → [../CLAUDE.md](../CLAUDE.md)
 
 **Add new functionality:**
@@ -193,6 +238,8 @@ The `tasks/` folder contains feature-specific documentation:
 **Debug issues:**
 - API flow → [project_architecture.md](./system/project_architecture.md) (Data Flow section)
 - Database queries → [database_schema.md](./system/database_schema.md) (Common Queries section)
+- Worker performance → [async_workers.md](./system/async_workers.md) (Troubleshooting section)
+- Rate limiting → [async_workers.md](./system/async_workers.md) (Rate Limiting section)
 - Authentication → [project_architecture.md](./system/project_architecture.md) (Authentication Flow section)
 
 **Learn the stack:**
@@ -299,18 +346,20 @@ The `tasks/` folder contains feature-specific documentation:
 
 ## 📊 Documentation Health
 
-**Last Full Review:** 2025-11-23
+**Last Full Review:** 2025-11-24
 **Coverage:** ✅ Complete
 
 ### Coverage Checklist
 
 - [x] System architecture documented
 - [x] Database schema documented
-- [x] SOPs for common tasks (migrations, routes, components)
+- [x] **Async workers & concurrency (v2.0)** ⭐ NEW
+- [x] SOPs for common tasks (migrations, routes, components, deployment)
 - [x] Development workflow (CLAUDE.md)
 - [x] Quick start guide (README.md)
-- [ ] Task-specific PRDs (in progress)
+- [x] Task-specific PRDs (Image Factory v1.2)
 - [ ] API documentation (Swagger - auto-generated)
+- [x] Troubleshooting guides (per workflow, workers)
 
 ---
 

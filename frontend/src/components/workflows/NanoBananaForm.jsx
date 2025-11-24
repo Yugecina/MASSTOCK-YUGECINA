@@ -16,11 +16,14 @@ import logger from '@/utils/logger';
  * - Clear error messages with actionable guidance
  * - **NEW: Organic Factory design with Lime Action button (CRITICAL CTA)**
  */
-export function NanoBananaForm({ onSubmit, loading }) {
+export function NanoBananaForm({ onSubmit, loading, workflow }) {
   const [formData, setFormData] = useState({
     prompts_text: '',
     api_key: '',
-    reference_images: []
+    reference_images: [],
+    model: 'flash', // 'flash' or 'pro'
+    aspect_ratio: '1:1',
+    resolution: '1K'
   });
 
   const [validationState, setValidationState] = useState({
@@ -34,12 +37,43 @@ export function NanoBananaForm({ onSubmit, loading }) {
   const [showExampleModal, setShowExampleModal] = useState(false);
   const [showSecurityInfo, setShowSecurityInfo] = useState(false);
 
-  // Calculate prompt count and estimated cost
+  // Load defaults from workflow config
+  useEffect(() => {
+    if (workflow?.config) {
+      logger.debug('🔧 NanoBananaForm: Loading workflow config defaults');
+      setFormData(prev => ({
+        ...prev,
+        model: workflow.config.default_model === 'gemini-3-pro-image-preview' ? 'pro' : 'flash',
+        aspect_ratio: workflow.config.default_aspect_ratio || '1:1',
+        resolution: workflow.config.default_resolution?.pro || '1K'
+      }));
+    }
+  }, [workflow]);
+
+  // Calculate prompt count
   const promptCount = formData.prompts_text
     .split('\n\n')
     .filter(p => p.trim())
     .length;
-  const estimatedCost = (promptCount * 0.039).toFixed(2);
+
+  // Calculate dynamic pricing based on model and resolution
+  const calculatePricing = () => {
+    let costPerImage;
+
+    if (formData.model === 'flash') {
+      costPerImage = 0.039;
+    } else {
+      // Pro model
+      costPerImage = formData.resolution === '4K' ? 0.06 : 0.03633;
+    }
+
+    const totalCost = costPerImage * promptCount;
+
+    return { costPerImage, totalCost };
+  };
+
+  const { costPerImage, totalCost } = calculatePricing();
+  const estimatedCost = totalCost.toFixed(3);
 
   // Real-time API key validation
   useEffect(() => {
@@ -147,6 +181,12 @@ export function NanoBananaForm({ onSubmit, loading }) {
     formDataToSend.append('prompts_text', formData.prompts_text);
     formDataToSend.append('api_key', formData.api_key);
 
+    // Add new params
+    const modelValue = formData.model === 'pro' ? 'gemini-3-pro-image-preview' : 'gemini-2.5-flash-image';
+    formDataToSend.append('model', modelValue);
+    formDataToSend.append('aspect_ratio', formData.aspect_ratio);
+    formDataToSend.append('resolution', formData.resolution);
+
     formData.reference_images.forEach((file) => {
       formDataToSend.append('reference_images', file);
     });
@@ -154,7 +194,11 @@ export function NanoBananaForm({ onSubmit, loading }) {
     logger.debug('📤 NanoBananaForm: Sending execution request:', {
       promptCount,
       hasApiKey: !!formData.api_key,
-      referenceImagesCount: formData.reference_images.length
+      referenceImagesCount: formData.reference_images.length,
+      model: modelValue,
+      aspectRatio: formData.aspect_ratio,
+      resolution: formData.resolution,
+      estimatedCost: estimatedCost
     });
 
     onSubmit(formDataToSend);
@@ -530,7 +574,268 @@ a portrait of a cat wearing sunglasses, studio lighting"
           )}
         </div>
 
-        {/* Step 3: Optional Enhancement (Reference Images) */}
+        {/* Step 3: Factory Configuration (Model, Aspect Ratio, Resolution) */}
+        <div style={{
+          marginBottom: '24px',
+          padding: '24px',
+          background: 'white',
+          borderRadius: '12px',
+          border: '2px solid var(--neutral-200)',
+          position: 'relative'
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            background: 'var(--primary-500)',
+            color: 'white',
+            padding: '4px 12px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: 600,
+            letterSpacing: '0.05em'
+          }}>
+            STEP 3
+          </div>
+
+          <div style={{ marginBottom: '20px' }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <svg style={{ width: '20px', height: '20px', color: 'var(--primary-500)' }} fill="currentColor" viewBox="0 0 20 20">
+                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+              </svg>
+              Factory Configuration
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              Choose model, output format, and quality
+            </p>
+          </div>
+
+          {/* Model Selection */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: '8px'
+            }}>
+              Model *
+            </label>
+            <select
+              value={formData.model}
+              onChange={(e) => {
+                const newModel = e.target.value;
+                setFormData(prev => ({
+                  ...prev,
+                  model: newModel,
+                  // Reset resolution to 1K when switching models
+                  resolution: newModel === 'flash' ? '1K' : prev.resolution
+                }));
+                logger.debug(`🔄 Model changed to: ${newModel}`);
+              }}
+              required
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                fontSize: '14px',
+                border: '2px solid var(--neutral-300)',
+                borderRadius: '8px',
+                background: 'white',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                transition: 'border-color 0.2s ease'
+              }}
+            >
+              <option value="flash">⚡ Nano Banana (Flash) - Rapide - €0.039/image</option>
+              <option value="pro">🎨 Nano Banana Pro - Qualité Max - dès €0.036/image</option>
+            </select>
+          </div>
+
+          {/* Aspect Ratio Selection */}
+          <div style={{ marginBottom: '20px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '13px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: '8px'
+            }}>
+              Format d'image *
+            </label>
+            <select
+              value={formData.aspect_ratio}
+              onChange={(e) => {
+                setFormData({ ...formData, aspect_ratio: e.target.value });
+                logger.debug(`🔄 Aspect ratio changed to: ${e.target.value}`);
+              }}
+              required
+              style={{
+                width: '100%',
+                padding: '12px 16px',
+                fontSize: '14px',
+                border: '2px solid var(--neutral-300)',
+                borderRadius: '8px',
+                background: 'white',
+                color: 'var(--text-primary)',
+                cursor: 'pointer',
+                transition: 'border-color 0.2s ease'
+              }}
+            >
+              <optgroup label="📐 Carré">
+                <option value="1:1">1:1 - Carré (1024×1024)</option>
+              </optgroup>
+              <optgroup label="📱 Portrait">
+                <option value="2:3">2:3 - Portrait photo (832×1248)</option>
+                <option value="3:4">3:4 - Portrait classique (864×1184)</option>
+                <option value="4:5">4:5 - Portrait Instagram (896×1152)</option>
+                <option value="5:4">5:4 - Portrait court (1152×896)</option>
+                <option value="9:16">9:16 - Portrait mobile (768×1344)</option>
+              </optgroup>
+              <optgroup label="🖼️ Paysage">
+                <option value="3:2">3:2 - Photo paysage (1248×832)</option>
+                <option value="4:3">4:3 - Paysage classique (1184×864)</option>
+                <option value="16:9">16:9 - Paysage vidéo (1344×768)</option>
+                <option value="21:9">21:9 - Ultra wide (1536×672)</option>
+              </optgroup>
+            </select>
+          </div>
+
+          {/* Resolution Selection (Pro only) */}
+          {formData.model === 'pro' && (
+            <div style={{ marginBottom: '0' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '13px',
+                fontWeight: 600,
+                color: 'var(--text-primary)',
+                marginBottom: '8px'
+              }}>
+                Résolution * <span style={{ fontSize: '11px', fontWeight: 400, color: 'var(--text-secondary)' }}>(Pro uniquement)</span>
+              </label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <label style={{
+                  flex: 1,
+                  padding: '16px',
+                  border: `2px solid ${formData.resolution === '1K' ? 'var(--primary-500)' : 'var(--neutral-300)'}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  background: formData.resolution === '1K' ? 'var(--primary-50)' : 'white'
+                }}>
+                  <input
+                    type="radio"
+                    name="resolution"
+                    value="1K"
+                    checked={formData.resolution === '1K'}
+                    onChange={(e) => {
+                      setFormData({ ...formData, resolution: e.target.value });
+                      logger.debug(`🔄 Resolution changed to: ${e.target.value}`);
+                    }}
+                    style={{ marginRight: '8px' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>1K - Standard</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>1024px - €0.036/image</div>
+                  </div>
+                </label>
+                <label style={{
+                  flex: 1,
+                  padding: '16px',
+                  border: `2px solid ${formData.resolution === '2K' ? 'var(--primary-500)' : 'var(--neutral-300)'}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  background: formData.resolution === '2K' ? 'var(--primary-50)' : 'white'
+                }}>
+                  <input
+                    type="radio"
+                    name="resolution"
+                    value="2K"
+                    checked={formData.resolution === '2K'}
+                    onChange={(e) => {
+                      setFormData({ ...formData, resolution: e.target.value });
+                      logger.debug(`🔄 Resolution changed to: ${e.target.value}`);
+                    }}
+                    style={{ marginRight: '8px' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>2K - Haute</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>2048px - €0.036/image</div>
+                  </div>
+                </label>
+                <label style={{
+                  flex: 1,
+                  padding: '16px',
+                  border: `2px solid ${formData.resolution === '4K' ? 'var(--primary-500)' : 'var(--neutral-300)'}`,
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s ease',
+                  background: formData.resolution === '4K' ? 'var(--primary-50)' : 'white'
+                }}>
+                  <input
+                    type="radio"
+                    name="resolution"
+                    value="4K"
+                    checked={formData.resolution === '4K'}
+                    onChange={(e) => {
+                      setFormData({ ...formData, resolution: e.target.value });
+                      logger.debug(`🔄 Resolution changed to: ${e.target.value}`);
+                    }}
+                    style={{ marginRight: '8px' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>4K - Ultra</div>
+                    <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '4px' }}>4096px - €0.06/image</div>
+                  </div>
+                </label>
+              </div>
+            </div>
+          )}
+
+          {/* Pricing Summary */}
+          <div style={{
+            marginTop: '20px',
+            padding: '16px',
+            background: 'linear-gradient(135deg, var(--primary-50) 0%, var(--secondary-50) 100%)',
+            borderRadius: '8px',
+            border: '1px solid var(--primary-200)'
+          }}>
+            <div style={{ fontSize: '13px', fontWeight: 600, color: 'var(--primary-700)', marginBottom: '8px' }}>
+              💰 Estimation des coûts
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '12px', color: 'var(--text-secondary)' }}>
+              <div>Modèle : <strong>{formData.model === 'flash' ? 'Flash' : 'Pro'}</strong></div>
+              {formData.model === 'pro' && <div>Résolution : <strong>{formData.resolution}</strong></div>}
+              <div>Format : <strong>{formData.aspect_ratio}</strong></div>
+              <div>Images : <strong>{promptCount}</strong></div>
+            </div>
+            <div style={{
+              marginTop: '12px',
+              paddingTop: '12px',
+              borderTop: '1px solid var(--primary-200)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <div style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                Coût par image : <strong style={{ color: 'var(--text-primary)' }}>€{costPerImage.toFixed(4)}</strong>
+              </div>
+              <div style={{ fontSize: '16px', fontWeight: 700, color: 'var(--primary-700)' }}>
+                Total : €{estimatedCost}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Step 4: Optional Enhancement (Reference Images) */}
         <div style={{
           marginBottom: '32px',
           padding: '24px',

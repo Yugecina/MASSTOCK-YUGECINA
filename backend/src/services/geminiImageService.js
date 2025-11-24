@@ -17,9 +17,10 @@ const { logApiCall, logApiResponse, logError, logRetry } = require('../utils/wor
 // API Configuration
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const GEMINI_MODEL = 'gemini-2.5-flash-image';
-const API_TIMEOUT = 60000; // 60 seconds
+const API_TIMEOUT = 120000; // 120 seconds (increased from 60s due to observed 84s processing times)
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
+const TIMEOUT_RETRY_DELAY = 5000; // 5 seconds for timeout errors (longer delay)
 
 /**
  * Gemini Image Service Class
@@ -42,12 +43,17 @@ class GeminiImageService {
 
   /**
    * Set the Gemini model to use
-   * 
-   * @param {string} model - Model name (e.g., 'gemini-2.5-flash-image')
+   *
+   * @param {string} model - Model name (e.g., 'gemini-2.5-flash-image', 'gemini-3-pro-image-preview')
    */
   setModel(model) {
-    if (model) {
+    const validModels = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
+    if (model && validModels.includes(model)) {
       this.model = model;
+      logger.debug(`Model set to: ${model}`);
+    } else {
+      logger.warn(`Invalid model "${model}". Using default: ${GEMINI_MODEL}`);
+      this.model = GEMINI_MODEL;
     }
   }
 
@@ -58,19 +64,22 @@ class GeminiImageService {
    * @param {object} options - Generation options
    * @param {Array<object>} options.referenceImages - Array of reference images in base64
    * @param {string} options.aspectRatio - Image aspect ratio (default: "1:1")
+   * @param {string} options.imageSize - Image resolution for Pro model: "1K", "2K", or "4K" (default: null)
    * @param {number} options.timeout - Request timeout in ms (default: 60000)
    * @returns {Promise<object>} Generated image result
    *
    * @example
    * const result = await service.generateImage("a cat wearing sunglasses", {
    *   referenceImages: [{ data: "base64...", mimeType: "image/jpeg" }],
-   *   aspectRatio: "16:9"
+   *   aspectRatio: "16:9",
+   *   imageSize: "4K"  // For Pro model only
    * });
    */
   async generateImage(prompt, options = {}) {
     const {
       referenceImages = [],
       aspectRatio = '1:1',
+      imageSize = null,
       timeout = API_TIMEOUT
     } = options;
 
@@ -94,11 +103,12 @@ class GeminiImageService {
     logger.debug(`   Prompt length: ${prompt.length} chars`);
     logger.debug(`   Reference images: ${referenceImages.length}`);
     logger.debug(`   Aspect ratio: ${aspectRatio}`);
+    logger.debug(`   Image size: ${imageSize || 'default'}`);
     logger.debug(`   Model: ${this.model}`);
 
     try {
       // Build request payload
-      const payload = this._buildRequestPayload(prompt, referenceImages, aspectRatio);
+      const payload = this._buildRequestPayload(prompt, referenceImages, aspectRatio, imageSize);
 
       logger.debug(`📦 Request payload built:`);
       logger.debug(`   Parts count: ${payload.contents[0].parts.length}`);
@@ -199,9 +209,10 @@ class GeminiImageService {
    * @param {string} prompt - The text prompt
    * @param {Array<object>} referenceImages - Reference images
    * @param {string} aspectRatio - Image aspect ratio
+   * @param {string|null} imageSize - Image resolution (1K, 2K, 4K) for Pro model
    * @returns {object} Request payload
    */
-  _buildRequestPayload(prompt, referenceImages, aspectRatio) {
+  _buildRequestPayload(prompt, referenceImages, aspectRatio, imageSize = null) {
     const parts = [];
 
     // Add text prompt
@@ -221,15 +232,25 @@ class GeminiImageService {
       }
     });
 
+    // Build imageConfig
+    const imageConfig = {
+      aspectRatio: aspectRatio
+    };
+
+    // Add imageSize for Pro model only
+    const isProModel = this.model === 'gemini-3-pro-image-preview';
+    if (isProModel && imageSize) {
+      imageConfig.imageSize = imageSize;
+      logger.debug(`   Adding imageSize "${imageSize}" for Pro model`);
+    }
+
     return {
       contents: [{
         parts: parts
       }],
       generationConfig: {
         responseModalities: ['Image'],
-        imageConfig: {
-          aspectRatio: aspectRatio
-        }
+        imageConfig: imageConfig
       }
     };
   }
@@ -247,20 +268,24 @@ class GeminiImageService {
 
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
       try {
+        // Progressive timeout: increase timeout on each retry attempt
+        const attemptTimeout = timeout + (30000 * (attempt - 1)); // Add 30s per retry
+
         const url = `${this.baseUrl}/models/${this.model}:generateContent`;
 
         logger.debug(`\n🌐 Making Gemini API request (attempt ${attempt}/${MAX_RETRIES})`);
         logger.debug(`   URL: ${url}`);
         logger.debug(`   API Key: ${this.apiKey.substring(0, 8)}...${this.apiKey.substring(this.apiKey.length - 4)} (length: ${this.apiKey.length})`);
         logger.debug(`   Payload size: ${JSON.stringify(payload).length} bytes`);
-        logger.debug(`   Timeout: ${timeout}ms`);
+        logger.debug(`   Timeout: ${attemptTimeout}ms (base: ${timeout}ms + ${30000 * (attempt - 1)}ms)`);
 
         logApiCall('Gemini', payload, {
           model: this.model,
           apiKey: this.apiKey,
           attempt,
           maxAttempts: MAX_RETRIES,
-          url
+          url,
+          timeout: attemptTimeout
         });
 
         logger.debug('Making Gemini API request', {
@@ -268,7 +293,8 @@ class GeminiImageService {
           attempt,
           payloadSize: JSON.stringify(payload).length,
           hasApiKey: !!this.apiKey,
-          apiKeyLength: this.apiKey?.length
+          apiKeyLength: this.apiKey?.length,
+          timeout: attemptTimeout
         });
 
         const requestStartTime = Date.now();
@@ -281,7 +307,7 @@ class GeminiImageService {
               'x-goog-api-key': this.apiKey,
               'Content-Type': 'application/json'
             },
-            timeout: timeout
+            timeout: attemptTimeout
           }
         );
 
@@ -290,6 +316,15 @@ class GeminiImageService {
         logger.debug(`\n✅ Gemini API request successful (${requestTime}ms)`);
         logger.debug(`   Status: ${response.status}`);
         logger.debug(`   Response data keys: ${Object.keys(response.data).join(', ')}`);
+
+        // Warn if request took >80% of timeout
+        if (requestTime > attemptTimeout * 0.8) {
+          logger.warn(`⚠️  Request took ${requestTime}ms (${Math.round(requestTime/attemptTimeout*100)}% of ${attemptTimeout}ms timeout)`, {
+            requestTime,
+            timeout: attemptTimeout,
+            percentUsed: Math.round(requestTime/attemptTimeout*100)
+          });
+        }
 
         logger.debug('Gemini API response received', {
           status: response.status,
@@ -301,9 +336,11 @@ class GeminiImageService {
 
       } catch (error) {
         lastError = error;
+        const isTimeout = error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT';
 
         logger.debug(`\n❌ Gemini API request failed (attempt ${attempt}/${MAX_RETRIES})`);
         logger.debug(`   Error: ${error.message}`);
+        logger.debug(`   Is timeout: ${isTimeout}`);
 
         if (error.response) {
           logger.debug(`   Status: ${error.response.status}`);
@@ -328,7 +365,8 @@ class GeminiImageService {
           statusText: error.response?.statusText,
           responseData: error.response?.data,
           hasResponse: !!error.response,
-          code: error.code
+          code: error.code,
+          isTimeout
         });
 
         // Don't retry on certain errors
@@ -339,15 +377,23 @@ class GeminiImageService {
 
         // Log retry attempt
         if (attempt < MAX_RETRIES) {
-          const backoffDelay = RETRY_DELAY * attempt;
+          // Use longer delay for timeout errors
+          const backoffDelay = isTimeout
+            ? TIMEOUT_RETRY_DELAY * attempt
+            : RETRY_DELAY * attempt;
 
           logger.debug(`\n⏳ Retrying in ${backoffDelay}ms...`);
+          if (isTimeout) {
+            logger.debug(`   Using extended delay for timeout error`);
+          }
 
           logRetry(attempt + 1, MAX_RETRIES, backoffDelay, error);
 
           logger.warn(`Gemini API request failed, retrying (${attempt}/${MAX_RETRIES})`, {
             error: error.message,
-            statusCode: error.response?.status
+            statusCode: error.response?.status,
+            isTimeout,
+            retryDelay: backoffDelay
           });
 
           // Wait before retrying

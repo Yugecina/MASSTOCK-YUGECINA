@@ -1,13 +1,13 @@
 /**
- * Verify Nano Banana Workflow Script
- * Verifies the "Batch Nano Banana" workflow is properly configured
+ * Verify Image Factory Workflow Script
+ * Verifies the "Image Factory" workflow is properly configured
  */
 
 const { supabaseAdmin } = require('../src/config/database');
 require('dotenv').config();
 
 async function verifyNanoBananaWorkflow() {
-  console.log('Verifying Nano Banana workflow configuration...\n');
+  console.log('Verifying Image Factory workflow configuration...\n');
 
   try {
     // Get all workflows
@@ -33,8 +33,8 @@ async function verifyNanoBananaWorkflow() {
     });
     console.log('─'.repeat(100));
 
-    // Get Nano Banana workflow details
-    console.log('\nFetching Nano Banana workflow details...');
+    // Get Image Factory workflow details
+    console.log('\nFetching Image Factory workflow details...');
     const { data: nanoBanana, error: nbError } = await supabaseAdmin
       .from('workflows')
       .select(`
@@ -55,19 +55,19 @@ async function verifyNanoBananaWorkflow() {
           email
         )
       `)
-      .eq('name', 'Batch Nano Banana')
+      .eq('name', 'Image Factory')
       .single();
 
     if (nbError) {
       if (nbError.code === 'PGRST116') {
-        console.error('\n❌ ERROR: Batch Nano Banana workflow not found in database!');
+        console.error('\n❌ ERROR: Image Factory workflow not found in database!');
         return;
       }
-      throw new Error(`Error fetching Nano Banana workflow: ${nbError.message}`);
+      throw new Error(`Error fetching Image Factory workflow: ${nbError.message}`);
     }
 
     console.log('\n' + '═'.repeat(100));
-    console.log('BATCH NANO BANANA WORKFLOW DETAILS');
+    console.log('IMAGE FACTORY WORKFLOW DETAILS');
     console.log('═'.repeat(100));
     console.log(`\nWorkflow ID: ${nanoBanana.id}`);
     console.log(`Name: ${nanoBanana.name}`);

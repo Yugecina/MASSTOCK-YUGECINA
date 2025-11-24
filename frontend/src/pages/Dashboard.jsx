@@ -198,7 +198,7 @@ export function Dashboard() {
                         background: getWorkflowGradient(index)
                       }}
                     >
-                      {getWorkflowIcon(index)}
+                      {getWorkflowIcon(workflow.name, index)}
                     </div>
                     <span
                       className="badge"
@@ -207,15 +207,15 @@ export function Dashboard() {
                         fontSize: '12px',
                         fontWeight: 500,
                         borderRadius: '6px',
-                        background: workflow.status === 'active'
+                        background: workflow.status === 'deployed'
                           ? 'var(--success-light)'
                           : 'var(--neutral-100)',
-                        color: workflow.status === 'active'
+                        color: workflow.status === 'deployed'
                           ? 'var(--success-dark)'
                           : 'var(--neutral-600)'
                       }}
                     >
-                      {workflow.status === 'active' ? 'Active' : 'Inactive'}
+                      {workflow.status === 'deployed' ? 'Active' : 'Inactive'}
                     </span>
                   </div>
                   <h3
@@ -305,7 +305,29 @@ export function Dashboard() {
   )
 }
 
-function getWorkflowIcon(index) {
+function getWorkflowIcon(workflowName, index) {
+  // Custom SVG icon for Image Factory - Apple style minimalist
+  if (workflowName === 'Image Factory') {
+    return (
+      <svg
+        width="28"
+        height="28"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="white"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
+        {/* Mountain/landscape icon */}
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <path d="M21 15l-5-5L5 21" />
+      </svg>
+    )
+  }
+
+  // Fallback to emoji icons for other workflows
   const icons = ['📊', '📈', '📉', '💼', '📋', '⚡', '🚀', '💰', '📄', '🔧']
   return icons[index % icons.length]
 }

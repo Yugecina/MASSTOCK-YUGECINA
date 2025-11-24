@@ -1,17 +1,17 @@
-# Batch Nano Banana Workflow - Setup Complete
+# Image Factory Workflow - Setup Complete
 
 ## Summary
 
-The "Batch Nano Banana" workflow has been successfully created in the database and is now accessible to the Estee user.
+The "Image Factory" workflow has been successfully created in the database and is now accessible to the Estee user.
 
 ## What Was Done
 
 ### 1. Workflow Creation
 - **Workflow ID**: `f8b20b59-7d06-4599-8413-64da74225b0c`
-- **Name**: Batch Nano Banana
+- **Name**: Image Factory
 - **Client**: Estee Agency (`a76e631c-4dc4-4abc-b759-9f7c225c142b`)
 - **Status**: deployed
-- **Type**: nano_banana (Google Gemini 2.5 Flash Image API)
+- **Type**: nano_banana (internal identifier)
 
 ### 2. Configuration Details
 ```json
@@ -19,7 +19,7 @@ The "Batch Nano Banana" workflow has been successfully created in the database a
   "workflow_type": "nano_banana",
   "model": "gemini-2.5-flash-image",
   "api_provider": "google_gemini",
-  "max_prompts": 100,
+  "max_prompts": 10000,
   "max_reference_images": 3,
   "cost_per_image": 0.039,
   "supported_formats": ["png", "jpg", "webp"],
@@ -55,7 +55,7 @@ All tests passed successfully:
 
 The following utility scripts were created in `/backend/scripts/`:
 
-1. **seed-nano-banana.js** - Creates the Batch Nano Banana workflow
+1. **seed-nano-banana.js** - Creates the Image Factory workflow
 2. **verify-nano-banana.js** - Verifies workflow configuration and visibility
 3. **check-estee-user.js** - Checks Estee user and client linkage
 4. **check-auth-users.js** - Lists all Supabase Auth users
@@ -85,7 +85,7 @@ node scripts/test-estee-login.js
 
 4. Navigate to the Workflows page
 
-5. Verify "Batch Nano Banana" appears in the workflow list
+5. Verify "Image Factory" appears in the workflow list
 
 ### Admin Test
 1. Log in as admin:
@@ -94,7 +94,7 @@ node scripts/test-estee-login.js
 
 2. Navigate to Admin > Workflows
 
-3. Verify "Batch Nano Banana" appears in the list
+3. Verify "Image Factory" appears in the list
 
 ## Database Structure
 
@@ -110,7 +110,7 @@ SELECT
   revenue_per_execution,
   deployed_at
 FROM workflows
-WHERE name = 'Batch Nano Banana';
+WHERE name = 'Image Factory';
 ```
 
 ### Client-User Linkage
@@ -157,8 +157,8 @@ Response:
     "workflows": [
       {
         "id": "f8b20b59-7d06-4599-8413-64da74225b0c",
-        "name": "Batch Nano Banana",
-        "description": "AI image generation...",
+        "name": "Image Factory",
+        "description": "Transformez vos idées en images...",
         "status": "deployed",
         "config": { ... },
         "cost_per_execution": 0.04,

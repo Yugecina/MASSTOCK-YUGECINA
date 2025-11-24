@@ -30,12 +30,13 @@ export function Modal({ isOpen, onClose, title, children }) {
           left: '50%',
           transform: 'translate(-50%, -50%)',
           backgroundColor: 'white',
-          borderRadius: 'var(--radius-lg)',
+          borderRadius: 'var(--radius-xl)',
           padding: 'var(--spacing-xl)',
           maxWidth: '600px',
           width: '90%',
           zIndex: 50,
-          boxShadow: 'var(--shadow-lg)'
+          boxShadow: 'var(--shadow-xl)',
+          overflow: 'hidden'
         }}
       >
         {title && <h2 className="text-h2" style={{marginBottom: 'var(--spacing-md)'}}>{title}</h2>}

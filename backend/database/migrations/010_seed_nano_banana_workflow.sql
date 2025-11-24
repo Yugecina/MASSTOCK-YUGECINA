@@ -1,8 +1,8 @@
--- Migration: Seed Batch Nano Banana Workflow
--- Description: Creates a permanent "Batch Nano Banana" workflow for image generation
+-- Migration: Seed Image Factory Workflow
+-- Description: Creates a permanent "Image Factory" workflow for image generation
 -- Date: 2025-01-18
 
--- Insert Batch Nano Banana workflow for Estee client
+-- Insert Image Factory workflow for Estee client
 DO $$
 DECLARE
     estee_client_id UUID;
@@ -23,11 +23,11 @@ BEGIN
     SELECT EXISTS(
         SELECT 1 FROM workflows
         WHERE client_id = estee_client_id
-        AND name = 'Batch Nano Banana'
+        AND name = 'Image Factory'
     ) INTO workflow_exists;
 
     IF workflow_exists THEN
-        RAISE NOTICE 'Batch Nano Banana workflow already exists for Estee.';
+        RAISE NOTICE 'Image Factory workflow already exists for Estee.';
         RETURN;
     END IF;
 
@@ -45,18 +45,47 @@ BEGIN
         deployed_at
     ) VALUES (
         estee_client_id,
-        'Batch Nano Banana',
-        'AI image generation using Google Gemini 2.5 Flash Image API. Generate multiple images from text prompts with optional reference images. Supports batch processing up to 100 images per execution.',
+        'Image Factory',
+        'Transformez vos idées en images. Production en masse jusqu''à 10 000 générations par batch.',
         'deployed',
         '{
             "workflow_type": "nano_banana",
-            "model": "gemini-2.5-flash-image",
             "api_provider": "google_gemini",
-            "max_prompts": 100,
+            "available_models": ["gemini-2.5-flash-image", "gemini-3-pro-image-preview"],
+            "default_model": "gemini-2.5-flash-image",
+            "max_prompts": 10000,
             "max_reference_images": 3,
-            "cost_per_image": 0.039,
             "supported_formats": ["png", "jpg", "webp"],
-            "aspect_ratios": ["1:1", "16:9", "9:16", "4:3", "3:4"],
+            "aspect_ratios": ["1:1", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "9:16", "16:9", "21:9"],
+            "default_aspect_ratio": "1:1",
+            "available_resolutions": {
+                "flash": ["1K"],
+                "pro": ["1K", "2K", "4K"]
+            },
+            "default_resolution": {
+                "flash": "1K",
+                "pro": "1K"
+            },
+            "pricing": {
+                "flash": {
+                    "cost_per_image": 0.039,
+                    "revenue_per_image": 0.10
+                },
+                "pro": {
+                    "1K": {
+                        "cost_per_image": 0.03633,
+                        "revenue_per_image": 0.10
+                    },
+                    "2K": {
+                        "cost_per_image": 0.03633,
+                        "revenue_per_image": 0.10
+                    },
+                    "4K": {
+                        "cost_per_image": 0.06,
+                        "revenue_per_image": 0.15
+                    }
+                }
+            },
             "requires_api_key": true,
             "api_key_storage": "encrypted_ephemeral"
         }'::jsonb,
@@ -67,7 +96,7 @@ BEGIN
         NOW()
     );
 
-    RAISE NOTICE 'Successfully created Batch Nano Banana workflow for Estee.';
+    RAISE NOTICE 'Successfully created Image Factory workflow for Estee.';
 END $$;
 
 -- Add comment
