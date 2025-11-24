@@ -4,7 +4,7 @@ import logger from '@/utils/logger';
 
 /**
  * NanoBananaForm Component
- * Form for Batch Nano Banana workflow (AI image generation)
+ * Form for Image Factory workflow (AI image generation)
  *
  * UX Improvements (Iteration 2 + Organic Factory):
  * - Cost confirmation modal before execution
@@ -67,7 +67,7 @@ export function NanoBananaForm({ onSubmit, loading }) {
   useEffect(() => {
     if (promptCount === 0) {
       setValidationState(prev => ({ ...prev, promptCountValid: null }));
-    } else if (promptCount >= 1 && promptCount <= 100) {
+    } else if (promptCount >= 1 && promptCount <= 10000) {
       setValidationState(prev => ({ ...prev, promptCountValid: true }));
       logger.debug(`✅ NanoBananaForm: ${promptCount} prompts valid`);
     } else {
@@ -120,13 +120,13 @@ export function NanoBananaForm({ onSubmit, loading }) {
   };
 
   const loadExamplePrompts = () => {
-    const examples = `a beautiful sunset over snow-capped mountains, cinematic lighting, 8k resolution
+    const examples = `[product] on a rustic wooden table with natural morning light, surrounded by fresh herbs and organic ingredients, warm atmosphere, professional food photography
 
-a futuristic cyberpunk city at night with neon lights reflecting on wet streets
+[product] floating in a minimalist zen garden setting with smooth stones, raked sand patterns, soft shadows, clean modern aesthetic, 8k resolution
 
-a portrait of a cat wearing vintage sunglasses and a leather jacket, studio lighting
+[product] in a cozy hygge-inspired interior with candles, soft blankets, and warm bokeh lights in background, intimate atmosphere, Scandinavian design
 
-an underwater scene with colorful coral reefs and tropical fish, crystal clear water`;
+[product] on a vibrant tropical beach scene with turquoise water, palm leaves, white sand, golden hour sunlight, vacation lifestyle photography`;
 
     setFormData({ ...formData, prompts_text: examples });
     setShowExampleModal(false);
@@ -168,11 +168,11 @@ an underwater scene with colorful coral reefs and tropical fish, crystal clear w
     validationState.promptCountValid === true &&
     validationState.fileSizeValid === true &&
     promptCount > 0 &&
-    promptCount <= 100;
+    promptCount <= 10000;
 
   const getSubmitDisabledReason = () => {
     if (promptCount === 0) return 'Add at least one prompt';
-    if (promptCount > 100) return 'Maximum 100 prompts allowed';
+    if (promptCount > 10000) return 'Maximum 10 000 prompts allowed';
     if (!formData.api_key.trim()) return 'API key required';
     if (validationState.apiKeyValid === false) return 'Invalid API key format';
     if (!validationState.fileSizeValid) return 'Fix file validation errors';
@@ -185,181 +185,430 @@ an underwater scene with colorful coral reefs and tropical fish, crystal clear w
 
   return (
     <>
-      <form onSubmit={handleFormSubmit} className="space-y-lg">
-        {/* Prompts Input */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-body-sm font-medium text-neutral-700">
-              Image Prompts <span className="text-error-main">*</span>
-            </label>
-            <button
-              type="button"
-              onClick={() => setShowExampleModal(true)}
-              className="btn-link"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Load Example
-            </button>
-          </div>
-          <textarea
-            value={formData.prompts_text}
-            onChange={(e) => setFormData({ ...formData, prompts_text: e.target.value })}
-            placeholder="Enter your image prompts, separated by double line breaks.
-
-Example:
-a beautiful sunset over mountains
-
-a futuristic city at night
-
-a portrait of a cat wearing sunglasses"
-            rows={12}
-            required
-            className="input-field"
-            style={{ fontFamily: 'var(--font-mono)' }}
-          />
-
-          {/* Prompt Counter with Validation */}
-          <div className="mt-2 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              {validationState.promptCountValid === true && (
-                <span className="text-success-main">✓</span>
-              )}
-              {validationState.promptCountValid === false && (
-                <span className="text-error-main">✗</span>
-              )}
-              <p className={`text-xs ${
-                validationState.promptCountValid === false ? 'text-error-main font-medium' :
-                validationState.promptCountValid === true ? 'text-success-dark font-medium' :
-                'text-neutral-500'
-              }`}>
-                {promptCount} prompt{promptCount !== 1 ? 's' : ''} detected
-                {promptCount > 0 && ` • Estimated cost: $${estimatedCost} USD`}
-              </p>
-            </div>
-            {promptCount > 100 && (
-              <p className="text-xs text-error-main font-medium">
-                Maximum 100 prompts allowed
-              </p>
-            )}
-          </div>
-
-          {/* Format Helper */}
-          <div className="mt-2 text-xs text-neutral-500 bg-neutral-50 p-3 rounded-lg">
-            <strong>Format:</strong> Separate each prompt with a double line break (press Enter twice).
-            Each prompt will generate one image.
+      <form onSubmit={handleFormSubmit}>
+        {/* Production Line Header */}
+        <div style={{
+          marginBottom: '32px',
+          padding: '24px',
+          background: 'linear-gradient(135deg, var(--primary-50) 0%, var(--secondary-50) 100%)',
+          borderRadius: '16px',
+          border: '2px solid var(--primary-200)',
+          position: 'relative',
+          overflow: 'hidden'
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            width: '200px',
+            height: '200px',
+            background: 'radial-gradient(circle, rgba(42, 157, 143, 0.1) 0%, transparent 70%)',
+            pointerEvents: 'none'
+          }} />
+          <div style={{ position: 'relative' }}>
+            <h2 style={{
+              fontSize: '28px',
+              fontWeight: 700,
+              color: 'var(--primary-700)',
+              marginBottom: '8px',
+              letterSpacing: '-0.02em'
+            }}>
+              Image Production Line
+            </h2>
+            <p style={{
+              fontSize: '14px',
+              color: 'var(--primary-600)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <span style={{
+                width: '6px',
+                height: '6px',
+                borderRadius: '50%',
+                background: 'var(--success-main)',
+                animation: 'pulse 2s infinite'
+              }} />
+              Factory Status: Ready • $0.039/image
+            </p>
           </div>
         </div>
 
-        {/* API Key with Security UI */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-body-sm font-medium text-neutral-700">
-              Google Gemini API Key <span className="text-error-main">*</span>
-            </label>
+        {/* Step 1: Raw Materials (Prompts) */}
+        <div style={{
+          marginBottom: '24px',
+          padding: '24px',
+          background: 'white',
+          borderRadius: '12px',
+          border: '2px solid var(--neutral-200)',
+          position: 'relative'
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            background: 'var(--secondary-500)',
+            color: 'white',
+            padding: '4px 12px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: 600,
+            letterSpacing: '0.05em'
+          }}>
+            STEP 1
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <svg style={{ width: '20px', height: '20px', color: 'var(--secondary-500)' }} fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
+                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
+              </svg>
+              Raw Materials: Image Prompts
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              Input your production queue • Separate with double line breaks
+            </p>
+          </div>
+
+          <div style={{ position: 'relative' }}>
+            <textarea
+              value={formData.prompts_text}
+              onChange={(e) => setFormData({ ...formData, prompts_text: e.target.value })}
+              placeholder="Enter production queue:
+
+a beautiful sunset over mountains, cinematic 8k
+
+a futuristic city at night with neon lights
+
+a portrait of a cat wearing sunglasses, studio lighting"
+              rows={10}
+              required
+              style={{
+                width: '100%',
+                padding: '16px',
+                fontSize: '14px',
+                fontFamily: 'var(--font-mono)',
+                border: `2px solid ${validationState.promptCountValid === true ? 'var(--success-main)' : 'var(--neutral-300)'}`,
+                borderRadius: '8px',
+                background: 'var(--canvas-base)',
+                color: 'var(--text-primary)',
+                resize: 'vertical',
+                transition: 'all 0.2s ease'
+              }}
+            />
+
+            {/* Live Counter Overlay */}
+            <div style={{
+              position: 'absolute',
+              bottom: '12px',
+              right: '12px',
+              background: validationState.promptCountValid === true ? 'var(--success-main)' : validationState.promptCountValid === false ? 'var(--error-main)' : 'var(--neutral-400)',
+              color: 'white',
+              padding: '6px 14px',
+              borderRadius: '20px',
+              fontSize: '13px',
+              fontWeight: 600,
+              fontFamily: 'var(--font-mono)',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.3s ease'
+            }}>
+              <span style={{ fontSize: '16px' }}>{promptCount}</span>
+              <span style={{ fontSize: '11px', opacity: 0.9 }}>UNITS</span>
+            </div>
+          </div>
+
+          {/* Production Stats */}
+          <div style={{
+            marginTop: '12px',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
+            gap: '12px'
+          }}>
+            <div style={{
+              background: 'var(--secondary-50)',
+              padding: '12px 16px',
+              borderRadius: '8px',
+              border: '1px solid var(--secondary-200)'
+            }}>
+              <div style={{ fontSize: '11px', color: 'var(--secondary-700)', fontWeight: 600, marginBottom: '4px', letterSpacing: '0.05em' }}>
+                ESTIMATED COST
+              </div>
+              <div style={{ fontSize: '20px', fontWeight: 700, color: 'var(--secondary-600)', fontFamily: 'var(--font-mono)' }}>
+                ${estimatedCost}
+              </div>
+            </div>
+
             <button
               type="button"
-              onClick={() => setShowSecurityInfo(!showSecurityInfo)}
-              className="btn-link"
+              onClick={() => setShowExampleModal(true)}
+              style={{
+                background: 'var(--info-50)',
+                padding: '12px 16px',
+                borderRadius: '8px',
+                border: '1px solid var(--info-200)',
+                cursor: 'pointer',
+                transition: 'all 0.2s ease',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px'
+              }}
             >
-              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+              <svg style={{ width: '16px', height: '16px', color: 'var(--info-dark)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
               </svg>
-              Security Info
+              <span style={{ fontSize: '13px', fontWeight: 600, color: 'var(--info-dark)' }}>Load Examples</span>
             </button>
           </div>
 
-          <div className="relative">
+          {promptCount > 10000 && (
+            <div style={{
+              marginTop: '12px',
+              padding: '12px',
+              background: 'var(--error-light)',
+              border: '1px solid var(--error-main)',
+              borderRadius: '8px',
+              fontSize: '13px',
+              color: 'var(--error-dark)',
+              fontWeight: 500
+            }}>
+              ⚠️ Production limit exceeded: Maximum 10,000 units allowed
+            </div>
+          )}
+        </div>
+
+        {/* Step 2: Power Source (API Key) */}
+        <div style={{
+          marginBottom: '24px',
+          padding: '24px',
+          background: 'white',
+          borderRadius: '12px',
+          border: '2px solid var(--neutral-200)',
+          position: 'relative'
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            background: 'var(--primary-500)',
+            color: 'white',
+            padding: '4px 12px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: 600,
+            letterSpacing: '0.05em'
+          }}>
+            STEP 2
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <svg style={{ width: '20px', height: '20px', color: 'var(--primary-500)' }} fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+              </svg>
+              Power Source: API Credentials
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              Secure authentication • AES-256 encrypted
+            </p>
+          </div>
+
+          <div style={{ position: 'relative' }}>
             <input
               type="password"
               value={formData.api_key}
               onChange={(e) => setFormData({ ...formData, api_key: e.target.value })}
               placeholder="AIza..."
               required
-              className={`input-field ${
-                validationState.apiKeyValid === false ? 'input-error' :
-                validationState.apiKeyValid === true ? 'border-success-main bg-success-light' :
-                ''
-              }`}
+              style={{
+                width: '100%',
+                padding: '14px 48px 14px 16px',
+                fontSize: '14px',
+                fontFamily: 'var(--font-mono)',
+                border: `2px solid ${
+                  validationState.apiKeyValid === false ? 'var(--error-main)' :
+                  validationState.apiKeyValid === true ? 'var(--success-main)' :
+                  'var(--neutral-300)'
+                }`,
+                borderRadius: '8px',
+                background: validationState.apiKeyValid === true ? 'var(--success-light)' : 'white',
+                color: 'var(--text-primary)',
+                transition: 'all 0.2s ease'
+              }}
             />
-            {validationState.apiKeyValid === true && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-success-main">
-                ✓
-              </span>
-            )}
-            {validationState.apiKeyValid === false && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-error-main">
-                ✗
-              </span>
-            )}
+
+            {/* Validation Badge */}
+            <div style={{
+              position: 'absolute',
+              right: '12px',
+              top: '50%',
+              transform: 'translateY(-50%)',
+              width: '28px',
+              height: '28px',
+              borderRadius: '50%',
+              background: validationState.apiKeyValid === true ? 'var(--success-main)' : validationState.apiKeyValid === false ? 'var(--error-main)' : 'var(--neutral-300)',
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '14px',
+              fontWeight: 700,
+              transition: 'all 0.3s ease'
+            }}>
+              {validationState.apiKeyValid === true ? '✓' : validationState.apiKeyValid === false ? '✗' : '?'}
+            </div>
           </div>
 
-          {/* Validation Error */}
           {validationState.errors.apiKey && (
-            <p className="mt-1 text-xs text-error-main">{validationState.errors.apiKey}</p>
+            <p style={{ marginTop: '8px', fontSize: '12px', color: 'var(--error-main)', fontWeight: 500 }}>
+              {validationState.errors.apiKey}
+            </p>
           )}
 
-          {/* Security Info Expandable */}
+          <button
+            type="button"
+            onClick={() => setShowSecurityInfo(!showSecurityInfo)}
+            style={{
+              marginTop: '12px',
+              padding: '8px 12px',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--primary-600)',
+              fontSize: '12px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'color 0.2s ease'
+            }}
+          >
+            <svg style={{ width: '14px', height: '14px' }} fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+            </svg>
+            {showSecurityInfo ? 'Hide' : 'Show'} Security Details
+          </button>
+
           {showSecurityInfo && (
-            <div className="mt-2 bg-indigo-50 border border-indigo-200 rounded-lg p-3">
-              <div className="flex items-start gap-2">
-                <svg className="w-4 h-4 text-indigo-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                </svg>
-                <div className="text-xs text-indigo-900">
-                  <p className="font-semibold mb-1">How we protect your API key:</p>
-                  <ul className="list-disc pl-4 space-y-1">
-                    <li>Encrypted in transit using HTTPS</li>
-                    <li>Encrypted at rest with AES-256</li>
-                    <li>Never stored in logs or databases</li>
-                    <li>Only used for your image generation</li>
-                    <li>Deleted immediately after execution</li>
-                  </ul>
-                </div>
-              </div>
+            <div style={{
+              marginTop: '12px',
+              padding: '16px',
+              background: 'var(--primary-50)',
+              border: '1px solid var(--primary-200)',
+              borderRadius: '8px',
+              fontSize: '12px',
+              color: 'var(--primary-900)'
+            }}>
+              <p style={{ fontWeight: 600, marginBottom: '8px' }}>🔒 Security Protocol:</p>
+              <ul style={{ paddingLeft: '20px', margin: 0, lineHeight: 1.8 }}>
+                <li>HTTPS-only transmission</li>
+                <li>AES-256 encryption at rest</li>
+                <li>Zero persistent storage</li>
+                <li>Auto-deletion post-execution</li>
+              </ul>
             </div>
           )}
-
-          <p className="mt-1 text-xs text-neutral-500 flex items-center gap-1">
-            <svg className="w-3 h-3 text-success-main" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-            </svg>
-            Encrypted and never stored permanently
-          </p>
         </div>
 
-        {/* Reference Images (Optional) */}
-        <div>
-          <label className="block text-body-sm font-medium text-neutral-700 mb-2">
-            Reference Images (Optional)
-          </label>
+        {/* Step 3: Optional Enhancement (Reference Images) */}
+        <div style={{
+          marginBottom: '32px',
+          padding: '24px',
+          background: 'white',
+          borderRadius: '12px',
+          border: '2px dashed var(--neutral-300)',
+          position: 'relative'
+        }}>
+          <div style={{
+            position: 'absolute',
+            top: '16px',
+            right: '16px',
+            background: 'var(--neutral-400)',
+            color: 'white',
+            padding: '4px 12px',
+            borderRadius: '20px',
+            fontSize: '12px',
+            fontWeight: 600,
+            letterSpacing: '0.05em'
+          }}>
+            OPTIONAL
+          </div>
+
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{
+              fontSize: '18px',
+              fontWeight: 600,
+              color: 'var(--text-primary)',
+              marginBottom: '4px',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              <svg style={{ width: '20px', height: '20px', color: 'var(--neutral-500)' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              Quality Control: Reference Images
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+              Up to 3 images • 10MB max each • PNG, JPG, WEBP
+            </p>
+          </div>
+
           <input
             type="file"
             accept="image/*"
             multiple
             onChange={handleFileChange}
-            className="block w-full text-sm text-neutral-500
-              file:mr-4 file:py-2 file:px-4
-              file:rounded-lg file:border-0
-              file:text-sm file:font-medium
-              file:bg-indigo-50 file:text-indigo-700
-              hover:file:bg-indigo-100
-              transition-colors cursor-pointer"
+            style={{
+              width: '100%',
+              padding: '14px',
+              fontSize: '13px',
+              border: '2px solid var(--neutral-300)',
+              borderRadius: '8px',
+              background: 'var(--neutral-50)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
           />
-          <p className="mt-1 text-xs text-neutral-500">
-            Upload up to 3 reference images (PNG, JPG, WEBP) • Max 10MB each
-          </p>
 
-          {/* File Validation Error */}
           {validationState.errors.files && (
-            <p className="mt-1 text-xs text-error-main font-medium">{validationState.errors.files}</p>
+            <p style={{ marginTop: '8px', fontSize: '12px', color: 'var(--error-main)', fontWeight: 500 }}>
+              {validationState.errors.files}
+            </p>
           )}
 
           {formData.reference_images.length > 0 && validationState.fileSizeValid && (
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div style={{ marginTop: '12px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
               {formData.reference_images.map((file, i) => (
-                <div key={i} className="badge badge-success">
+                <div key={i} style={{
+                  padding: '6px 12px',
+                  background: 'var(--success-light)',
+                  border: '1px solid var(--success-main)',
+                  borderRadius: '20px',
+                  fontSize: '12px',
+                  color: 'var(--success-dark)',
+                  fontWeight: 500
+                }}>
                   ✓ {file.name} ({(file.size / 1024 / 1024).toFixed(2)}MB)
                 </div>
               ))}
@@ -367,38 +616,63 @@ a portrait of a cat wearing sunglasses"
           )}
         </div>
 
-        {/* Info Box */}
-        <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-          <p className="text-sm text-indigo-900">
-            <strong>How it works:</strong> This workflow uses Google Gemini 2.5 Flash Image to generate images from your prompts.
-            Each prompt will be processed individually, and you'll receive a detailed report with all generated images.
-          </p>
-        </div>
+        {/* Start Production Button */}
+        <div style={{
+          padding: '24px',
+          background: 'linear-gradient(135deg, var(--success-main) 0%, var(--primary-600) 100%)',
+          borderRadius: '12px',
+          boxShadow: isFormValid && !loading ? '0 8px 24px rgba(42, 157, 143, 0.3)' : 'none',
+          transition: 'all 0.3s ease'
+        }}>
+          <button
+            type="submit"
+            disabled={!isFormValid || loading}
+            style={{
+              width: '100%',
+              padding: '18px 24px',
+              background: 'white',
+              border: 'none',
+              borderRadius: '8px',
+              fontSize: '16px',
+              fontWeight: 700,
+              color: 'var(--success-dark)',
+              cursor: isFormValid && !loading ? 'pointer' : 'not-allowed',
+              opacity: isFormValid && !loading ? 1 : 0.5,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '12px',
+              transition: 'all 0.2s ease',
+              letterSpacing: '0.02em'
+            }}
+          >
+            {loading ? (
+              <>
+                <span className="spinner-gradient-indigo-lime"></span>
+                <span>PRODUCTION IN PROGRESS...</span>
+              </>
+            ) : (
+              <>
+                <svg style={{ width: '20px', height: '20px' }} fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                </svg>
+                <span>START PRODUCTION • {promptCount} UNITS</span>
+              </>
+            )}
+          </button>
 
-        {/* CRITICAL: Generate Button - Lime Action Button with Glow Pulse */}
-        <button
-          type="submit"
-          disabled={!isFormValid || loading}
-          className={`btn btn-primary-lime btn-lg w-full ${!isFormValid || loading ? '' : 'glow-pulse'}`}
-        >
-          {loading ? (
-            <>
-              <span className="spinner-gradient-indigo-lime"></span>
-              Generating...
-            </>
-          ) : (
-            <>
-              🚀 Generate {promptCount} Image{promptCount !== 1 ? 's' : ''}
-            </>
+          {!isFormValid && !loading && (
+            <p style={{
+              marginTop: '12px',
+              textAlign: 'center',
+              fontSize: '12px',
+              color: 'white',
+              opacity: 0.9
+            }}>
+              ⚠️ {getSubmitDisabledReason()}
+            </p>
           )}
-        </button>
-
-        {/* Disabled Reason */}
-        {!isFormValid && !loading && (
-          <p className="text-xs text-center text-neutral-500">
-            {getSubmitDisabledReason()}
-          </p>
-        )}
+        </div>
       </form>
 
       {/* Cost Confirmation Modal */}
@@ -408,7 +682,7 @@ a portrait of a cat wearing sunglasses"
             <div className="modal-header">
               <h3 className="text-h3 font-bold">Confirm Batch Generation</h3>
               <button onClick={() => setShowConfirmModal(false)} className="btn btn-icon btn-ghost">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -417,7 +691,7 @@ a portrait of a cat wearing sunglasses"
             <div className="modal-body space-y-4">
               <div className="bg-warning-light border-l-4 border-warning-main rounded-lg p-4">
                 <div className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-warning-main flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                  <svg style={{ width: '24px', height: '24px' }} className="text-warning-main flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                   </svg>
                   <div>
@@ -452,8 +726,7 @@ a portrait of a cat wearing sunglasses"
               {/* Pricing Info */}
               <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-3">
                 <p className="text-xs text-indigo-900">
-                  <strong>Pricing:</strong> Each image costs approximately $0.039 USD (Google Gemini API pricing).
-                  Final costs may vary based on actual API usage and any promotional credits.
+                  <strong>Tarification:</strong> $0.039 par image générée. Les coûts finaux peuvent varier selon l'utilisation réelle.
                 </p>
               </div>
             </div>
@@ -483,7 +756,7 @@ a portrait of a cat wearing sunglasses"
             <div className="modal-header">
               <h3 className="text-h3 font-bold">Example Prompts</h3>
               <button onClick={() => setShowExampleModal(false)} className="btn btn-icon btn-ghost">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
@@ -491,19 +764,31 @@ a portrait of a cat wearing sunglasses"
 
             <div className="modal-body">
               <p className="text-sm text-neutral-600 mb-4">
-                Load these example prompts to see how to format your batch. You can edit them after loading.
+                Ces exemples montrent comment mettre en valeur votre produit dans différents décors. Remplacez [product] par votre produit réel.
               </p>
 
-              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4 text-xs" style={{ fontFamily: 'var(--font-mono)' }}>
-                <pre className="whitespace-pre-wrap">
-a beautiful sunset over snow-capped mountains, cinematic lighting, 8k resolution
+              <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-4 text-xs" style={{ fontFamily: 'var(--font-mono)', lineHeight: '1.8' }}>
+                <div style={{ whiteSpace: 'pre-wrap' }}>
+                  <div style={{ marginBottom: '16px' }}>
+                    <strong style={{ color: 'var(--primary-600)' }}>1. Rustique & Naturel:</strong><br />
+                    [product] on a rustic wooden table with natural morning light, surrounded by fresh herbs and organic ingredients, warm atmosphere, professional food photography
+                  </div>
 
-a futuristic cyberpunk city at night with neon lights reflecting on wet streets
+                  <div style={{ marginBottom: '16px' }}>
+                    <strong style={{ color: 'var(--primary-600)' }}>2. Minimaliste Zen:</strong><br />
+                    [product] floating in a minimalist zen garden setting with smooth stones, raked sand patterns, soft shadows, clean modern aesthetic, 8k resolution
+                  </div>
 
-a portrait of a cat wearing vintage sunglasses and a leather jacket, studio lighting
+                  <div style={{ marginBottom: '16px' }}>
+                    <strong style={{ color: 'var(--primary-600)' }}>3. Hygge Cosy:</strong><br />
+                    [product] in a cozy hygge-inspired interior with candles, soft blankets, and warm bokeh lights in background, intimate atmosphere, Scandinavian design
+                  </div>
 
-an underwater scene with colorful coral reefs and tropical fish, crystal clear water
-                </pre>
+                  <div>
+                    <strong style={{ color: 'var(--primary-600)' }}>4. Tropical Vibrant:</strong><br />
+                    [product] on a vibrant tropical beach scene with turquoise water, palm leaves, white sand, golden hour sunlight, vacation lifestyle photography
+                  </div>
+                </div>
               </div>
             </div>
 
