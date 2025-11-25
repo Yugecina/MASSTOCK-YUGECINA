@@ -1,5 +1,4 @@
-const pLimitModule = require('p-limit');
-const pLimit = pLimitModule.default || pLimitModule;
+const pLimit = require('p-limit');
 const { workflowQueue } = require('../queues/workflowQueue');
 const { supabaseAdmin } = require('../config/database');
 const { createGeminiImageService } = require('../services/geminiImageService');
