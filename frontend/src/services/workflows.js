@@ -24,6 +24,25 @@ export const workflowService = {
   getExecutions: (workflowId) => api.get(`/v1/workflows/${workflowId}/executions`),
 
   /**
+   * Get all executions for the client with pagination
+   * @param {Object} params - Query parameters
+   * @param {number} params.limit - Number of executions to fetch (default: 20)
+   * @param {number} params.offset - Offset for pagination (default: 0)
+   * @param {string} params.status - Filter by status (optional)
+   * @param {string} params.workflow_id - Filter by workflow (optional)
+   * @param {string} params.user_id - Filter by user (optional)
+   */
+  getAllExecutions: (params = {}) => {
+    const queryParams = new URLSearchParams()
+    if (params.limit) queryParams.append('limit', params.limit)
+    if (params.offset) queryParams.append('offset', params.offset)
+    if (params.status && params.status !== 'all') queryParams.append('status', params.status)
+    if (params.workflow_id && params.workflow_id !== 'all') queryParams.append('workflow_id', params.workflow_id)
+    if (params.user_id && params.user_id !== 'all') queryParams.append('user_id', params.user_id)
+    return api.get(`/v1/workflows/executions/all?${queryParams.toString()}`)
+  },
+
+  /**
    * Get batch results for workflows with batch processing
    * @param {string} executionId - Execution ID
    */
@@ -33,4 +52,9 @@ export const workflowService = {
    * Get dashboard stats
    */
   getDashboardStats: () => api.get('/v1/workflows/stats/dashboard'),
+
+  /**
+   * Get client members (for filtering executions by collaborator)
+   */
+  getClientMembers: () => api.get('/v1/workflows/client/members'),
 }

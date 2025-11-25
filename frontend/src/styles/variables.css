@@ -1,0 +1,405 @@
+/* ========================================
+   FONT FACES - Local fonts for better performance
+   ======================================== */
+
+/* Space Grotesk (Local - Display/Headings) */
+@font-face {
+  font-family: 'Space Grotesk';
+  src: url('/fonts/SpaceGrotesk-Variable.woff2') format('woff2');
+  font-weight: 300 700;
+  font-display: swap;
+}
+
+/* Inter - Fallback to Google Fonts for body text */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+/**
+ * MASSTOCK DESIGN SYSTEM - "THE TRUSTED MAGICIAN"
+ * Version: 7.2 - Dark Premium Bleu Petrole
+ * Date: November 25, 2025
+ *
+ * Philosophy: Sombre, epure, haut de gamme
+ * Palette: Tons sombres + accent Bleu Petrole moderne
+ *
+ * IDENTITY:
+ * - Emotion: Confiance & Excellence
+ * - Archetype: Le Magicien (transformation fiable)
+ * - Style: Dark Premium - surfaces sombres, accent moderne SaaS
+ * - Inspirations: Linear Dark, Vercel, Raycast, Arc Browser
+ *
+ * DESIGN RULES:
+ * - Pure CSS only (NO Tailwind)
+ * - Dark-first design
+ * - Accent Bleu Petrole #2E6B7B (moderne, raffine, tech premium)
+ * - Bordures tres subtiles
+ * - Ombres minimales
+ * - Coins arrondis doux (8-10px)
+ *
+ * CRITICAL RULES:
+ * - Typography: Space Grotesk (display) + Inter (body) + JetBrains Mono (data)
+ * - Transitions: smooth (200ms)
+ */
+
+/* ========================================
+   1. CSS VARIABLES - DARK PREMIUM THEME
+   ======================================== */
+
+:root {
+  /* ==========================================================
+     ACCENT COLOR PALETTE - SINGLE SOURCE OF TRUTH
+     Change these 4 values to change the entire color scheme
+     ========================================================== */
+  --accent-base: #2E6B7B;          /* Main accent - Bleu Petrole */
+  --accent-light: #3D8A9C;         /* Lighter variant (for text on dark) */
+  --accent-dark: #245560;          /* Darker variant (hover states) */
+  --accent-darker: #1A3F48;        /* Darkest variant (pressed states) */
+
+  /* Light mode accent variants (auto-calculated feel) */
+  --accent-base-light: #245560;    /* Main accent in light mode */
+  --accent-light-light: #2E6B7B;   /* Lighter in light mode */
+  --accent-dark-light: #1A3F48;    /* Darker in light mode */
+
+  /* Accent-tinted backgrounds */
+  --accent-bg-dark: #1A2E33;       /* Accent tinted bg for dark mode */
+  --accent-bg-light: #F0F7F9;      /* Accent tinted bg for light mode */
+
+  /* ===== BACKGROUNDS (Dark by default - Softer) ===== */
+  --background: #16181D;           /* Soft dark gray-blue */
+  --foreground: #F4F4F5;           /* Off-white text */
+  --card: #1E2028;                 /* Slightly lighter cards */
+  --card-foreground: #F4F4F5;      /* Light text on cards */
+  --popover: #1E2028;              /* Popover background */
+  --popover-foreground: #F4F4F5;   /* Popover text */
+
+  /* ===== PRIMARY (References accent palette) ===== */
+  --primary: var(--accent-base);
+  --primary-foreground: #FFFFFF;
+  --primary-hover: var(--accent-dark);
+
+  /* ===== SECONDARY ===== */
+  --secondary: #252830;            /* Soft dark gray */
+  --secondary-foreground: #F4F4F5; /* Light text */
+
+  /* ===== MUTED ===== */
+  --muted: #252830;                /* Soft muted backgrounds */
+  --muted-foreground: #8B8D98;     /* Softer gray text */
+
+  /* ===== ACCENT (References accent palette) ===== */
+  --accent: #2A2D36;               /* Subtle dark accent bg */
+  --accent-foreground: var(--accent-light);
+  --accent-bright: var(--accent-light);
+
+  /* ===== DESTRUCTIVE ===== */
+  --destructive: #EF4444;
+  --destructive-foreground: #F4F4F5;
+
+  /* ===== BORDERS & INPUTS ===== */
+  --border: #32353F;               /* Softer border */
+  --input: #32353F;                /* Input border */
+  --ring: var(--accent-base);      /* Focus ring uses accent */
+
+  /* ===== CHART COLORS ===== */
+  --chart-1: var(--accent-base);
+  --chart-2: var(--accent-light);
+  --chart-3: #7C9F6B;              /* Muted green */
+  --chart-4: #9F8A6B;              /* Warm tan */
+  --chart-5: #6B7C9F;              /* Muted blue */
+
+  /* ===== SIDEBAR (References accent palette) ===== */
+  --sidebar: #16181D;
+  --sidebar-foreground: #F4F4F5;
+  --sidebar-primary: var(--accent-base);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #252830;
+  --sidebar-accent-foreground: #F4F4F5;
+  --sidebar-border: #32353F;
+  --sidebar-ring: var(--accent-base);
+
+  /* ===== SEMANTIC COLORS ===== */
+  --success: #4ADE80;
+  --success-foreground: #16181D;
+  --success-light: #14532D;
+  --success-dark: #86EFAC;
+
+  --warning: #FBBF24;
+  --warning-foreground: #0C0C0E;
+  --warning-light: #78350F;
+  --warning-dark: #FDE68A;
+
+  --error: #F87171;
+  --error-foreground: #0C0C0E;
+  --error-light: #7F1D1D;
+  --error-dark: #FCA5A5;
+
+  --info: var(--accent-base);
+  --info-foreground: #FFFFFF;
+  --info-light: var(--accent-bg-dark);
+  --info-dark: var(--accent-light);
+
+  /* ===== NEUTRAL SCALE ===== */
+  --neutral-50: #FAFAFA;
+  --neutral-100: #F4F4F5;
+  --neutral-200: #E4E4E7;
+  --neutral-300: #D4D4D8;
+  --neutral-400: #A1A1AA;
+  --neutral-500: #71717A;
+  --neutral-600: #52525B;
+  --neutral-700: #3F3F46;
+  --neutral-800: #27272A;
+  --neutral-900: #18181B;
+  --neutral-950: #0C0C0E;
+
+  /* ===== TYPOGRAPHY ===== */
+  --font-sans: 'Space Grotesk', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+  --font-serif: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* ===== BORDER RADIUS ===== */
+  --radius: 0.75rem;               /* 12px base */
+  --radius-sm: calc(var(--radius) - 4px);   /* 8px */
+  --radius-md: calc(var(--radius) - 2px);   /* 10px */
+  --radius-lg: var(--radius);               /* 12px */
+  --radius-xl: calc(var(--radius) + 4px);   /* 16px */
+  --radius-2xl: calc(var(--radius) + 12px); /* 24px */
+  --radius-full: 9999px;
+
+  /* ===== SHADOWS ===== */
+  --shadow-x: 0;
+  --shadow-y: 1px;
+  --shadow-blur: 3px;
+  --shadow-spread: 0px;
+  --shadow-opacity: 0.1;
+  --shadow-color: oklch(0 0 0);
+
+  --shadow-2xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-xs: 0 1px 3px 0px hsl(0 0% 0% / 0.05);
+  --shadow-sm: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+  --shadow: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 1px 2px -1px hsl(0 0% 0% / 0.10);
+  --shadow-md: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 2px 4px -1px hsl(0 0% 0% / 0.10);
+  --shadow-lg: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 4px 6px -1px hsl(0 0% 0% / 0.10);
+  --shadow-xl: 0 1px 3px 0px hsl(0 0% 0% / 0.10), 0 8px 10px -1px hsl(0 0% 0% / 0.10);
+  --shadow-2xl: 0 1px 3px 0px hsl(0 0% 0% / 0.25);
+
+  /* Glow shadows for neon effects - Electric Trust */
+  --shadow-glow-primary: 0 0 30px rgba(99, 102, 241, 0.5), 0 0 60px rgba(99, 102, 241, 0.3), 0 4px 12px rgba(99, 102, 241, 0.2);
+  --shadow-glow-accent: 0 0 25px rgba(6, 182, 212, 0.4), 0 0 50px rgba(6, 182, 212, 0.25);
+  --shadow-glow-success: 0 0 25px rgba(16, 185, 129, 0.4), 0 0 50px rgba(16, 185, 129, 0.25);
+
+  /* ===== SPACING (8px base system) ===== */
+  --spacing: 0.25rem;              /* 4px */
+  --spacing-0: 0;
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-8: 32px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-16: 64px;
+  --spacing-20: 80px;
+  --spacing-24: 96px;
+
+  /* ===== GLASSMORPHISM (Light theme) - PREMIUM ===== */
+  --glass-bg-light: rgba(255, 255, 255, 0.5);
+  --glass-bg-medium: rgba(255, 255, 255, 0.7);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(226, 232, 240, 0.6);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 32px;
+
+  /* ===== NEUMORPHISM (Soft UI) - Light Theme ===== */
+  --neu-bg: #E8EEF5;                /* Tinted background - soft blue-gray */
+  --neu-surface: #E8EEF5;           /* Same as bg for seamless look */
+  --neu-shadow-light: #FFFFFF;      /* Light shadow (top-left) */
+  --neu-shadow-dark: rgba(163, 177, 198, 0.6);  /* Dark shadow (bottom-right) */
+
+  /* Neumorphic shadow presets */
+  --neu-shadow-raised:
+    8px 8px 20px var(--neu-shadow-dark),
+    -8px -8px 20px var(--neu-shadow-light);
+  --neu-shadow-hover:
+    12px 12px 30px var(--neu-shadow-dark),
+    -12px -12px 30px var(--neu-shadow-light);
+  --neu-shadow-pressed:
+    inset 4px 4px 10px var(--neu-shadow-dark),
+    inset -4px -4px 10px var(--neu-shadow-light);
+  --neu-shadow-inset:
+    inset 2px 2px 5px var(--neu-shadow-dark),
+    inset -2px -2px 5px var(--neu-shadow-light);
+  --neu-shadow-small:
+    4px 4px 10px var(--neu-shadow-dark),
+    -4px -4px 10px var(--neu-shadow-light);
+
+  /* ===== BRUTALIST DESIGN - Light Theme ===== */
+  --brutal-bg: #FFFFFF;             /* Pure white */
+  --brutal-surface: #FFFFFF;        /* Pure white cards */
+  --brutal-border: #000000;         /* Pure black borders */
+  --brutal-border-width: 2px;       /* Thick borders */
+  --brutal-text: #000000;           /* Pure black text */
+  --brutal-text-muted: #666666;     /* Gray for secondary */
+  --brutal-accent: #6366F1;         /* Electric Indigo accent */
+  --brutal-offset: 4px;             /* Offset shadow distance */
+  --brutal-radius: 0px;             /* Sharp corners */
+
+  /* ===== TRANSITIONS ===== */
+  --transition-fast: 200ms;
+  --transition-normal: 300ms;
+  --transition-slow: 400ms;
+  --transition-slower: 600ms;
+
+  /* ===== EASING ===== */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+
+  /* ===== TYPOGRAPHY SCALE ===== */
+  --text-xs: 12px;
+  --text-sm: 14px;
+  --text-base: 16px;
+  --text-lg: 18px;
+  --text-xl: 20px;
+  --text-2xl: 24px;
+  --text-3xl: 30px;
+  --text-4xl: 36px;
+  --text-5xl: 48px;
+  --text-6xl: 60px;
+
+  /* ===== FONT WEIGHTS ===== */
+  --weight-light: 300;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+
+  /* ===== LINE HEIGHTS ===== */
+  --line-height-none: 1;
+  --line-height-tight: 1.25;
+  --line-height-snug: 1.375;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+  --line-height-loose: 2;
+
+  /* ===== LETTER SPACING ===== */
+  --tracking-tighter: -0.05em;
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0em;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+}
+
+/* ========================================
+   LIGHT MODE (Toggle - optional)
+   Default is dark, .dark class switches to light
+   ======================================== */
+
+.dark {
+  /* Light mode - Uses accent palette variables for consistency
+     High contrast, modern, SaaS premium feel */
+  --background: #F8FAFB;
+  --foreground: #1A1A1A;
+  --card: #FFFFFF;
+  --card-foreground: #1A1A1A;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A1A1A;
+
+  /* Primary references the light mode accent variants */
+  --primary: var(--accent-base-light);
+  --primary-foreground: #FFFFFF;
+  --primary-hover: var(--accent-dark-light);
+
+  --secondary: #F3F5F6;
+  --secondary-foreground: #1A1A1A;
+
+  --muted: #EEF1F2;
+  --muted-foreground: #52525B;
+
+  /* Accent uses light mode variants */
+  --accent: var(--accent-bg-light);
+  --accent-foreground: var(--accent-dark-light);
+  --accent-bright: var(--accent-base-light);
+
+  --border: #D4D4D4;
+  --input: #D4D4D4;
+  --ring: var(--accent-base-light);
+
+  /* Sidebar references accent palette */
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #1A1A1A;
+  --sidebar-primary: var(--accent-base-light);
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: var(--accent-bg-light);
+  --sidebar-accent-foreground: #1A1A1A;
+  --sidebar-border: #E5E5E5;
+
+  --success: #15803D;
+  --success-light: #DCFCE7;
+  --error: #B91C1C;
+  --error-light: #FEE2E2;
+  --warning: #B45309;
+  --warning-light: #FEF3C7;
+
+  /* Shadows more visible in light mode */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.07), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.08), 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* ========================================
+   THEME INLINE (for framework compatibility)
+   ======================================== */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+  --font-serif: var(--font-serif);
+}
+
+/* ========================================
+   2. FONT FACES
+   ======================================== */
+
+/* JetBrains Mono (Local - Data/Tech - IDs, timestamps) */
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-display: swap;
+}

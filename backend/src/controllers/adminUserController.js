@@ -38,17 +38,18 @@ async function syncAuthToDatabase(authUserId, email, role = 'user') {
 
 /**
  * POST /api/v1/admin/users
- * Create a new user/client via admin interface
+ * Create a new user via admin interface
+ * - For role='user': client_id is REQUIRED, creates entry in client_members
+ * - For role='admin': no client association needed
  */
 async function createUser(req, res) {
   const {
     email,
     password,
-    company_name,
     name,
-    plan = 'premium_custom',
-    subscription_amount = 0,
-    role = 'user'
+    role = 'user',
+    client_id,
+    member_role = 'collaborator'
   } = req.body;
 
   // Validate input
@@ -64,6 +65,16 @@ async function createUser(req, res) {
     throw new ApiError(400, 'Role must be either "user" or "admin"', 'INVALID_ROLE');
   }
 
+  // For regular users, client_id is required
+  if (role === 'user' && !client_id) {
+    throw new ApiError(400, 'client_id is required for regular users', 'CLIENT_ID_REQUIRED');
+  }
+
+  // Validate member_role
+  if (role === 'user' && !['owner', 'collaborator'].includes(member_role)) {
+    throw new ApiError(400, 'member_role must be "owner" or "collaborator"', 'INVALID_MEMBER_ROLE');
+  }
+
   // Check if user already exists
   const { data: existingUser } = await supabaseAdmin
     .from('users')
@@ -75,6 +86,21 @@ async function createUser(req, res) {
     throw new ApiError(400, 'User with this email already exists', 'USER_EXISTS');
   }
 
+  // If client_id provided, verify the client exists
+  let client = null;
+  if (client_id) {
+    const { data: clientData, error: clientError } = await supabaseAdmin
+      .from('clients')
+      .select('id, name')
+      .eq('id', client_id)
+      .single();
+
+    if (clientError || !clientData) {
+      throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+    }
+    client = clientData;
+  }
+
   try {
     // Step 1: Create user in Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -82,8 +108,7 @@ async function createUser(req, res) {
       password,
       email_confirm: true,
       user_metadata: {
-        name: name || email.split('@')[0],
-        company_name: company_name
+        name: name || email.split('@')[0]
       }
     });
 
@@ -94,37 +119,36 @@ async function createUser(req, res) {
     // Step 2: Sync to public.users
     const user = await syncAuthToDatabase(authData.user.id, email, role);
 
-    // Step 3: Create client record (only if role is 'user')
-    let client = null;
-    if (role === 'user') {
-      const { data: clientData, error: clientError } = await supabaseAdmin
-        .from('clients')
+    // Step 3: Create client_members entry (only if role is 'user' and client_id provided)
+    let membership = null;
+    if (role === 'user' && client_id) {
+      const { data: memberData, error: memberError } = await supabaseAdmin
+        .from('client_members')
         .insert([{
+          client_id: client_id,
           user_id: user.id,
-          name: company_name || name || email.split('@')[0],
-          email: email,
-          company_name: company_name,
-          plan: plan,
+          role: member_role,
           status: 'active',
-          subscription_amount: parseFloat(subscription_amount),
-          subscription_start_date: new Date().toISOString().split('T')[0]
+          invited_by: req.user.id,
+          invited_at: new Date().toISOString(),
+          accepted_at: new Date().toISOString()
         }])
         .select()
         .single();
 
-      if (clientError) {
+      if (memberError) {
         // Rollback
         await supabaseAdmin.from('users').delete().eq('id', user.id);
         await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-        throw new ApiError(500, `Failed to create client: ${clientError.message}`, 'CLIENT_CREATION_FAILED');
+        throw new ApiError(500, `Failed to add user to client: ${memberError.message}`, 'MEMBER_CREATION_FAILED');
       }
 
-      client = clientData;
+      membership = memberData;
     }
 
     // Step 4: Create audit log
     await supabaseAdmin.from('audit_logs').insert([{
-      client_id: client?.id,
+      client_id: client_id || null,
       user_id: req.user.id,
       action: 'user_created_by_admin',
       resource_type: 'user',
@@ -132,7 +156,8 @@ async function createUser(req, res) {
       changes: {
         email: email,
         role: role,
-        plan: plan,
+        client_id: client_id,
+        member_role: member_role,
         created_by: req.user.email
       },
       ip_address: req.ip,
@@ -151,11 +176,12 @@ async function createUser(req, res) {
         },
         client: client ? {
           id: client.id,
-          name: client.name,
-          company_name: client.company_name,
-          plan: client.plan,
-          status: client.status,
-          subscription_amount: client.subscription_amount
+          name: client.name
+        } : null,
+        membership: membership ? {
+          id: membership.id,
+          role: membership.role,
+          status: membership.status
         } : null,
         credentials: {
           email: email,
@@ -268,23 +294,19 @@ async function getClients(req, res) {
     sort = 'created_at'
   } = req.query;
 
+  console.log('📊 AdminUserController.getClients: Loading clients list', {
+    page, limit, status, plan, search, sort
+  });
+
   // Calculate offset from page if not provided directly
   const pageNum = parseInt(page);
   const limitNum = parseInt(limit);
   const calculatedOffset = offset !== undefined ? parseInt(offset) : (pageNum - 1) * limitNum;
 
-  // Build query - select clients with owner and users info
+  // Build query - select clients (no more owner FK since user_id was dropped)
   let query = supabaseAdmin
     .from('clients')
-    .select(`
-      *,
-      owner:users!clients_owner_id_fkey(
-        id,
-        email,
-        status,
-        created_at
-      )
-    `, { count: 'exact' });
+    .select('*', { count: 'exact' });
 
   // Apply filters first
   if (status) {
@@ -308,31 +330,74 @@ async function getClients(req, res) {
   const { data: clients, error, count } = await query;
 
   if (error) {
-    logger.error('Failed to fetch clients:', error);
+    console.error('❌ AdminUserController.getClients: Database error', { error });
     throw new ApiError(500, 'Failed to fetch clients', 'DATABASE_ERROR');
   }
 
-  // For each client, get the count of users
-  const clientsWithUserCounts = await Promise.all(
-    clients.map(async (client) => {
-      const { count: usersCount } = await supabaseAdmin
-        .from('users')
+  console.log('✅ AdminUserController.getClients: Clients fetched', {
+    count: clients?.length || 0,
+    total: count
+  });
+
+  // For each client, get owner (from client_members), users count, workflows count, executions count
+  const clientsWithCounts = await Promise.all(
+    (clients || []).map(async (client) => {
+      // Get owner from client_members
+      const { data: owners } = await supabaseAdmin
+        .from('client_members')
+        .select(`
+          id,
+          user:user_id (
+            id,
+            email,
+            status,
+            created_at
+          )
+        `)
+        .eq('client_id', client.id)
+        .eq('role', 'owner')
+        .eq('status', 'active')
+        .limit(1);
+
+      // Get total members count
+      const { count: membersCount } = await supabaseAdmin
+        .from('client_members')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', client.id)
+        .eq('status', 'active');
+
+      // Get workflows count
+      const { count: workflowsCount } = await supabaseAdmin
+        .from('workflows')
+        .select('id', { count: 'exact', head: true })
+        .eq('client_id', client.id)
+        .neq('status', 'archived');
+
+      // Get executions count
+      const { count: executionsCount } = await supabaseAdmin
+        .from('workflow_executions')
         .select('id', { count: 'exact', head: true })
         .eq('client_id', client.id);
 
       return {
         ...client,
-        users_count: usersCount || 0,
-        workflows_count: 0, // To be filled from workflows table if needed
-        executions_count: 0 // To be filled from executions table if needed
+        owner: owners?.[0]?.user || null,
+        users_count: membersCount || 0,
+        workflows_count: workflowsCount || 0,
+        executions_count: executionsCount || 0
       };
     })
   );
 
+  console.log('✅ AdminUserController.getClients: Response ready', {
+    clientsCount: clientsWithCounts.length,
+    pagination: { total: count, page: pageNum, limit: limitNum }
+  });
+
   res.json({
     success: true,
     data: {
-      clients: clientsWithUserCounts,
+      clients: clientsWithCounts,
       pagination: {
         total: count,
         limit: limitNum,
@@ -351,6 +416,8 @@ async function getClients(req, res) {
 async function getClient(req, res) {
   const { client_id } = req.params;
 
+  console.log('📊 AdminUserController.getClient: Loading client details', { client_id });
+
   // Fetch client
   const { data: client, error } = await supabaseAdmin
     .from('clients')
@@ -359,32 +426,58 @@ async function getClient(req, res) {
     .single();
 
   if (error || !client) {
+    console.error('❌ AdminUserController.getClient: Client not found', { client_id, error });
     throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
   }
 
-  // Fetch workflows
-  const { data: workflows } = await supabaseAdmin
+  console.log('✅ AdminUserController.getClient: Client found', {
+    clientId: client.id,
+    name: client.name
+  });
+
+  // Fetch workflows - FIX: use client_id not id
+  const { data: workflows, error: workflowsError } = await supabaseAdmin
     .from('workflows')
     .select('*')
-    .eq('id', client_id);
+    .eq('client_id', client_id);
 
-  // Fetch workflow requests
-  const { data: requests } = await supabaseAdmin
+  console.log('📦 AdminUserController.getClient: Workflows fetched', {
+    count: workflows?.length || 0,
+    error: workflowsError?.message
+  });
+
+  // Fetch workflow requests - FIX: use client_id not id
+  const { data: requests, error: requestsError } = await supabaseAdmin
     .from('workflow_requests')
     .select('*')
-    .eq('id', client_id);
+    .eq('client_id', client_id);
 
-  // Fetch support tickets
-  const { data: tickets } = await supabaseAdmin
+  console.log('📦 AdminUserController.getClient: Requests fetched', {
+    count: requests?.length || 0,
+    error: requestsError?.message
+  });
+
+  // Fetch support tickets - FIX: use client_id not id
+  const { data: tickets, error: ticketsError } = await supabaseAdmin
     .from('support_tickets')
     .select('*')
-    .eq('id', client_id);
+    .eq('client_id', client_id);
 
-  // Fetch executions for stats
-  const { data: executions } = await supabaseAdmin
+  console.log('📦 AdminUserController.getClient: Tickets fetched', {
+    count: tickets?.length || 0,
+    error: ticketsError?.message
+  });
+
+  // Fetch executions for stats - FIX: use client_id not id
+  const { data: executions, error: executionsError } = await supabaseAdmin
     .from('workflow_executions')
     .select('status, created_at')
-    .eq('id', client_id);
+    .eq('client_id', client_id);
+
+  console.log('📦 AdminUserController.getClient: Executions fetched', {
+    count: executions?.length || 0,
+    error: executionsError?.message
+  });
 
   const totalExecutions = executions?.length || 0;
   const successCount = executions?.filter(e => e.status === 'completed').length || 0;
@@ -399,8 +492,38 @@ async function getClient(req, res) {
   ).length || 0;
 
   const monthlyRevenue = workflows?.reduce((sum, w) =>
-    sum + (w.revenue_per_execution * monthlyExecutions), 0
+    sum + ((w.revenue_per_execution || 0) * monthlyExecutions), 0
   ) || 0;
+
+  // Fetch members count
+  const { data: members, error: membersError } = await supabaseAdmin
+    .from('client_members')
+    .select('id, role')
+    .eq('client_id', client_id)
+    .eq('status', 'active');
+
+  console.log('📦 AdminUserController.getClient: Members fetched', {
+    count: members?.length || 0,
+    error: membersError?.message
+  });
+
+  const stats = {
+    total_workflows: workflows?.length || 0,
+    total_executions: totalExecutions,
+    success_count: successCount,
+    success_rate: totalExecutions > 0 ? ((successCount / totalExecutions) * 100).toFixed(2) : '0',
+    executions_this_month: monthlyExecutions,
+    revenue_this_month: monthlyRevenue.toFixed(2),
+    open_tickets: tickets?.filter(t => t.status === 'open').length || 0,
+    total_members: members?.length || 0,
+    owners_count: members?.filter(m => m.role === 'owner').length || 0,
+    collaborators_count: members?.filter(m => m.role === 'collaborator').length || 0
+  };
+
+  console.log('✅ AdminUserController.getClient: Response ready', {
+    clientId: client.id,
+    stats
+  });
 
   res.json({
     success: true,
@@ -409,15 +532,7 @@ async function getClient(req, res) {
       workflows: workflows || [],
       requests: requests || [],
       tickets: tickets || [],
-      stats: {
-        total_workflows: workflows?.length || 0,
-        total_executions: totalExecutions,
-        success_count: successCount,
-        success_rate: totalExecutions > 0 ? ((successCount / totalExecutions) * 100).toFixed(2) : '0',
-        executions_this_month: monthlyExecutions,
-        revenue_this_month: monthlyRevenue.toFixed(2),
-        open_tickets: tickets?.filter(t => t.status === 'open').length || 0
-      }
+      stats
     }
   });
 }

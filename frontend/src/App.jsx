@@ -13,6 +13,7 @@ import { Settings } from './pages/Settings'
 import { AdminDashboard } from './pages/admin/AdminDashboard'
 import { AdminUsers } from './pages/admin/AdminUsers'
 import { AdminClients } from './pages/admin/AdminClients'
+import { AdminClientDetail } from './pages/admin/AdminClientDetail'
 import { AdminWorkflows } from './pages/admin/AdminWorkflows'
 import { AdminErrors } from './pages/admin/AdminErrors'
 import { AdminTickets } from './pages/admin/AdminTickets'
@@ -134,6 +135,14 @@ export default function App() {
             element={
               <ProtectedRoute requireAdmin={true}>
                 <AdminClients />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/admin/clients/:id"
+            element={
+              <ProtectedRoute requireAdmin={true}>
+                <AdminClientDetail />
               </ProtectedRoute>
             }
           />

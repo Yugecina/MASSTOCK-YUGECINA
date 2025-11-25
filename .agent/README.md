@@ -1,6 +1,6 @@
 # MasStock Documentation
 
-**Last Updated:** 2025-11-24
+**Last Updated:** 2025-11-25
 
 Welcome to the MasStock documentation hub. This folder contains all technical documentation for developers working on the MasStock platform.
 
@@ -88,8 +88,8 @@ Welcome to the MasStock documentation hub. This folder contains all technical do
 
 - **What it covers:**
   - Entity Relationship Diagram (ERD)
-  - All 7 tables with full schemas
-  - Row Level Security (RLS) policies
+  - All 9 tables with full schemas (including `client_members`, `workflow_templates` ⭐ v2.1)
+  - Row Level Security (RLS) policies (updated for N:N user-client relationships)
   - Indexes and performance optimization
   - Storage buckets
   - Common SQL queries
@@ -100,6 +100,7 @@ Welcome to the MasStock documentation hub. This folder contains all technical do
   - When writing complex queries
   - Debugging data access issues
   - Understanding multi-tenant isolation
+  - Understanding client membership (owner vs collaborator roles)
 
 ### [Async Workers & Concurrency](./system/async_workers.md) ⭐ NEW (v2.0)
 
@@ -161,6 +162,23 @@ Welcome to the MasStock documentation hub. This folder contains all technical do
   - Creating a new API endpoint
   - Adding CRUD operations
   - Implementing new features
+
+### [SOP: Workflows & Executions](./SOP/workflows_executions.md) ⭐ NEW
+
+**Understanding the workflow system architecture:**
+
+- **What you'll learn:**
+  - Template Instantiation pattern (templates → workflows → executions)
+  - How workflows are assigned to clients
+  - Execution tracking (client_id + triggered_by_user_id)
+  - Visibility rules and RLS policies
+  - Best practices for creating workflows and executions
+
+- **When to use:**
+  - Working on workflow-related features
+  - Understanding execution ownership
+  - Implementing filters by collaborator
+  - Debugging visibility issues
 
 ### [SOP: Add React Component](./SOP/add_component.md)
 
@@ -346,14 +364,16 @@ The `tasks/` folder contains feature-specific documentation:
 
 ## 📊 Documentation Health
 
-**Last Full Review:** 2025-11-24
+**Last Full Review:** 2025-11-25
 **Coverage:** ✅ Complete
 
 ### Coverage Checklist
 
 - [x] System architecture documented
-- [x] Database schema documented
-- [x] **Async workers & concurrency (v2.0)** ⭐ NEW
+- [x] Database schema documented (9 tables)
+- [x] **Async workers & concurrency (v2.0)**
+- [x] **Multi-user client management (v2.1)** ⭐ NEW
+- [x] **Workflow templates system (v2.1)** ⭐ NEW
 - [x] SOPs for common tasks (migrations, routes, components, deployment)
 - [x] Development workflow (CLAUDE.md)
 - [x] Quick start guide (README.md)

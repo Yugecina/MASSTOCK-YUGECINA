@@ -62,13 +62,12 @@ export function Sidebar() {
 
   return (
     <aside className="sidebar">
-      {/* Logo */}
-      <div className="sidebar-logo">
-        <img
-          src="/logo-full-color.svg"
-          alt="MasStock"
-          style={{ height: '36px', width: 'auto' }}
-        />
+      {/* Header: Logo + Dark Mode */}
+      <div className="sidebar-header">
+        <div className="sidebar-logo">
+          <span className="sidebar-logo-text">MASSTOCK</span>
+        </div>
+        <DarkModeToggle />
       </div>
 
       {/* Navigation */}
@@ -103,11 +102,6 @@ export function Sidebar() {
               {user?.email || 'user@example.com'}
             </div>
           </div>
-        </div>
-
-        {/* Dark Mode Toggle */}
-        <div className="sidebar-toggle-wrapper">
-          <DarkModeToggle />
         </div>
 
         {/* Logout Button */}

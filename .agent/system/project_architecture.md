@@ -1,8 +1,8 @@
 # MasStock - Project Architecture
 
-**Last Updated:** 2025-11-24
+**Last Updated:** 2025-11-25
 **Status:** Production-Ready
-**Version:** 2.0.0 (Async Workers)
+**Version:** 2.1.0 (Multi-User Client Management)
 
 ## 📋 Table of Contents
 
@@ -27,8 +27,10 @@
 - **Workflow Automation**: Execute AI-powered workflows with job queue management
 - **Batch Processing**: Process multiple items (e.g., image generation) in parallel
 - **Multi-tenant**: Support for multiple clients with role-based access
+- **Multi-User Clients**: Users can belong to multiple clients with different roles (owner/collaborator) ⭐ v2.1
+- **Workflow Templates**: Admin-defined templates for easy workflow assignment ⭐ v2.1
 - **Real-time Monitoring**: Track workflow executions in real-time
-- **Admin Dashboard**: Complete analytics, user management, and system monitoring
+- **Admin Dashboard**: Complete analytics, user management, client management, and system monitoring
 - **Production-Ready**: Zero-log production mode, SSL, CI/CD, automated backups
 
 ### Primary Use Case
@@ -241,6 +243,8 @@ Handle HTTP requests and responses:
 - `adminController.js` - Admin operations (legacy)
 - `adminUserController.js` - User management (CRUD)
 - `adminWorkflowController.js` - Admin workflow management
+- `adminClientController.js` - **Client management** (members, workflows, executions, activity) ⭐ v2.1
+- `workflowTemplatesController.js` - **Workflow templates CRUD** ⭐ v2.1
 - `analyticsController.js` - Analytics & metrics
 - `settingsController.js` - User/client settings
 
@@ -317,7 +321,8 @@ Route components (one per URL):
 **Admin Pages** (`frontend/src/pages/admin/`):
 - `AdminDashboard.jsx` - Admin overview
 - `AdminUsers.jsx` - User management
-- `AdminClients.jsx` - Client management
+- `AdminClients.jsx` - Client list & management
+- `AdminClientDetail.jsx` - **Client detail page with tabs** (Overview, Members, Workflows, Executions, Activity) ⭐ v2.1
 - `AdminWorkflows.jsx` - Workflow & request management
 - `AdminTickets.jsx` - Support tickets
 - `AdminErrors.jsx` - Error tracking
@@ -359,6 +364,14 @@ Route components (one per URL):
 - `TopWorkflowsTable.jsx` - Top workflows
 - `TopClientsTable.jsx` - Top clients
 - `RecentFailuresTable.jsx` - Failed executions
+- **Client Management Components** ⭐ v2.1:
+  - `ClientOverviewTab.jsx` - Client stats and info
+  - `ClientMembersTab.jsx` - Member list with role badges
+  - `ClientWorkflowsTab.jsx` - Assigned workflows
+  - `ClientExecutionsTab.jsx` - Executions with filters
+  - `ClientActivityTab.jsx` - Audit log timeline
+  - `AddMemberModal.jsx` - User search & add to client
+  - `AssignWorkflowModal.jsx` - Template selection & assign
 
 **Workflow Components** (`workflows/`):
 - `NanoBananaForm.jsx` - Nano Banana workflow form
@@ -375,6 +388,7 @@ API client wrappers:
 - `admin.js` - Admin API calls
 - `adminUserService.js` - User management API
 - `adminWorkflowService.js` - Admin workflow API
+- `adminClientService.js` - **Client management API** (members, workflows, executions, activity, templates) ⭐ v2.1
 - `analyticsService.js` - Analytics API
 - `settings.js` - Settings API
 
@@ -385,6 +399,7 @@ Zustand state management:
 - `authStore.js` - Authentication state (user, login, logout)
 - `workflowStore.js` - Workflow list state
 - `adminWorkflowsStore.js` - Admin workflow state
+- `adminClientStore.js` - **Client detail state** (members, workflows, executions, activity, search, templates) ⭐ v2.1
 
 #### 5. **Hooks** (`frontend/src/hooks/`)
 
@@ -412,7 +427,9 @@ Zustand state management:
 **Tables Used:**
 - `users` - User accounts
 - `clients` - Client organizations
-- `workflows` - Workflow definitions
+- `client_members` - User-client membership (N:N junction) ⭐ v2.1
+- `workflow_templates` - Admin-defined workflow templates ⭐ v2.1
+- `workflows` - Workflow instances (assigned to clients)
 - `workflow_executions` - Execution records
 - `workflow_batch_results` - Batch processing results
 - `workflow_requests` - Client requests
@@ -501,8 +518,9 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-im
    - Supabase Auth integration
 
 2. **Authorization**
-   - Role-based access control (admin, client)
-   - Row Level Security (RLS) in Supabase
+   - **Platform roles:** `admin` (MasStock team), `user` (everyone else)
+   - **Client roles:** `owner` (full access, billing), `collaborator` (workflows only) ⭐ v2.1
+   - Row Level Security (RLS) in Supabase using `client_members` table
    - Middleware for role checks (`requireAdmin`, `requireClient`)
 
 3. **API Security**

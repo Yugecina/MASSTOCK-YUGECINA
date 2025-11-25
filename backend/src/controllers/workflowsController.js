@@ -297,6 +297,7 @@ async function executeWorkflow(req, res) {
       id: executionId,
       workflow_id: workflow_id,
       client_id: clientId,
+      triggered_by_user_id: req.user.id,
       status: 'pending',
       input_data,
       started_at: new Date().toISOString()
@@ -430,10 +431,16 @@ async function getWorkflowExecutions(req, res) {
     throw new ApiError(404, 'Workflow not found', 'WORKFLOW_NOT_FOUND');
   }
 
-  // Build query
+  // Build query with triggered_by user info
   let query = supabaseAdmin
     .from('workflow_executions')
-    .select('*', { count: 'exact' })
+    .select(`
+      *,
+      triggered_by:triggered_by_user_id (
+        id,
+        email
+      )
+    `, { count: 'exact' })
     .eq('workflow_id', workflow_id)
     .order('created_at', { ascending: false })
     .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
@@ -573,6 +580,111 @@ async function getExecutionBatchResults(req, res) {
   });
 }
 
+/**
+ * GET /api/workflows/client/members
+ * Get all members of the current client (for filtering executions by collaborator)
+ */
+async function getClientMembers(req, res) {
+  const clientId = req.client.id;
+
+  const { data: members, error } = await supabaseAdmin
+    .from('client_members')
+    .select(`
+      id,
+      role,
+      user:user_id (
+        id,
+        email
+      )
+    `)
+    .eq('client_id', clientId)
+    .eq('status', 'active')
+    .order('role', { ascending: true });
+
+  if (error) {
+    throw new ApiError(500, 'Failed to fetch client members', 'DATABASE_ERROR');
+  }
+
+  // Flatten the user data
+  const formattedMembers = (members || []).map(m => ({
+    id: m.user?.id,
+    email: m.user?.email,
+    role: m.role
+  })).filter(m => m.id);
+
+  res.json({
+    success: true,
+    data: {
+      members: formattedMembers,
+      total: formattedMembers.length
+    }
+  });
+}
+
+/**
+ * GET /api/executions
+ * Get all executions for the client with pagination
+ */
+async function getAllClientExecutions(req, res) {
+  const clientId = req.client.id;
+  const { limit = 20, offset = 0, status, workflow_id, user_id } = req.query;
+
+  // Build query with workflow and triggered_by user info
+  let query = supabaseAdmin
+    .from('workflow_executions')
+    .select(`
+      *,
+      workflow:workflow_id (
+        id,
+        name,
+        config
+      ),
+      triggered_by:triggered_by_user_id (
+        id,
+        email
+      )
+    `, { count: 'exact' })
+    .eq('client_id', clientId)
+    .order('created_at', { ascending: false })
+    .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+
+  // Apply optional filters
+  if (status && status !== 'all') {
+    query = query.eq('status', status);
+  }
+  if (workflow_id && workflow_id !== 'all') {
+    query = query.eq('workflow_id', workflow_id);
+  }
+  if (user_id && user_id !== 'all') {
+    query = query.eq('triggered_by_user_id', user_id);
+  }
+
+  const { data: executions, error, count } = await query;
+
+  if (error) {
+    throw new ApiError(500, 'Failed to fetch executions', 'DATABASE_ERROR');
+  }
+
+  // Format executions with workflow info
+  const formattedExecutions = (executions || []).map(exec => ({
+    ...exec,
+    workflow_name: exec.workflow?.name || 'Unknown Workflow',
+    workflow_type: exec.workflow?.config?.workflow_type || 'standard',
+    triggered_by_email: exec.triggered_by?.email || null
+  }));
+
+  res.json({
+    success: true,
+    data: {
+      executions: formattedExecutions,
+      total: count,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      hasMore: parseInt(offset) + formattedExecutions.length < count
+    }
+  });
+}
+
 module.exports = {
   getWorkflows,
   getWorkflow,
@@ -581,7 +693,9 @@ module.exports = {
   getWorkflowExecutions,
   getWorkflowStats,
   getExecutionBatchResults,
-  getDashboardStats
+  getDashboardStats,
+  getClientMembers,
+  getAllClientExecutions
 };
 
 /**

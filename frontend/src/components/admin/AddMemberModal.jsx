@@ -1,0 +1,214 @@
+import { useState, useEffect } from 'react'
+import toast from 'react-hot-toast'
+import useAdminClientStore from '../../store/adminClientStore'
+import { Spinner } from '../ui/Spinner'
+
+/**
+ * AddMemberModal - Search and add users to client
+ */
+export function AddMemberModal({ clientId, onClose }) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [selectedRole, setSelectedRole] = useState('collaborator')
+  const [isAdding, setIsAdding] = useState(false)
+
+  const {
+    searchResults,
+    searchLoading,
+    searchUsers,
+    clearSearchResults,
+    addMember
+  } = useAdminClientStore()
+
+  // Debounced search
+  useEffect(() => {
+    console.log('🔍 AddMemberModal: Search effect triggered', {
+      searchQuery,
+      searchQueryLength: searchQuery.length,
+      clientId
+    })
+    const timer = setTimeout(() => {
+      if (searchQuery.length >= 2) {
+        console.log('🔎 AddMemberModal: Triggering search', { searchQuery, clientId })
+        searchUsers(searchQuery, clientId)
+      } else {
+        console.log('⚠️  AddMemberModal: Query too short, clearing results', { searchQuery })
+        clearSearchResults()
+      }
+    }, 300)
+
+    return () => clearTimeout(timer)
+  }, [searchQuery, clientId, searchUsers, clearSearchResults])
+  
+  // Log when searchResults changes
+  useEffect(() => {
+    console.log('📦 AddMemberModal: searchResults updated', {
+      searchResults,
+      length: searchResults?.length,
+      searchLoading,
+      selectedUser
+    })
+  }, [searchResults, searchLoading, selectedUser])
+
+  // Cleanup on close
+  useEffect(() => {
+    return () => {
+      clearSearchResults()
+    }
+  }, [clearSearchResults])
+
+  const handleSelectUser = (user) => {
+    setSelectedUser(user)
+    setSearchQuery(user.email)
+    clearSearchResults()
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!selectedUser) {
+      toast.error('Please select a user')
+      return
+    }
+
+    setIsAdding(true)
+    const result = await addMember(clientId, selectedUser.id, selectedRole)
+    setIsAdding(false)
+
+    if (result.success) {
+      toast.success(`${selectedUser.email} added as ${selectedRole}`)
+      onClose()
+    } else {
+      toast.error(result.error || 'Failed to add member')
+    }
+  }
+
+  const handleBackdropClick = (e) => {
+    if (e.target === e.currentTarget) {
+      onClose()
+    }
+  }
+
+  return (
+    <div className="admin-modal-overlay" onClick={handleBackdropClick}>
+      <div className="admin-modal">
+        <div className="admin-modal-header">
+          <h3 className="admin-modal-title">Add Member</h3>
+          <button className="admin-modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <form onSubmit={handleSubmit}>
+          <div className="admin-modal-body">
+            {/* User Search */}
+            <div className="admin-form-group">
+              <label className="admin-form-label">Search User</label>
+              <div className="admin-search-container">
+                <input
+                  type="text"
+                  className="admin-input"
+                  placeholder="Search by email..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value)
+                    setSelectedUser(null)
+                  }}
+                  autoFocus
+                />
+                {searchLoading && (
+                  <div className="admin-search-loading">
+                    <Spinner size="sm" />
+                  </div>
+                )}
+              </div>
+
+              {/* Debug info - remove after fix */}
+              <div style={{ fontSize: '10px', color: '#999', marginTop: '4px' }}>
+                Debug: results={searchResults?.length || 0}, loading={String(searchLoading)}, selected={String(!!selectedUser)}
+              </div>
+
+              {/* Search Results */}
+              {searchResults.length > 0 && !selectedUser && (
+                <div className="admin-search-results">
+                  {searchResults.map((user) => (
+                    <button
+                      key={user.id}
+                      type="button"
+                      className="admin-search-result"
+                      onClick={() => handleSelectUser(user)}
+                    >
+                      <div className="admin-search-result-avatar">
+                        {user.email.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="admin-search-result-info">
+                        <span className="admin-search-result-email">{user.email}</span>
+                        <span className="admin-search-result-meta">
+                          Created: {new Date(user.created_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {searchQuery.length >= 2 && searchResults.length === 0 && !searchLoading && !selectedUser && (
+                <p className="admin-search-empty">No users found matching "{searchQuery}"</p>
+              )}
+
+              {searchQuery.length > 0 && searchQuery.length < 2 && !selectedUser && (
+                <p className="admin-search-hint">Type at least 2 characters to search</p>
+              )}
+            </div>
+
+            {/* Selected User */}
+            {selectedUser && (
+              <div className="admin-selected-user">
+                <div className="admin-selected-user-avatar">
+                  {selectedUser.email.charAt(0).toUpperCase()}
+                </div>
+                <div className="admin-selected-user-info">
+                  <span className="admin-selected-user-email">{selectedUser.email}</span>
+                  <button
+                    type="button"
+                    className="admin-selected-user-clear"
+                    onClick={() => {
+                      setSelectedUser(null)
+                      setSearchQuery('')
+                    }}
+                  >
+                    Change
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Role Selection */}
+            <div className="admin-form-group">
+              <label className="admin-form-label">Role</label>
+              <select
+                className="admin-select"
+                value={selectedRole}
+                onChange={(e) => setSelectedRole(e.target.value)}
+              >
+                <option value="collaborator">Collaborator - Workflows & Results only</option>
+                <option value="owner">Owner - Full access including billing</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="admin-modal-footer">
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={!selectedUser || isAdding}
+            >
+              {isAdding ? 'Adding...' : 'Add Member'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}

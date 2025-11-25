@@ -142,147 +142,6 @@ async function createAdminUser(req, res) {
 }
 
 /**
- * POST /api/v1/admin/users
- * Create a new user/client via admin interface
- * Protection: Requires admin authentication
- */
-async function createUser(req, res) {
-  const {
-    email,
-    password,
-    company_name,
-    name,
-    plan = 'premium_custom',
-    subscription_amount = 0,
-    role = 'user'
-  } = req.body;
-
-  // Validate input
-  if (!email || !password) {
-    throw new ApiError(400, 'Email and password are required', 'MISSING_REQUIRED_FIELDS');
-  }
-
-  if (password.length < 8) {
-    throw new ApiError(400, 'Password must be at least 8 characters', 'WEAK_PASSWORD');
-  }
-
-  if (!['user', 'admin'].includes(role)) {
-    throw new ApiError(400, 'Role must be either "user" or "admin"', 'INVALID_ROLE');
-  }
-
-  // Check if user already exists
-  const { data: existingUser } = await supabaseAdmin
-    .from('users')
-    .select('id')
-    .eq('email', email)
-    .single();
-
-  if (existingUser) {
-    throw new ApiError(400, 'User with this email already exists', 'USER_EXISTS');
-  }
-
-  try {
-    // Step 1: Create user in Supabase Auth (auth.users)
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email,
-      password,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: {
-        name: name || email.split('@')[0],
-        company_name: company_name
-      }
-    });
-
-    if (authError) {
-      throw new ApiError(400, `Auth creation failed: ${authError.message}`, 'AUTH_CREATION_FAILED');
-    }
-
-    // Step 2: Manually insert into public.users (bypass trigger dependency)
-    const user = await syncAuthToDatabase(authData.user.id, email, role);
-
-    // Step 3: Create client record (only if role is 'user')
-    let client = null;
-    if (role === 'user') {
-      const { data: clientData, error: clientError } = await supabaseAdmin
-        .from('clients')
-        .insert([{
-          user_id: user.id,
-          name: company_name || name || email.split('@')[0],
-          email: email,
-          company_name: company_name,
-          plan: plan,
-          status: 'active',
-          subscription_amount: parseFloat(subscription_amount),
-          subscription_start_date: new Date().toISOString().split('T')[0]
-        }])
-        .select()
-        .single();
-
-      if (clientError) {
-        // Rollback: delete the user we just created
-        await supabaseAdmin.from('users').delete().eq('id', user.id);
-        await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-
-        throw new ApiError(500, `Failed to create client: ${clientError.message}`, 'CLIENT_CREATION_FAILED');
-      }
-
-      client = clientData;
-    }
-
-    // Step 4: Create audit log
-    await supabaseAdmin.from('audit_logs').insert([{
-      client_id: client?.id,
-      user_id: req.user.id, // Admin who created this user
-      action: 'user_created_by_admin',
-      resource_type: 'user',
-      resource_id: user.id,
-      changes: {
-        email: email,
-        role: role,
-        plan: plan,
-        created_by: req.user.email
-      },
-      ip_address: req.ip,
-      user_agent: req.get('user-agent')
-    }]);
-
-    res.status(201).json({
-      success: true,
-      message: 'User created successfully',
-      data: {
-        user: {
-          id: user.id,
-          email: user.email,
-          role: user.role,
-          status: user.status
-        },
-        client: client ? {
-          id: client.id,
-          name: client.name,
-          company_name: client.company_name,
-          plan: client.plan,
-          status: client.status,
-          subscription_amount: client.subscription_amount
-        } : null,
-        credentials: {
-          email: email,
-          password: password,
-          note: 'Share these credentials with the user. They can change the password after first login.'
-        }
-      }
-    });
-
-  } catch (error) {
-    // If error is already ApiError, rethrow it
-    if (error instanceof ApiError) {
-      throw error;
-    }
-
-    throw new ApiError(500, `Failed to create user: ${error.message}`, 'USER_CREATION_FAILED');
-  }
-}
-
-/**
  * GET /api/admin/clients
  * Get all clients with filtering and pagination
  */
@@ -397,43 +256,42 @@ async function getClient(req, res) {
 
 /**
  * POST /api/admin/clients
- * Create new client
+ * Create new client (entreprise)
+ * Client = company with name, plan, subscription - members added separately
  */
 async function createClient(req, res) {
-  const { name, email, company_name, plan, subscription_amount } = req.body;
+  const { name, plan = 'premium_custom', subscription_amount = 0 } = req.body;
 
-  if (!name || !email) {
-    throw new ApiError(400, 'Name and email are required', 'MISSING_REQUIRED_FIELDS');
+  if (!name) {
+    throw new ApiError(400, 'Company name is required', 'MISSING_REQUIRED_FIELDS');
   }
 
-  // Check if client already exists
+  // Check if client with same name already exists
   const { data: existing } = await supabaseAdmin
     .from('clients')
     .select('id')
-    .eq('email', email)
+    .eq('name', name)
     .single();
 
   if (existing) {
-    throw new ApiError(400, 'Client with this email already exists', 'CLIENT_EXISTS');
+    throw new ApiError(400, 'Client with this name already exists', 'CLIENT_EXISTS');
   }
 
-  // Create client
+  // Create client (company)
   const { data: client, error } = await supabaseAdmin
     .from('clients')
     .insert([{
       name,
-      email,
-      company_name,
-      plan: plan || 'premium_custom',
-      status: 'pending',
-      subscription_amount: subscription_amount || 0,
+      plan,
+      status: 'active',
+      subscription_amount: parseFloat(subscription_amount) || 0,
       subscription_start_date: new Date().toISOString().split('T')[0]
     }])
     .select()
     .single();
 
   if (error) {
-    throw new ApiError(500, 'Failed to create client', 'DATABASE_ERROR');
+    throw new ApiError(500, `Failed to create client: ${error.message}`, 'DATABASE_ERROR');
   }
 
   // Create audit log
@@ -443,13 +301,14 @@ async function createClient(req, res) {
     action: 'client_created',
     resource_type: 'client',
     resource_id: client.id,
-    changes: { status: 'pending' },
+    changes: { name, plan, subscription_amount },
     ip_address: req.ip,
     user_agent: req.get('user-agent')
   }]);
 
   res.status(201).json({
     success: true,
+    message: 'Client created successfully',
     data: client
   });
 }
@@ -460,7 +319,7 @@ async function createClient(req, res) {
  */
 async function updateClient(req, res) {
   const { client_id } = req.params;
-  const { status, subscription_amount, metadata, plan } = req.body;
+  const { name, status, subscription_amount, metadata, plan } = req.body;
 
   // Fetch existing client
   const { data: client, error: fetchError } = await supabaseAdmin
@@ -474,8 +333,14 @@ async function updateClient(req, res) {
   }
 
   // Build update object
-  const updates = {};
+  const updates = { updated_at: new Date().toISOString() };
   const changes = { before: {}, after: {} };
+
+  if (name && name !== client.name) {
+    updates.name = name;
+    changes.before.name = client.name;
+    changes.after.name = name;
+  }
 
   if (status) {
     updates.status = status;
@@ -484,9 +349,9 @@ async function updateClient(req, res) {
   }
 
   if (subscription_amount !== undefined) {
-    updates.subscription_amount = subscription_amount;
+    updates.subscription_amount = parseFloat(subscription_amount);
     changes.before.subscription_amount = client.subscription_amount;
-    changes.after.subscription_amount = subscription_amount;
+    changes.after.subscription_amount = parseFloat(subscription_amount);
   }
 
   if (plan) {
@@ -621,12 +486,23 @@ async function getDashboard(req, res) {
     sum + (workflowRevenueMap[e.workflow_id] || 0), 0
   ) || 0;
 
-  // Get recent activity (audit logs)
+  // Get recent activity (audit logs) with user info
   const { data: recentActivity } = await supabaseAdmin
     .from('audit_logs')
-    .select('*')
+    .select(`
+      *,
+      user:user_id (
+        id,
+        email,
+        name
+      ),
+      client:client_id (
+        id,
+        name
+      )
+    `)
     .order('created_at', { ascending: false })
-    .limit(10);
+    .limit(15);
 
   res.json({
     success: true,
@@ -766,6 +642,5 @@ module.exports = {
   getWorkflowStats,
   getErrors,
   getAuditLogs,
-  createAdminUser,
-  createUser
+  createAdminUser
 };

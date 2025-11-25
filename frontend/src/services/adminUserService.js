@@ -4,7 +4,6 @@
  */
 
 import api from './api';
-import logger from '@/utils/logger';
 
 
 export const adminUserService = {
@@ -24,17 +23,24 @@ export const adminUserService = {
       ...(filters.search && { search: filters.search })
     };
 
-    logger.debug('👥 adminUserService.getUsers: Fetching users with params:', params);
+    console.log('📡 adminUserService.getUsers: Starting', { params });
 
     try {
       const response = await api.get('/v1/admin/users', { params });
-      logger.debug('✅ adminUserService.getUsers: Success:', response);
+      console.log('✅ adminUserService.getUsers: Response', {
+        status: response.status,
+        data: response.data,
+        users: response.data?.data?.users,
+        pagination: response.data?.data?.pagination
+      });
       return response;
     } catch (error) {
-      logger.error('❌ adminUserService.getUsers: Failed:', {
+      console.error('❌ adminUserService.getUsers: Error', {
         error,
         message: error.message,
-        response: error.response
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data
       });
       throw error;
     }
@@ -55,17 +61,25 @@ export const adminUserService = {
       ...(filters.search && { search: filters.search })
     };
 
-    logger.debug('🏢 adminUserService.getClients: Fetching clients with params:', params);
+    console.log('📡 adminUserService.getClients: Starting', { params });
 
     try {
       const response = await api.get('/v1/admin/clients', { params });
-      logger.debug('✅ adminUserService.getClients: Success:', response);
+      console.log('✅ adminUserService.getClients: Response', {
+        status: response.status,
+        data: response.data,
+        clients: response.data?.data?.clients,
+        clientsCount: response.data?.data?.clients?.length,
+        pagination: response.data?.data?.pagination
+      });
       return response;
     } catch (error) {
-      logger.error('❌ adminUserService.getClients: Failed:', {
+      console.error('❌ adminUserService.getClients: Error', {
         error,
         message: error.message,
-        response: error.response
+        response: error.response,
+        status: error.response?.status,
+        data: error.response?.data
       });
       throw error;
     }

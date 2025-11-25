@@ -201,7 +201,7 @@ export function Settings() {
                 <div className="settings-card-header">
                   <h2 className="settings-card-title">Team Management</h2>
                   {!showInviteForm && (
-                    <button className="btn btn-primary" onClick={() => setShowInviteForm(true)}>
+                    <button className="btn btn-primary" disabled>
                       + Invite Collaborator
                     </button>
                   )}
@@ -220,17 +220,13 @@ export function Settings() {
                         className="settings-input"
                         disabled={inviting}
                       />
-                      <button type="submit" className="btn btn-primary" disabled={inviting}>
+                      <button type="submit" className="btn btn-primary" disabled>
                         {inviting ? 'Sending...' : 'Send Invitation'}
                       </button>
                       <button
                         type="button"
                         className="btn btn-secondary"
-                        onClick={() => {
-                          setShowInviteForm(false)
-                          setInviteEmail('')
-                        }}
-                        disabled={inviting}
+                        disabled
                       >
                         Cancel
                       </button>
@@ -260,7 +256,7 @@ export function Settings() {
                         {collab.client_role !== 'owner' && (
                           <button
                             className="btn btn-danger btn-sm"
-                            onClick={() => handleRemoveCollaborator(collab)}
+                            disabled
                           >
                             Remove
                           </button>
@@ -289,7 +285,7 @@ export function Settings() {
                 </div>
                 <button
                   className="btn btn-secondary"
-                  onClick={() => toast.info('Change password feature coming soon')}
+                  disabled
                 >
                   Change
                 </button>

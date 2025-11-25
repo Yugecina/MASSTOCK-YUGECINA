@@ -13,6 +13,16 @@ const workflowsController = require('../controllers/workflowsController');
 const router = express.Router();
 
 /**
+ * GET /api/workflows/client/members
+ * Get all members of the current client (for filtering executions by collaborator)
+ */
+router.get('/client/members',
+  authenticate,
+  requireClient,
+  asyncHandler(workflowsController.getClientMembers)
+);
+
+/**
  * GET /api/workflows/stats/dashboard
  * Get dashboard stats
  */
@@ -30,6 +40,23 @@ router.get('/',
   authenticate,
   requireClient,
   asyncHandler(workflowsController.getWorkflows)
+);
+
+/**
+ * GET /api/workflows/executions/all
+ * Get all executions for client with pagination and filters
+ * Supports lazy loading
+ */
+router.get('/executions/all',
+  authenticate,
+  requireClient,
+  query('limit').optional().isInt({ min: 1, max: 100 }),
+  query('offset').optional().isInt({ min: 0 }),
+  query('status').optional().isString(),
+  query('workflow_id').optional(),
+  query('user_id').optional(),
+  validate,
+  asyncHandler(workflowsController.getAllClientExecutions)
 );
 
 /**

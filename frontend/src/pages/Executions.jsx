@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClientLayout } from '../components/layout/ClientLayout'
 import { Spinner } from '../components/ui/Spinner'
@@ -6,194 +6,218 @@ import { workflowService } from '../services/workflows'
 import { BatchResultsView } from '../components/workflows/BatchResultsView'
 import logger from '@/utils/logger';
 
+const ITEMS_PER_PAGE = 20
+
 /**
  * Executions Page - "The Trusted Magician" - Electric Trust
  * Premium glassmorphism, Electric Indigo + Bright Cyan, rich animations
- * Inspirations: Linear, Vercel, Stripe - Confident, sophisticated, magic through motion
+ * Now with lazy loading / infinite scroll
  */
 export function Executions() {
   const navigate = useNavigate()
   const [executions, setExecutions] = useState([])
   const [workflows, setWorkflows] = useState([])
   const [workflowsMap, setWorkflowsMap] = useState({})
+  const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [selectedExecution, setSelectedExecution] = useState(null)
   const [statusFilter, setStatusFilter] = useState('all')
   const [workflowFilter, setWorkflowFilter] = useState('all')
+  const [userFilter, setUserFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
+  const [copyFeedback, setCopyFeedback] = useState(null)
 
+  // Pagination state
+  const [hasMore, setHasMore] = useState(true)
+  const [total, setTotal] = useState(0)
+  const [offset, setOffset] = useState(0)
+
+  // Ref for infinite scroll
+  const loadMoreRef = useRef(null)
+
+  // Load initial data (workflows and members for filters, then executions)
   useEffect(() => {
-    loadData()
+    loadInitialData()
   }, [])
 
-  async function loadData() {
-    logger.debug('🔍 Executions.loadData: Starting data load...')
+  // Reload executions when filters change
+  useEffect(() => {
+    if (!loading) {
+      // Reset and reload when filters change
+      setExecutions([])
+      setOffset(0)
+      setHasMore(true)
+      loadExecutions(0, true)
+    }
+  }, [statusFilter, workflowFilter, userFilter])
+
+  // Intersection Observer for infinite scroll
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current)
+    }
+
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore, loading, offset])
+
+  async function loadInitialData() {
+    logger.debug('🔍 Executions.loadInitialData: Starting...')
 
     try {
       setLoading(true)
 
-      // Get all workflows first
-      logger.debug('📡 Executions.loadData: Fetching workflows...')
-      const workflowsData = await workflowService.list()
-      const workflowsList = workflowsData.data?.workflows || workflowsData.workflows || []
+      // Load workflows and members in parallel for filters
+      const [workflowsRes, membersRes] = await Promise.all([
+        workflowService.list().catch(err => {
+          logger.warn('⚠️ Executions: Could not load workflows:', err.message)
+          return { data: { workflows: [] } }
+        }),
+        workflowService.getClientMembers().catch(err => {
+          logger.warn('⚠️ Executions: Could not load members:', err.message)
+          return { data: { members: [] } }
+        })
+      ])
+
+      // Process workflows
+      const workflowsList = workflowsRes.data?.workflows || workflowsRes.workflows || []
       setWorkflows(workflowsList)
 
-      // Create a map of workflow_id -> workflow for quick lookup
       const wfMap = {}
       workflowsList.forEach(wf => {
         wfMap[wf.id] = wf
       })
       setWorkflowsMap(wfMap)
+      logger.debug('✅ Executions: Workflows loaded:', { count: workflowsList.length })
 
-      logger.debug('✅ Executions.loadData: Workflows loaded successfully', {
-        count: workflowsList.length,
-        workflows: workflowsList.map(w => ({
-          id: w.id,
-          name: w.name,
-          type: w.config?.workflow_type
-        }))
-      })
+      // Process members
+      const membersList = membersRes.data?.data?.members || membersRes.data?.members || []
+      setMembers(membersList)
+      logger.debug('✅ Executions: Members loaded:', { count: membersList.length })
 
-      // Get executions for each workflow
-      logger.debug('📡 Executions.loadData: Fetching executions for all workflows...')
-      const allExecutions = []
+      // Load first page of executions
+      await loadExecutions(0, true)
 
-      for (const workflow of workflowsList) {
-        try {
-          logger.debug(`🔍 Executions.loadData: Fetching executions for workflow: ${workflow.name} (${workflow.id})`)
-          const response = await workflowService.getExecutions(workflow.id)
-
-          logger.debug(`📦 Executions.loadData: Response received for ${workflow.name}:`, {
-            status: response.status,
-            hasData: !!response.data,
-            dataKeys: response.data ? Object.keys(response.data) : [],
-            dataStructure: response.data
-          })
-
-          // Backend returns: { success: true, data: { executions, total, limit, offset } }
-          const execData = response.data.data || response.data
-          const executions = execData.executions || []
-
-          logger.debug(`✅ Executions.loadData: Found ${executions.length} execution(s) for ${workflow.name}`, {
-            executionIds: executions.map(e => e.id),
-            statuses: executions.map(e => e.status)
-          })
-
-          if (executions.length > 0) {
-            allExecutions.push(...executions.map(exec => ({
-              ...exec,
-              workflow_name: workflow.name,
-              workflow_type: workflow.config?.workflow_type || 'standard'
-            })))
-          }
-        } catch (err) {
-          logger.error(`❌ Executions.loadData: Failed to fetch executions for ${workflow.name}:`, {
-            workflowId: workflow.id,
-            workflowName: workflow.name,
-            error: err,
-            message: err.message,
-            response: err.response?.data,
-            status: err.response?.status
-          })
-        }
-      }
-
-      // Sort by created_at descending (newest first)
-      allExecutions.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      setExecutions(allExecutions)
-
-      logger.debug('✅ Executions.loadData: All data loaded successfully', {
-        totalExecutions: allExecutions.length,
-        totalWorkflows: workflowsList.length,
-        statusBreakdown: {
-          completed: allExecutions.filter(e => e.status === 'completed').length,
-          pending: allExecutions.filter(e => e.status === 'pending').length,
-          processing: allExecutions.filter(e => e.status === 'processing').length,
-          failed: allExecutions.filter(e => e.status === 'failed').length
-        }
-      })
     } catch (err) {
-      logger.error('❌ Executions.loadData: Critical error loading data:', {
+      logger.error('❌ Executions.loadInitialData: Error:', {
         error: err,
-        message: err.message,
-        stack: err.stack,
-        response: err.response?.data
+        message: err.message
       })
     } finally {
       setLoading(false)
-      logger.debug('🏁 Executions.loadData: Data load complete')
     }
   }
 
-  async function viewExecutionDetails(executionId) {
-    logger.debug('🔍 Executions.viewExecutionDetails: Opening execution details', { executionId })
+  async function loadExecutions(currentOffset = 0, isReset = false) {
+    logger.debug('📡 Executions.loadExecutions:', { currentOffset, isReset, statusFilter, workflowFilter, userFilter })
 
     try {
-      logger.debug('📡 Executions.viewExecutionDetails: Fetching execution data...')
-      const data = await workflowService.getExecution(executionId)
+      if (!isReset) {
+        setLoadingMore(true)
+      }
 
-      logger.debug('📦 Executions.viewExecutionDetails: Execution details received:', {
-        status: data.status,
-        hasData: !!data.data,
-        dataKeys: data.data ? Object.keys(data.data) : [],
-        dataStructure: data.data
+      const response = await workflowService.getAllExecutions({
+        limit: ITEMS_PER_PAGE,
+        offset: currentOffset,
+        status: statusFilter,
+        workflow_id: workflowFilter,
+        user_id: userFilter
       })
 
+      const data = response.data?.data || response.data
+      const newExecutions = data.executions || []
+
+      logger.debug('✅ Executions.loadExecutions: Received:', {
+        count: newExecutions.length,
+        total: data.total,
+        hasMore: data.hasMore
+      })
+
+      if (isReset) {
+        setExecutions(newExecutions)
+      } else {
+        setExecutions(prev => [...prev, ...newExecutions])
+      }
+
+      setTotal(data.total || 0)
+      setHasMore(data.hasMore || false)
+      setOffset(currentOffset + newExecutions.length)
+
+    } catch (err) {
+      logger.error('❌ Executions.loadExecutions: Error:', {
+        error: err,
+        message: err.message,
+        response: err.response?.data
+      })
+    } finally {
+      setLoadingMore(false)
+    }
+  }
+
+  const loadMore = useCallback(() => {
+    if (!loadingMore && hasMore) {
+      logger.debug('🔄 Executions.loadMore: Loading more from offset:', offset)
+      loadExecutions(offset, false)
+    }
+  }, [loadingMore, hasMore, offset, statusFilter, workflowFilter, userFilter])
+
+  async function viewExecutionDetails(executionId) {
+    logger.debug('🔍 Executions.viewExecutionDetails:', { executionId })
+
+    try {
+      const data = await workflowService.getExecution(executionId)
       const executionData = data.data.data || data.data
 
-      logger.debug('✅ Executions.viewExecutionDetails: Setting selected execution:', {
+      logger.debug('✅ Executions.viewExecutionDetails: Loaded:', {
         id: executionData.id,
-        workflowId: executionData.workflow_id,
-        status: executionData.status,
-        hasInputData: !!executionData.input_data,
-        hasOutputData: !!executionData.output_data,
-        hasError: !!executionData.error_message,
-        progress: executionData.progress,
-        duration: executionData.duration_seconds
+        status: executionData.status
       })
 
       setSelectedExecution(executionData)
     } catch (err) {
-      logger.error('❌ Executions.viewExecutionDetails: Failed to load execution details:', {
+      logger.error('❌ Executions.viewExecutionDetails: Error:', {
         executionId,
         error: err,
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status
+        message: err.message
       })
     }
   }
 
-  // Apply filters and sorting
-  const filteredExecutions = executions
-    .filter(exec => {
-      if (statusFilter !== 'all' && exec.status !== statusFilter) return false
-      if (workflowFilter !== 'all' && exec.workflow_id !== workflowFilter) return false
-      return true
-    })
-    .sort((a, b) => {
-      switch (sortBy) {
-        case 'newest':
-          return new Date(b.created_at) - new Date(a.created_at)
-        case 'oldest':
-          return new Date(a.created_at) - new Date(b.created_at)
-        case 'duration':
-          return (b.duration_seconds || 0) - (a.duration_seconds || 0)
-        default:
-          return 0
-      }
-    })
+  async function handleCopyInputData(data) {
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(data, null, 2))
+      setCopyFeedback('input')
+      setTimeout(() => setCopyFeedback(null), 2000)
+    } catch (err) {
+      logger.error('❌ Executions.handleCopyInputData: Failed to copy:', err)
+    }
+  }
 
-  logger.debug('🔍 Executions.render: Current filters and results:', {
-    statusFilter,
-    workflowFilter,
-    sortBy,
-    totalExecutions: executions.length,
-    filteredCount: filteredExecutions.length
+  // Apply client-side sorting
+  const sortedExecutions = [...executions].sort((a, b) => {
+    switch (sortBy) {
+      case 'newest':
+        return new Date(b.created_at) - new Date(a.created_at)
+      case 'oldest':
+        return new Date(a.created_at) - new Date(b.created_at)
+      case 'duration':
+        return (b.duration_seconds || 0) - (a.duration_seconds || 0)
+      default:
+        return 0
+    }
   })
 
   const statusCounts = {
-    all: executions.length,
+    all: total,
     completed: executions.filter(e => e.status === 'completed').length,
     pending: executions.filter(e => e.status === 'pending').length,
     processing: executions.filter(e => e.status === 'processing').length,
@@ -201,7 +225,6 @@ export function Executions() {
   }
 
   if (loading) {
-    logger.debug('⏳ Executions.render: Showing loading state')
     return (
       <ClientLayout>
         <div className="flex justify-center items-center" style={{ minHeight: '60vh' }}>
@@ -233,7 +256,7 @@ export function Executions() {
           {[
             {
               label: 'Total',
-              value: statusCounts.all,
+              value: total,
               icon: '📊',
               gradient: 'indigo',
               filter: 'all',
@@ -319,6 +342,27 @@ export function Executions() {
 
             <div className="filter-field">
               <label className="filter-field-label">
+                Triggered By
+              </label>
+              <select
+                value={userFilter}
+                onChange={(e) => {
+                  setUserFilter(e.target.value)
+                  logger.debug('🔍 Executions: User filter changed to:', e.target.value)
+                }}
+                className="filter-field-select"
+              >
+                <option value="all">All Collaborators</option>
+                {members.map(member => (
+                  <option key={member.id} value={member.id}>
+                    {member.email}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="filter-field">
+              <label className="filter-field-label">
                 Sort By
               </label>
               <select
@@ -335,12 +379,13 @@ export function Executions() {
               </select>
             </div>
 
-            {(statusFilter !== 'all' || workflowFilter !== 'all' || sortBy !== 'newest') && (
+            {(statusFilter !== 'all' || workflowFilter !== 'all' || userFilter !== 'all' || sortBy !== 'newest') && (
               <div className="filter-field-action">
                 <button
                   onClick={() => {
                     setStatusFilter('all')
                     setWorkflowFilter('all')
+                    setUserFilter('all')
                     setSortBy('newest')
                     logger.debug('🔄 Executions: Filters cleared')
                   }}
@@ -353,10 +398,10 @@ export function Executions() {
           </div>
         </div>
 
-        {/* Executions List - Premium Cards */}
-        {filteredExecutions.length > 0 ? (
+        {/* Executions List - Premium Cards with Lazy Loading */}
+        {sortedExecutions.length > 0 ? (
           <div className="executions-list">
-            {filteredExecutions.map((execution, index) => {
+            {sortedExecutions.map((execution, index) => {
               const statusConfig = {
                 completed: {
                   gradient: 'success',
@@ -418,6 +463,15 @@ export function Executions() {
                         })}
                       </span>
 
+                      {execution.triggered_by_email && (
+                        <>
+                          <span className="execution-item-separator">•</span>
+                          <span className="execution-item-user">
+                            {execution.triggered_by_email}
+                          </span>
+                        </>
+                      )}
+
                       {execution.duration_seconds && (
                         <>
                           <span className="execution-item-separator">•</span>
@@ -444,10 +498,41 @@ export function Executions() {
                 </div>
               )
             })}
+
+            {/* Load More Trigger / Infinite Scroll Sentinel */}
+            <div
+              ref={loadMoreRef}
+              className="executions-load-more"
+            >
+              {loadingMore && (
+                <div className="executions-load-more-spinner">
+                  <Spinner size="md" />
+                  <span>Loading more...</span>
+                </div>
+              )}
+              {!loadingMore && hasMore && (
+                <button
+                  onClick={loadMore}
+                  className="executions-load-more-btn"
+                >
+                  Load more ({executions.length} of {total})
+                </button>
+              )}
+              {!hasMore && executions.length > 0 && (
+                <div className="executions-load-more-end">
+                  All {total} executions loaded
+                </div>
+              )}
+            </div>
           </div>
         ) : (
           <div className="executions-empty">
-            <div className="executions-empty-icon">📭</div>
+            <div className="executions-empty-icon">
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+              </svg>
+            </div>
             <h3 className="executions-empty-title">
               No executions found
             </h3>
@@ -456,11 +541,12 @@ export function Executions() {
                 ? 'Try adjusting your filters to see more results'
                 : 'Execute a workflow to see results here'}
             </p>
-            {(statusFilter !== 'all' || workflowFilter !== 'all') && (
+            {(statusFilter !== 'all' || workflowFilter !== 'all' || userFilter !== 'all') && (
               <button
                 onClick={() => {
                   setStatusFilter('all')
                   setWorkflowFilter('all')
+                  setUserFilter('all')
                   logger.debug('🔄 Executions: Filters cleared from empty state')
                 }}
                 className="executions-empty-btn"
@@ -563,7 +649,26 @@ export function Executions() {
               {/* Input Data */}
               {selectedExecution.input_data && Object.keys(selectedExecution.input_data).length > 0 && (
                 <div className="execution-modal-section">
-                  <h3 className="execution-modal-section-title">Input Data</h3>
+                  <div className="execution-modal-section-header">
+                    <h3 className="execution-modal-section-title">Input Data</h3>
+                    <button
+                      onClick={() => handleCopyInputData(selectedExecution.input_data)}
+                      className={`execution-modal-copy-btn ${copyFeedback === 'input' ? 'copied' : ''}`}
+                      title="Copy Input Data"
+                    >
+                      {copyFeedback === 'input' ? (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      ) : (
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                        </svg>
+                      )}
+                      {copyFeedback === 'input' ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
                   <pre className="execution-modal-code">
                     {JSON.stringify(selectedExecution.input_data, null, 2)}
                   </pre>

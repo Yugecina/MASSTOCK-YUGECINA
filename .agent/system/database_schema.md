@@ -1,6 +1,6 @@
 # MasStock - Database Schema
 
-**Last Updated:** 2025-11-23
+**Last Updated:** 2025-11-25
 **Database:** PostgreSQL (Supabase)
 **RLS Enabled:** ✅ All tables
 
@@ -27,108 +27,126 @@ MasStock uses **Supabase** (PostgreSQL) with the following features:
 
 ### Key Design Principles
 
-1. **Multi-tenancy**: Users belong to clients, data isolated by client_id
-2. **Soft deletes**: Status field instead of DELETE (users, clients)
-3. **Audit trails**: created_at, updated_at, last_login timestamps
-4. **Encryption**: Sensitive data (API keys) encrypted in database
-5. **Normalization**: Separate tables for entities (users, clients, workflows)
+1. **Multi-tenancy**: Users can belong to multiple clients via `client_members` junction table
+2. **Client Roles**: Users have roles within clients (owner, collaborator)
+3. **Soft deletes**: Status field instead of DELETE (users, clients)
+4. **Audit trails**: created_at, updated_at, last_login timestamps
+5. **Encryption**: Sensitive data (API keys) encrypted in database
+6. **Normalization**: Separate tables for entities (users, clients, workflows)
+7. **Templates**: Workflow templates system for easy workflow assignment
 
 ---
 
 ## Entity Relationship Diagram
 
 ```
-┌─────────────────┐
-│     USERS       │
-│─────────────────│
-│ id (PK)         │────┐
-│ email           │    │
-│ name            │    │
-│ role            │    │
-│ status          │    │
-│ client_id (FK)  │────┼────────────────────┐
-│ created_at      │    │                    │
-│ updated_at      │    │                    │
-│ last_login      │    │                    │
-└─────────────────┘    │                    │
-                       │                    │
-                       │                    ▼
-                       │           ┌─────────────────┐
-                       │           │    CLIENTS      │
-                       │           │─────────────────│
-                       │           │ id (PK)         │
-                       │           │ name            │
-                       │           │ email           │
-                       │           │ status          │
-                       │           │ created_at      │
-                       │           │ updated_at      │
-                       │           └─────────────────┘
-                       │                    │
-                       │                    │
-                       ▼                    ▼
-              ┌─────────────────┐  ┌─────────────────┐
-              │   WORKFLOWS     │  │ WORKFLOW_       │
-              │─────────────────│  │  REQUESTS       │
-              │ id (PK)         │  │─────────────────│
-              │ name            │  │ id (PK)         │
-              │ description     │  │ client_id (FK)  │
-              │ status          │  │ workflow_id (FK)│
-              │ config          │  │ status          │
-              │ created_at      │  │ notes           │
-              │ updated_at      │  │ created_at      │
-              └─────────────────┘  └─────────────────┘
-                       │
-                       │
-                       ▼
-              ┌─────────────────┐
-              │  WORKFLOW_      │
-              │  EXECUTIONS     │
-              │─────────────────│
-              │ id (PK)         │
-              │ workflow_id (FK)│
-              │ client_id (FK)  │
-              │ user_id (FK)    │
-              │ status          │
-              │ input_data      │
-              │ output_data     │
-              │ started_at      │
-              │ completed_at    │
-              │ duration_seconds│
-              │ error_message   │
-              └─────────────────┘
-                       │
-                       │
-                       ▼
-              ┌─────────────────┐
-              │  WORKFLOW_BATCH_│
-              │     RESULTS     │
-              │─────────────────│
-              │ id (PK)         │
-              │ execution_id(FK)│
-              │ batch_index     │
-              │ prompt_text     │
-              │ status          │
-              │ result_url      │
-              │ error_message   │
-              │ processing_time │
-              │ created_at      │
-              │ completed_at    │
-              └─────────────────┘
+┌─────────────────┐          ┌─────────────────┐
+│     USERS       │          │ CLIENT_MEMBERS  │
+│─────────────────│          │─────────────────│
+│ id (PK)         │◄────────►│ user_id (FK)    │
+│ email           │    N:N   │ client_id (FK)  │
+│ name            │          │ role            │  (owner/collaborator)
+│ role            │          │ created_at      │
+│ status          │          │ updated_at      │
+│ created_at      │          └────────┬────────┘
+│ updated_at      │                   │
+│ last_login      │                   │
+└─────────────────┘                   │
+                                      │
+                                      ▼
+                             ┌─────────────────┐
+                             │    CLIENTS      │
+                             │─────────────────│
+                             │ id (PK)         │
+                             │ name            │
+                             │ company_name    │
+                             │ email           │
+                             │ status          │
+                             │ created_at      │
+                             │ updated_at      │
+                             └────────┬────────┘
+                                      │
+              ┌───────────────────────┼───────────────────────┐
+              │                       │                       │
+              ▼                       ▼                       ▼
+     ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+     │   WORKFLOWS     │    │ WORKFLOW_       │    │ SUPPORT_TICKETS │
+     │─────────────────│    │  REQUESTS       │    │─────────────────│
+     │ id (PK)         │    │─────────────────│    │ id (PK)         │
+     │ name            │    │ id (PK)         │    │ client_id (FK)  │
+     │ description     │    │ client_id (FK)  │    │ user_id (FK)    │
+     │ status          │    │ workflow_id (FK)│    │ subject         │
+     │ config          │    │ status          │    │ description     │
+     │ client_id (FK)  │    │ notes           │    │ status          │
+     │ template_id (FK)│    │ created_at      │    │ priority        │
+     │ created_at      │    └─────────────────┘    │ created_at      │
+     │ updated_at      │                           │ updated_at      │
+     └────────┬────────┘                           └─────────────────┘
+              │
+              ▼
+     ┌─────────────────┐
+     │  WORKFLOW_      │
+     │  EXECUTIONS     │
+     │─────────────────│
+     │ id (PK)         │
+     │ workflow_id (FK)│
+     │ client_id (FK)  │
+     │ user_id (FK)    │
+     │ status          │
+     │ input_data      │
+     │ output_data     │
+     │ started_at      │
+     │ completed_at    │
+     │ duration_seconds│
+     │ error_message   │
+     └────────┬────────┘
+              │
+              ▼
+     ┌─────────────────┐
+     │  WORKFLOW_BATCH_│
+     │     RESULTS     │
+     │─────────────────│
+     │ id (PK)         │
+     │ execution_id(FK)│
+     │ batch_index     │
+     │ prompt_text     │
+     │ status          │
+     │ result_url      │
+     │ error_message   │
+     │ processing_time │
+     │ created_at      │
+     │ completed_at    │
+     └─────────────────┘
 
-              ┌─────────────────┐
-              │ SUPPORT_TICKETS │
-              │─────────────────│
-              │ id (PK)         │
-              │ client_id (FK)  │
-              │ user_id (FK)    │
-              │ subject         │
-              │ description     │
-              │ status          │
-              │ priority        │
-              │ created_at      │
-              │ updated_at      │
-              └─────────────────┘
+
+┌─────────────────────┐
+│ WORKFLOW_TEMPLATES  │  (Admin creates, assigns to clients → workflows)
+│─────────────────────│
+│ id (PK)             │
+│ name                │
+│ description         │
+│ icon                │
+│ workflow_type       │
+│ config              │
+│ cost_per_execution  │
+│ revenue_per_exec    │
+│ is_active           │
+│ created_at          │
+│ updated_at          │
+└─────────────────────┘
 ```
+
+### Relationship Summary
+
+| Relationship | Type | Description |
+|-------------|------|-------------|
+| Users ↔ Clients | **N:N** | Via `client_members` junction table |
+| Users → client_members | 1:N | One user can be member of many clients |
+| Clients → client_members | 1:N | One client can have many members |
+| client_members.role | - | `owner` (full access) or `collaborator` (workflows only) |
+| Clients → Workflows | 1:N | Each workflow belongs to one client |
+| Workflows → template_id | N:1 | Workflow can reference source template |
+| Templates → Workflows | 1:N | One template can create many workflows |
 
 ---
 
@@ -136,28 +154,29 @@ MasStock uses **Supabase** (PostgreSQL) with the following features:
 
 ### 1. `users`
 
-User accounts (admin, client users)
+User accounts (admin, platform users)
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | uuid | PK, DEFAULT uuid_generate_v4() | User ID (Supabase Auth user ID) |
 | `email` | text | UNIQUE, NOT NULL | Email address |
 | `name` | text | NOT NULL | Full name |
-| `role` | text | NOT NULL, CHECK (role IN ('admin', 'client')) | User role |
+| `role` | text | NOT NULL, CHECK (role IN ('admin', 'user')) | Platform role (admin = MasStock team) |
 | `status` | text | NOT NULL, DEFAULT 'active', CHECK (status IN ('active', 'suspended', 'deleted')) | Account status |
-| `client_id` | uuid | FK → clients(id), NULL | Associated client (NULL for admin) |
 | `created_at` | timestamptz | DEFAULT now() | Account creation timestamp |
 | `updated_at` | timestamptz | DEFAULT now() | Last update timestamp |
 | `last_login` | timestamptz | NULL | Last login timestamp |
 
+**Note:** Users' association with clients is managed via the `client_members` junction table (N:N relationship).
+
 **Indexes:**
 - `idx_users_email` ON email
-- `idx_users_client_id` ON client_id
 - `idx_users_role` ON role
 - `idx_users_status` ON status
 
 **RLS Policies:**
 - Users can view their own profile
+- Users can view other members of their clients
 - Admins can view all users
 - Only admins can create/update/delete users
 
@@ -167,9 +186,8 @@ User accounts (admin, client users)
   "id": "123e4567-e89b-12d3-a456-426614174000",
   "email": "john@client.com",
   "name": "John Doe",
-  "role": "client",
+  "role": "user",
   "status": "active",
-  "client_id": "456e7890-e89b-12d3-a456-426614174001",
   "created_at": "2025-01-15T10:00:00Z",
   "updated_at": "2025-01-20T14:30:00Z",
   "last_login": "2025-11-23T09:15:00Z"
@@ -185,18 +203,21 @@ Client organizations
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | uuid | PK, DEFAULT uuid_generate_v4() | Client ID |
-| `name` | text | NOT NULL | Company name |
+| `name` | text | NOT NULL | Display name |
+| `company_name` | text | NULL | Company legal name |
 | `email` | text | NOT NULL | Contact email |
 | `status` | text | NOT NULL, DEFAULT 'active', CHECK (status IN ('active', 'suspended', 'deleted')) | Client status |
 | `created_at` | timestamptz | DEFAULT now() | Client creation timestamp |
 | `updated_at` | timestamptz | DEFAULT now() | Last update timestamp |
+
+**Note:** Client members are managed via the `client_members` junction table (N:N with users).
 
 **Indexes:**
 - `idx_clients_status` ON status
 - `idx_clients_email` ON email
 
 **RLS Policies:**
-- Clients can view their own data
+- Users can view clients they are members of
 - Admins can view all clients
 - Only admins can create/update/delete clients
 
@@ -204,7 +225,8 @@ Client organizations
 ```json
 {
   "id": "456e7890-e89b-12d3-a456-426614174001",
-  "name": "Acme Corporation",
+  "name": "Acme Corp",
+  "company_name": "Acme Corporation Inc.",
   "email": "contact@acme.com",
   "status": "active",
   "created_at": "2025-01-10T12:00:00Z",
@@ -214,9 +236,108 @@ Client organizations
 
 ---
 
-### 3. `workflows`
+### 3. `client_members` ⭐ NEW
 
-Workflow definitions (templates)
+Junction table for multi-user per client (N:N relationship)
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, DEFAULT uuid_generate_v4() | Membership ID |
+| `client_id` | uuid | FK → clients(id) ON DELETE CASCADE, NOT NULL | Client |
+| `user_id` | uuid | FK → users(id) ON DELETE CASCADE, NOT NULL | User |
+| `role` | text | NOT NULL, DEFAULT 'collaborator', CHECK (role IN ('owner', 'collaborator')) | Role within client |
+| `created_at` | timestamptz | DEFAULT now() | Membership creation timestamp |
+| `updated_at` | timestamptz | DEFAULT now() | Last update timestamp |
+
+**Client Roles:**
+
+| Role | Access Level |
+|------|-------------|
+| `owner` | Full access: workflows, executions, billing, member management |
+| `collaborator` | Limited access: workflows, executions, results only |
+
+**Indexes:**
+- `idx_client_members_client_id` ON client_id
+- `idx_client_members_user_id` ON user_id
+- `idx_client_members_unique` ON (client_id, user_id) UNIQUE
+
+**RLS Policies:**
+- Admins can manage all memberships
+- Users can view memberships for their clients
+- Only admins can add/remove members
+
+**Example Row:**
+```json
+{
+  "id": "mem12345-e89b-12d3-a456-426614174007",
+  "client_id": "456e7890-e89b-12d3-a456-426614174001",
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "role": "owner",
+  "created_at": "2025-01-10T12:00:00Z",
+  "updated_at": "2025-01-10T12:00:00Z"
+}
+```
+
+---
+
+### 4. `workflow_templates` ⭐ NEW
+
+Pre-defined workflow templates for assignment to clients
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, DEFAULT uuid_generate_v4() | Template ID |
+| `name` | text | NOT NULL | Template name |
+| `description` | text | NULL | Template description |
+| `icon` | text | DEFAULT 'zap' | Icon identifier (zap, sparkles, etc.) |
+| `workflow_type` | text | NOT NULL | Workflow type (nano_banana, pro_banana, etc.) |
+| `config` | jsonb | NOT NULL, DEFAULT '{}'::jsonb | Default configuration |
+| `cost_per_execution` | decimal(10,2) | DEFAULT 0.00 | Cost per execution (for admin tracking) |
+| `revenue_per_execution` | decimal(10,2) | DEFAULT 0.00 | Revenue per execution |
+| `is_active` | boolean | DEFAULT true | Whether template is available for assignment |
+| `created_at` | timestamptz | DEFAULT now() | Creation timestamp |
+| `updated_at` | timestamptz | DEFAULT now() | Last update timestamp |
+
+**Seed Data:**
+
+| Name | Type | Cost | Revenue |
+|------|------|------|---------|
+| Flash Image Gen | nano_banana | $0.039 | $0.10 |
+| Pro Image Gen | pro_banana | $0.10 | $0.25 |
+
+**Indexes:**
+- `idx_workflow_templates_is_active` ON is_active
+- `idx_workflow_templates_workflow_type` ON workflow_type
+
+**RLS Policies:**
+- Only admins can view/manage templates
+
+**Example Row:**
+```json
+{
+  "id": "tpl12345-e89b-12d3-a456-426614174008",
+  "name": "Flash Image Generation",
+  "description": "Fast AI image generation using Gemini 2.5 Flash",
+  "icon": "zap",
+  "workflow_type": "nano_banana",
+  "config": {
+    "model": "gemini-2.5-flash-image",
+    "max_prompts": 100,
+    "requires_api_key": true
+  },
+  "cost_per_execution": 0.039,
+  "revenue_per_execution": 0.10,
+  "is_active": true,
+  "created_at": "2025-01-05T08:00:00Z",
+  "updated_at": "2025-01-05T08:00:00Z"
+}
+```
+
+---
+
+### 5. `workflows`
+
+Workflow instances (assigned to clients from templates)
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
@@ -225,6 +346,8 @@ Workflow definitions (templates)
 | `description` | text | NULL | Workflow description |
 | `status` | text | NOT NULL, DEFAULT 'active', CHECK (status IN ('active', 'inactive')) | Workflow status |
 | `config` | jsonb | NOT NULL, DEFAULT '{}'::jsonb | Workflow configuration |
+| `client_id` | uuid | FK → clients(id), NULL | Client this workflow belongs to |
+| `template_id` | uuid | FK → workflow_templates(id), NULL | Source template (if assigned from template) |
 | `created_at` | timestamptz | DEFAULT now() | Creation timestamp |
 | `updated_at` | timestamptz | DEFAULT now() | Last update timestamp |
 
@@ -241,16 +364,19 @@ Workflow definitions (templates)
 
 **Indexes:**
 - `idx_workflows_status` ON status
+- `idx_workflows_client_id` ON client_id
+- `idx_workflows_template_id` ON template_id
 
 **RLS Policies:**
-- All authenticated users can view active workflows
+- Users can view workflows for their clients
+- Admins can view all workflows
 - Only admins can create/update/delete workflows
 
 **Example Row:**
 ```json
 {
   "id": "789e1234-e89b-12d3-a456-426614174002",
-  "name": "Nano Banana - Image Generation",
+  "name": "Acme Corp - Nano Banana",
   "description": "Generate AI images using Gemini 2.5 Flash",
   "status": "active",
   "config": {
@@ -258,6 +384,8 @@ Workflow definitions (templates)
     "model": "gemini-2.5-flash-image",
     "requires_api_key": true
   },
+  "client_id": "456e7890-e89b-12d3-a456-426614174001",
+  "template_id": "tpl12345-e89b-12d3-a456-426614174008",
   "created_at": "2025-01-05T08:00:00Z",
   "updated_at": "2025-01-05T08:00:00Z"
 }
@@ -265,7 +393,7 @@ Workflow definitions (templates)
 
 ---
 
-### 4. `workflow_requests`
+### 6. `workflow_requests`
 
 Client requests for workflow execution
 
@@ -305,7 +433,7 @@ Client requests for workflow execution
 
 ---
 
-### 5. `workflow_executions`
+### 7. `workflow_executions`
 
 Workflow execution records
 
@@ -314,7 +442,7 @@ Workflow execution records
 | `id` | uuid | PK, DEFAULT uuid_generate_v4() | Execution ID |
 | `workflow_id` | uuid | FK → workflows(id), NOT NULL | Executed workflow |
 | `client_id` | uuid | FK → clients(id), NOT NULL | Client who executed |
-| `user_id` | uuid | FK → users(id), NOT NULL | User who executed |
+| `triggered_by_user_id` | uuid | FK → users(id), NULL | User (collaborator) who triggered this execution |
 | `status` | text | NOT NULL, DEFAULT 'pending', CHECK (status IN ('pending', 'processing', 'completed', 'failed')) | Execution status |
 | `input_data` | jsonb | NOT NULL | Execution input data |
 | `output_data` | jsonb | NULL | Execution output data |
@@ -348,7 +476,7 @@ Workflow execution records
 **Indexes:**
 - `idx_workflow_executions_workflow_id` ON workflow_id
 - `idx_workflow_executions_client_id` ON client_id
-- `idx_workflow_executions_user_id` ON user_id
+- `idx_workflow_executions_triggered_by` ON triggered_by_user_id
 - `idx_workflow_executions_status` ON status
 - `idx_workflow_executions_created_at` ON created_at DESC
 
@@ -384,7 +512,7 @@ Workflow execution records
 
 ---
 
-### 6. `workflow_batch_results`
+### 8. `workflow_batch_results`
 
 Individual batch processing results (one per prompt)
 
@@ -430,7 +558,7 @@ Individual batch processing results (one per prompt)
 
 ---
 
-### 7. `support_tickets`
+### 9. `support_tickets`
 
 Support ticket system
 
@@ -494,14 +622,15 @@ CREATE POLICY "Admins can access all records"
   );
 ```
 
-**2. Client Access (Own Data Only)**
+**2. Client Member Access (via client_members junction)**
 ```sql
-CREATE POLICY "Clients can view their own data"
+-- NEW PATTERN: Access via client_members table
+CREATE POLICY "Members can view their client data"
   ON table_name FOR SELECT
   USING (
     client_id IN (
-      SELECT client_id FROM users
-      WHERE users.id = auth.uid()
+      SELECT client_id FROM client_members
+      WHERE user_id = auth.uid()
     )
   );
 ```
@@ -513,17 +642,33 @@ CREATE POLICY "Users can view their own profile"
   USING (id = auth.uid());
 ```
 
+**4. Client Owner Only Access (billing, member management)**
+```sql
+-- For sensitive operations (owner role required)
+CREATE POLICY "Owners can manage client settings"
+  ON table_name FOR ALL
+  USING (
+    client_id IN (
+      SELECT client_id FROM client_members
+      WHERE user_id = auth.uid()
+      AND role = 'owner'
+    )
+  );
+```
+
 ### RLS by Table
 
-| Table | Admin | Client | User |
-|-------|-------|--------|------|
-| `users` | ALL | - | SELECT (own) |
-| `clients` | ALL | SELECT (own) | - |
-| `workflows` | ALL | SELECT (active) | SELECT (active) |
-| `workflow_requests` | ALL | ALL (own client) | SELECT (own client) |
-| `workflow_executions` | ALL | ALL (own client) | ALL (own client) |
-| `workflow_batch_results` | ALL | SELECT (own client) | SELECT (own client) |
-| `support_tickets` | ALL | ALL (own client) | ALL (own client) |
+| Table | Admin | Owner | Collaborator | User (self) |
+|-------|-------|-------|--------------|-------------|
+| `users` | ALL | SELECT (same client members) | SELECT (same client members) | SELECT (own) |
+| `clients` | ALL | ALL (via membership) | SELECT (via membership) | - |
+| `client_members` | ALL | SELECT (own client) | SELECT (own client) | - |
+| `workflow_templates` | ALL | - | - | - |
+| `workflows` | ALL | ALL (client's) | SELECT (client's) | - |
+| `workflow_requests` | ALL | ALL (client's) | SELECT (client's) | - |
+| `workflow_executions` | ALL | ALL (client's) | ALL (client's) | - |
+| `workflow_batch_results` | ALL | SELECT (client's) | SELECT (client's) | - |
+| `support_tickets` | ALL | ALL (client's) | ALL (client's) | - |
 
 ---
 

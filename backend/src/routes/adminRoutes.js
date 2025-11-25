@@ -11,6 +11,8 @@ const { adminLimiter } = require('../middleware/rateLimit');
 const adminController = require('../controllers/adminController');
 const adminUserController = require('../controllers/adminUserController');
 const adminWorkflowController = require('../controllers/adminWorkflowController');
+const adminClientController = require('../controllers/adminClientController');
+const workflowTemplatesController = require('../controllers/workflowTemplatesController');
 const analyticsController = require('../controllers/analyticsController');
 const supportTicketsController = require('../controllers/supportTicketsController');
 
@@ -46,16 +48,17 @@ router.use(adminLimiter);
 
 /**
  * POST /api/v1/admin/users
- * Create new user (admin or regular user with client)
+ * Create new user
+ * - For role='user': client_id is required, user is added to client_members
+ * - For role='admin': no client association needed
  */
 router.post('/users',
   body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'),
   body('name').optional().trim(),
-  body('company_name').optional().trim(),
-  body('plan').optional().isIn(['premium_custom', 'starter', 'pro']).withMessage('Invalid plan'),
-  body('subscription_amount').optional().isNumeric().withMessage('Subscription amount must be numeric'),
   body('role').optional().isIn(['user', 'admin']).withMessage('Role must be user or admin'),
+  body('client_id').optional().isUUID().withMessage('Invalid client ID'),
+  body('member_role').optional().isIn(['owner', 'collaborator']).withMessage('Member role must be owner or collaborator'),
   asyncHandler(async (req, res, next) => {
     const { validationResult } = require('express-validator');
     const errors = validationResult(req);
@@ -129,15 +132,20 @@ router.get('/clients/:client_id',
 
 /**
  * POST /api/v1/admin/clients
- * Create new client (legacy endpoint - kept for backward compatibility)
+ * Create new client (company) - members added separately
  */
 router.post('/clients',
-  body('name').trim().isLength({ min: 2, max: 255 }),
-  body('email').isEmail().normalizeEmail(),
-  body('company_name').optional().trim(),
-  body('plan').optional().isIn(['premium_custom', 'starter', 'pro']),
-  body('subscription_amount').optional().isNumeric(),
-  asyncHandler(adminController.createClient)
+  body('name').trim().isLength({ min: 2, max: 255 }).withMessage('Company name must be 2-255 characters'),
+  body('plan').optional().isIn(['premium_custom', 'starter', 'pro']).withMessage('Invalid plan'),
+  body('subscription_amount').optional().isNumeric().withMessage('Subscription amount must be numeric'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminController.createClient(req, res);
+  })
 );
 
 /**
@@ -175,6 +183,238 @@ router.delete('/clients/:client_id',
       throw validationErrorHandler(errors.array());
     }
     await adminUserController.deleteClient(req, res);
+  })
+);
+
+/**
+ * CLIENT MEMBERS ENDPOINTS
+ */
+
+/**
+ * GET /api/v1/admin/clients/:client_id/members
+ * List all members of a client
+ */
+router.get('/clients/:client_id/members',
+  param('client_id').isUUID().withMessage('Invalid client ID'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminClientController.getClientMembers(req, res);
+  })
+);
+
+/**
+ * POST /api/v1/admin/clients/:client_id/members
+ * Add a user to a client
+ */
+router.post('/clients/:client_id/members',
+  param('client_id').isUUID().withMessage('Invalid client ID'),
+  body('user_id').isUUID().withMessage('Invalid user ID'),
+  body('role').isIn(['owner', 'collaborator']).withMessage('Role must be owner or collaborator'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminClientController.addClientMember(req, res);
+  })
+);
+
+/**
+ * PUT /api/v1/admin/clients/:client_id/members/:member_id
+ * Update member role
+ */
+router.put('/clients/:client_id/members/:member_id',
+  param('client_id').isUUID().withMessage('Invalid client ID'),
+  param('member_id').isUUID().withMessage('Invalid member ID'),
+  body('role').isIn(['owner', 'collaborator']).withMessage('Role must be owner or collaborator'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminClientController.updateClientMemberRole(req, res);
+  })
+);
+
+/**
+ * DELETE /api/v1/admin/clients/:client_id/members/:member_id
+ * Remove member from client
+ */
+router.delete('/clients/:client_id/members/:member_id',
+  param('client_id').isUUID().withMessage('Invalid client ID'),
+  param('member_id').isUUID().withMessage('Invalid member ID'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminClientController.removeClientMember(req, res);
+  })
+);
+
+/**
+ * CLIENT WORKFLOWS ENDPOINTS
+ */
+
+/**
+ * GET /api/v1/admin/clients/:client_id/workflows
+ * List all workflows of a client
+ */
+router.get('/clients/:client_id/workflows',
+  param('client_id').isUUID().withMessage('Invalid client ID'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminClientController.getClientWorkflows(req, res);
+  })
+);
+
+/**
+ * POST /api/v1/admin/clients/:client_id/workflows
+ * Assign a workflow template to a client
+ */
+router.post('/clients/:client_id/workflows',
+  param('client_id').isUUID().withMessage('Invalid client ID'),
+  body('template_id').isUUID().withMessage('Invalid template ID'),
+  body('name').optional().trim(),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminClientController.assignWorkflowToClient(req, res);
+  })
+);
+
+/**
+ * DELETE /api/v1/admin/clients/:client_id/workflows/:workflow_id
+ * Remove workflow from client (archive)
+ */
+router.delete('/clients/:client_id/workflows/:workflow_id',
+  param('client_id').isUUID().withMessage('Invalid client ID'),
+  param('workflow_id').isUUID().withMessage('Invalid workflow ID'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminClientController.removeClientWorkflow(req, res);
+  })
+);
+
+/**
+ * CLIENT EXECUTIONS ENDPOINTS
+ */
+
+/**
+ * GET /api/v1/admin/clients/:client_id/executions
+ * List all executions of a client with filters
+ */
+router.get('/clients/:client_id/executions',
+  param('client_id').isUUID().withMessage('Invalid client ID'),
+  query('workflow_id').optional().isUUID().withMessage('Invalid workflow ID'),
+  query('user_id').optional().isUUID().withMessage('Invalid user ID'),
+  query('status').optional().isIn(['pending', 'processing', 'completed', 'failed']).withMessage('Invalid status'),
+  query('date_from').optional().isISO8601().withMessage('Invalid date format'),
+  query('date_to').optional().isISO8601().withMessage('Invalid date format'),
+  query('page').optional().isInt({ min: 1 }).withMessage('Page must be >= 1'),
+  query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be 1-100'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminClientController.getClientExecutions(req, res);
+  })
+);
+
+/**
+ * CLIENT ACTIVITY ENDPOINTS
+ */
+
+/**
+ * GET /api/v1/admin/clients/:client_id/activity
+ * Get audit logs for a client
+ */
+router.get('/clients/:client_id/activity',
+  param('client_id').isUUID().withMessage('Invalid client ID'),
+  query('limit').optional().isInt({ min: 1, max: 500 }).withMessage('Limit must be 1-500'),
+  query('offset').optional().isInt({ min: 0 }).withMessage('Offset must be >= 0'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await adminClientController.getClientActivity(req, res);
+  })
+);
+
+/**
+ * USER SEARCH ENDPOINT (for adding members)
+ */
+
+/**
+ * GET /api/v1/admin/users/search
+ * Search users for adding to clients
+ */
+router.get('/users/search',
+  query('q')
+    .notEmpty().withMessage('Search query is required')
+    .trim()
+    .isLength({ min: 2 }).withMessage('Search query must be at least 2 characters'),
+  query('exclude_client_id').optional().isUUID().withMessage('Invalid client ID'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      console.log('❌ /users/search: Validation failed', { errors: errors.array(), query: req.query });
+      throw validationErrorHandler(errors.array());
+    }
+    console.log('✅ /users/search: Validation passed', { query: req.query });
+    await adminClientController.searchUsersForMember(req, res);
+  })
+);
+
+
+/**
+ * WORKFLOW TEMPLATES ENDPOINTS
+ */
+
+/**
+ * GET /api/v1/admin/workflow-templates
+ * List all active workflow templates
+ */
+router.get('/workflow-templates',
+  asyncHandler(workflowTemplatesController.getTemplates)
+);
+
+/**
+ * GET /api/v1/admin/workflow-templates/:id
+ * Get single workflow template
+ */
+router.get('/workflow-templates/:id',
+  param('id').isUUID().withMessage('Invalid template ID'),
+  asyncHandler(async (req, res, next) => {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw validationErrorHandler(errors.array());
+    }
+    await workflowTemplatesController.getTemplate(req, res);
   })
 );
 
