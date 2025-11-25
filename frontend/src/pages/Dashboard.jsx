@@ -5,13 +5,11 @@ import { Spinner } from '../components/ui/Spinner'
 import { StatCard } from '../components/ui/StatCard'
 import { useAuth } from '../hooks/useAuth'
 import { workflowService } from '../services/workflows'
-import logger from '@/utils/logger';
-
+import logger from '@/utils/logger'
 
 /**
- * Dashboard Page - "The Organic Factory" Design
- * Bento Grid layout with glassmorphism subtle effects
- * Ghost White background, Indigo accents, Cabinet Grotesk typography
+ * Dashboard Page - Electric Trust Design System
+ * Clean, compact, proper glassmorphism with CSS classes
  */
 export function Dashboard() {
   const { user } = useAuth()
@@ -49,45 +47,56 @@ export function Dashboard() {
     loadData()
   }, [])
 
-  // Metrics
   const metrics = [
     {
       label: 'Active Workflows',
       value: stats.active_workflows.toString(),
-      change: 'Total',
-      trend: 'neutral'
+      change: 'Total active',
+      trend: 'neutral',
+      icon: '⚡',
+      variant: 'highlight',
+      glow: true
     },
     {
       label: 'Total Executions',
       value: stats.total_executions.toString(),
       change: 'All time',
-      trend: 'up'
+      trend: 'up',
+      icon: '🚀',
+      variant: 'accent'
     },
     {
       label: 'Success Rate',
       value: stats.success_rate,
       change: 'Average',
-      trend: 'up'
+      trend: 'up',
+      icon: '✨',
+      variant: 'success',
+      glow: true
     },
     {
       label: 'Time Saved',
       value: stats.time_saved,
       change: 'Estimated',
-      trend: 'up'
+      trend: 'up',
+      icon: '⏱️',
+      variant: 'default'
     },
   ]
 
   const recentWorkflows = workflows.slice(0, 6)
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 18) return 'Good afternoon'
+    return 'Good evening'
+  }
+
   if (loading) {
     return (
       <ClientLayout>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '60vh'
-        }}>
+        <div className="dashboard" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
           <Spinner size="lg" />
         </div>
       </ClientLayout>
@@ -96,39 +105,25 @@ export function Dashboard() {
 
   return (
     <ClientLayout>
-      <div style={{ padding: '48px', maxWidth: '1400px', margin: '0 auto' }}>
-        {/* Header - Cabinet Grotesk typography */}
-        <div style={{ marginBottom: '48px' }}>
-          <h1
-            className="font-display"
-            style={{
-              fontSize: '36px',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              marginBottom: '8px',
-              letterSpacing: '-0.02em'
-            }}
-          >
-            Welcome back, {user?.name || 'User'}
-          </h1>
-          <p
-            className="font-body"
-            style={{
-              fontSize: '16px',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            Manage and execute your automation workflows
-          </p>
-        </div>
+      <div className="dashboard">
+        {/* Header */}
+        <header style={{ marginBottom: '32px' }}>
+          <div className="dashboard__greeting-badge">
+            <span>👋</span>
+            {getGreeting()}
+          </div>
 
-        {/* Metrics Grid - Bento Style */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-          gap: '24px',
-          marginBottom: '48px'
-        }}>
+          <h1 className="dashboard__title">
+            Welcome back, <span className="dashboard__title-gradient">{user?.name || 'User'}</span>
+          </h1>
+
+          <p className="dashboard__subtitle">
+            Your automation workflows are ready. Monitor your executions and transform your processes.
+          </p>
+        </header>
+
+        {/* Stats Grid */}
+        <div className="dashboard__stats-grid">
           {metrics.map((metric, index) => (
             <StatCard
               key={index}
@@ -136,190 +131,141 @@ export function Dashboard() {
               value={metric.value}
               change={metric.change}
               trend={metric.trend}
+              icon={metric.icon}
+              variant={metric.variant}
               glow={metric.glow || false}
+              delay={index * 50}
             />
           ))}
         </div>
 
-        {/* Recent Workflows */}
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-            <h2
-              className="font-display"
-              style={{
-                fontSize: '24px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                letterSpacing: '-0.01em'
-              }}
-            >
-              Recent Workflows
-            </h2>
-            <button
-              onClick={() => navigate('/workflows')}
-              className="btn-ghost"
-              style={{
-                padding: '8px 16px',
-                fontSize: '14px',
-                fontWeight: 500
-              }}
-            >
-              View all →
+        {/* Quick Actions */}
+        <div className="dashboard__actions">
+          <button
+            onClick={() => navigate('/workflows')}
+            className="dashboard__action-btn dashboard__action-btn--primary"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+            New Execution
+          </button>
+
+          <button
+            onClick={() => navigate('/executions')}
+            className="dashboard__action-btn dashboard__action-btn--secondary"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+            </svg>
+            View History
+          </button>
+        </div>
+
+        {/* Workflows Section */}
+        <section>
+          <div className="dashboard__section-header">
+            <div>
+              <h2 className="dashboard__section-title">Your Workflows</h2>
+              <p className="dashboard__section-count">
+                {workflows.length} workflow{workflows.length !== 1 ? 's' : ''} available
+              </p>
+            </div>
+            <button onClick={() => navigate('/workflows')} className="dashboard__view-all">
+              View all
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <path d="M5 12h14M12 5l7 7-7 7" />
+              </svg>
             </button>
           </div>
 
           {recentWorkflows.length > 0 ? (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-              gap: '24px'
-            }}>
+            <div className="dashboard__workflows-grid">
               {recentWorkflows.map((workflow, index) => (
-                <div
+                <WorkflowCard
                   key={workflow.id}
+                  workflow={workflow}
+                  index={index}
                   onClick={() => navigate(`/workflows/${workflow.id}/execute`)}
-                  className="card-bento card-interactive"
-                  style={{
-                    background: 'var(--canvas-pure)',
-                    padding: '24px',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', marginBottom: '16px' }}>
-                    <div
-                      style={{
-                        width: '48px',
-                        height: '48px',
-                        borderRadius: '12px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '24px',
-                        background: getWorkflowGradient(index)
-                      }}
-                    >
-                      {getWorkflowIcon(workflow.name, index)}
-                    </div>
-                    <span
-                      className="badge"
-                      style={{
-                        padding: '4px 12px',
-                        fontSize: '12px',
-                        fontWeight: 500,
-                        borderRadius: '6px',
-                        background: workflow.status === 'deployed'
-                          ? 'var(--success-light)'
-                          : 'var(--neutral-100)',
-                        color: workflow.status === 'deployed'
-                          ? 'var(--success-dark)'
-                          : 'var(--neutral-600)'
-                      }}
-                    >
-                      {workflow.status === 'deployed' ? 'Active' : 'Inactive'}
-                    </span>
-                  </div>
-                  <h3
-                    className="font-display"
-                    style={{
-                      fontSize: '18px',
-                      fontWeight: 600,
-                      color: 'var(--text-primary)',
-                      marginBottom: '8px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}
-                  >
-                    {workflow.name}
-                  </h3>
-                  <p
-                    className="font-body"
-                    style={{
-                      fontSize: '14px',
-                      color: 'var(--text-secondary)',
-                      marginBottom: '16px',
-                      lineHeight: 1.5,
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {workflow.description || 'No description available'}
-                  </p>
-                  <div
-                    className="font-mono"
-                    style={{
-                      fontSize: '12px',
-                      color: 'var(--neutral-500)'
-                    }}
-                  >
-                    {workflow.execution_count || 0} executions
-                  </div>
-                </div>
+                />
               ))}
             </div>
           ) : (
-            <div
-              className="card-bento"
-              style={{
-                background: 'var(--canvas-pure)',
-                padding: '64px',
-                textAlign: 'center'
-              }}
-            >
-              <div style={{ fontSize: '64px', marginBottom: '16px' }}>🎯</div>
-              <h3
-                className="font-display"
-                style={{
-                  fontSize: '24px',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  marginBottom: '8px'
-                }}
-              >
-                No workflows yet
-              </h3>
-              <p
-                className="font-body"
-                style={{
-                  fontSize: '16px',
-                  color: 'var(--text-secondary)',
-                  marginBottom: '24px'
-                }}
-              >
-                Create your first workflow to get started
-              </p>
-              <button
-                onClick={() => navigate('/workflows')}
-                className="btn btn-primary"
-                style={{ padding: '12px 32px', fontSize: '16px' }}
-              >
-                Explore Workflows
-              </button>
-            </div>
+            <EmptyState onNavigate={() => navigate('/workflows')} />
           )}
-        </div>
+        </section>
       </div>
     </ClientLayout>
   )
 }
 
+function WorkflowCard({ workflow, index, onClick }) {
+  return (
+    <article
+      className="workflow-card"
+      onClick={onClick}
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
+      <div className="workflow-card__accent" />
+
+      <div className="workflow-card__header">
+        <div
+          className="workflow-card__icon"
+          style={{ background: getWorkflowGradient(index) }}
+        >
+          {getWorkflowIcon(workflow.name, index)}
+        </div>
+
+        <span className={`workflow-card__badge ${workflow.status === 'deployed' ? 'workflow-card__badge--active' : 'workflow-card__badge--inactive'}`}>
+          {workflow.status === 'deployed' ? 'Active' : 'Inactive'}
+        </span>
+      </div>
+
+      <h3 className="workflow-card__title">{workflow.name}</h3>
+      <p className="workflow-card__description">
+        {workflow.description || 'No description available'}
+      </p>
+
+      <div className="workflow-card__footer">
+        <div className="workflow-card__runs">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polygon points="5 3 19 12 5 21 5 3" />
+          </svg>
+          {workflow.execution_count || 0} runs
+        </div>
+
+        <div className="workflow-card__arrow">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M5 12h14M12 5l7 7-7 7" />
+          </svg>
+        </div>
+      </div>
+    </article>
+  )
+}
+
+function EmptyState({ onNavigate }) {
+  return (
+    <div className="dashboard__empty">
+      <div className="dashboard__empty-icon">🎯</div>
+      <h3 className="dashboard__empty-title">No workflows yet</h3>
+      <p className="dashboard__empty-text">
+        Create your first workflow to start automating your processes.
+      </p>
+      <button
+        onClick={onNavigate}
+        className="dashboard__action-btn dashboard__action-btn--primary"
+      >
+        Explore Workflows
+      </button>
+    </div>
+  )
+}
+
 function getWorkflowIcon(workflowName, index) {
-  // Custom SVG icon for Image Factory - Apple style minimalist
   if (workflowName === 'Image Factory') {
     return (
-      <svg
-        width="28"
-        height="28"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="white"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        {/* Mountain/landscape icon */}
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <circle cx="8.5" cy="8.5" r="1.5" />
         <path d="M21 15l-5-5L5 21" />
@@ -327,19 +273,27 @@ function getWorkflowIcon(workflowName, index) {
     )
   }
 
-  // Fallback to emoji icons for other workflows
-  const icons = ['📊', '📈', '📉', '💼', '📋', '⚡', '🚀', '💰', '📄', '🔧']
+  if (workflowName === 'Nano Banana') {
+    return (
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+        <line x1="4" y1="22" x2="4" y2="15" />
+      </svg>
+    )
+  }
+
+  const icons = ['⚡', '🔮', '🎨', '📊', '🔧', '💫']
   return icons[index % icons.length]
 }
 
 function getWorkflowGradient(index) {
   const gradients = [
-    'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', // Purple
-    'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', // Pink
-    'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', // Blue
-    'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', // Green
-    'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', // Orange
-    'linear-gradient(135deg, #30cfd0 0%, #330867 100%)', // Cyan
+    'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+    'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
+    'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)',
+    'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
+    'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)',
+    'linear-gradient(135deg, #14B8A6 0%, #6366F1 100%)',
   ]
   return gradients[index % gradients.length]
 }

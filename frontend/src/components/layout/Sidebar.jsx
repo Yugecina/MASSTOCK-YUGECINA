@@ -1,163 +1,123 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import DarkModeToggle from '../ui/DarkModeToggle'
 
+/**
+ * Sidebar - Electric Trust Design System
+ *
+ * DA-V2 Features:
+ * - Heavy glassmorphism with premium blur
+ * - Lucide-style line icons (SVG)
+ * - Active state with glow effects
+ * - Smooth transitions everywhere
+ */
 export function Sidebar() {
   const { user, logout } = useAuth()
 
+  const navItems = [
+    {
+      path: '/dashboard',
+      label: 'Dashboard',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="3" width="7" height="7" rx="1" />
+          <rect x="14" y="14" width="7" height="7" rx="1" />
+          <rect x="3" y="14" width="7" height="7" rx="1" />
+        </svg>
+      )
+    },
+    {
+      path: '/workflows',
+      label: 'Workflows',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="6" height="6" rx="1" />
+          <rect x="15" y="15" width="6" height="6" rx="1" />
+          <path d="M9 6h6v3a3 3 0 0 0 3 3h3" />
+          <path d="M6 9v6l3 3" />
+        </svg>
+      )
+    },
+    {
+      path: '/executions',
+      label: 'Executions',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+        </svg>
+      )
+    },
+    {
+      path: '/settings',
+      label: 'Settings',
+      icon: (
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      )
+    },
+  ]
+
   return (
-    <aside className="fixed left-0 top-0 bottom-0 w-70 bg-white border-r border-neutral-200 flex flex-col z-30">
+    <aside className="sidebar">
       {/* Logo */}
-      <div className="px-6 py-6 border-b border-neutral-200">
+      <div className="sidebar-logo">
         <img
           src="/logo-full-color.svg"
           alt="MasStock"
-          className="h-10 w-auto"
-          style={{ height: '40px', width: 'auto' }}
+          style={{ height: '36px', width: 'auto' }}
         />
       </div>
 
       {/* Navigation */}
-      <nav style={{
-        flex: 1,
-        padding: '24px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px'
-      }}>
-        {[
-          { path: '/dashboard', label: 'Dashboard', icon: '📊' },
-          { path: '/workflows', label: 'Workflows', icon: '⚙️' },
-          { path: '/executions', label: 'Executions', icon: '🚀' },
-          { path: '/settings', label: 'Settings', icon: '⚙️' },
-        ].map((item) => (
+      <nav className="sidebar-nav">
+        {navItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 500,
-              transition: 'all 0.2s ease-out',
-              textDecoration: 'none',
-              background: isActive ? 'var(--primary-50)' : 'transparent',
-              color: isActive ? 'var(--primary-600)' : 'var(--neutral-600)',
-              borderLeft: isActive ? '4px solid var(--primary-500)' : '4px solid transparent',
-              paddingLeft: isActive ? '12px' : '16px'
-            })}
-            onMouseEnter={(e) => {
-              if (!e.currentTarget.classList.contains('active')) {
-                e.currentTarget.style.background = 'var(--neutral-100)'
-                e.currentTarget.style.color = 'var(--neutral-900)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              const isActive = e.currentTarget.getAttribute('aria-current') === 'page'
-              if (!isActive) {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = 'var(--neutral-600)'
-              }
-            }}
+            className={({ isActive }) => isActive ? 'sidebar-link sidebar-link-active' : 'sidebar-link'}
           >
-            <span style={{ fontSize: '18px' }}>{item.icon}</span>
+            <span className="sidebar-link-icon">{item.icon}</span>
             {item.label}
           </NavLink>
         ))}
       </nav>
 
       {/* User Section */}
-      <div
-        className="border-t border-neutral-200 p-4"
-        style={{
-          background: 'linear-gradient(to bottom, transparent, var(--neutral-50))'
-        }}
-      >
-        <div
-          className="flex items-center gap-3 mb-3 p-3 rounded-lg"
-          style={{
-            background: 'var(--canvas-pure)',
-            border: '1px solid var(--neutral-200)'
-          }}
-        >
-          {/* Avatar */}
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--primary-500) 0%, var(--secondary-500) 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: '16px',
-              fontWeight: 600,
-              flexShrink: 0
-            }}
-          >
+      <div className="sidebar-footer">
+        {/* User Card */}
+        <div className="sidebar-user-card">
+          {/* Avatar with gradient */}
+          <div className="sidebar-user-avatar">
             {(user?.name || 'U').charAt(0).toUpperCase()}
           </div>
 
           {/* User Info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              className="font-semibold"
-              style={{
-                fontSize: '14px',
-                color: 'var(--text-primary)',
-                marginBottom: '2px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
+          <div className="sidebar-user-info">
+            <div className="sidebar-user-name">
               {user?.name || 'User'}
             </div>
-            <div
-              style={{
-                fontSize: '12px',
-                color: 'var(--text-tertiary)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
+            <div className="sidebar-user-email">
               {user?.email || 'user@example.com'}
             </div>
           </div>
         </div>
 
+        {/* Dark Mode Toggle */}
+        <div className="sidebar-toggle-wrapper">
+          <DarkModeToggle />
+        </div>
+
         {/* Logout Button */}
-        <button
-          onClick={logout}
-          className="w-full flex items-center justify-center gap-2"
-          style={{
-            padding: '10px 16px',
-            fontSize: '14px',
-            fontWeight: 500,
-            color: 'var(--text-secondary)',
-            background: 'transparent',
-            border: '1px solid var(--neutral-200)',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease-out'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--neutral-100)'
-            e.currentTarget.style.borderColor = 'var(--neutral-300)'
-            e.currentTarget.style.color = 'var(--text-primary)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.borderColor = 'var(--neutral-200)'
-            e.currentTarget.style.color = 'var(--text-secondary)'
-          }}
-        >
-          <span style={{ fontSize: '16px' }}>🚪</span>
-          Logout
+        <button onClick={logout} className="sidebar-logout-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+            <polyline points="16 17 21 12 16 7" />
+            <line x1="21" y1="12" x2="9" y2="12" />
+          </svg>
+          Sign out
         </button>
       </div>
     </aside>

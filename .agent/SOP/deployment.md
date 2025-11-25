@@ -2,7 +2,7 @@
 
 **Standard Operating Procedure for deploying MasStock to production VPS**
 
-Last updated: 2025-11-23
+Last updated: 2025-11-25
 
 ---
 
@@ -505,7 +505,7 @@ docker compose -f docker-compose.production.yml restart api
 
 #### 5. Worker Not Processing Jobs
 
-**Symptom:** Jobs stuck in queue, no workflow executions
+**Symptom:** Jobs stuck in queue, no workflow executions, API returns 500 on workflow execution
 
 **Diagnosis:**
 ```bash
@@ -515,8 +515,29 @@ docker compose -f docker-compose.production.yml logs worker
 # Check Redis connectivity
 docker exec masstock_redis redis-cli PING
 
+# If Redis has password, use:
+docker exec masstock_redis redis-cli -a "$REDIS_PASSWORD" PING
+
 # Check queue status (from API container)
 docker exec masstock_api node -e "const Queue = require('bull'); const q = new Queue('workflow-queue', 'redis://redis:6379'); q.getJobCounts().then(console.log);"
+```
+
+**Common cause: Redis password mismatch**
+
+If you see AUTH errors in logs, the problem is likely a mismatch between:
+1. The Redis server password (`--requirepass` in docker-compose)
+2. The `REDIS_PASSWORD` in `backend/.env.production`
+3. The `REDIS_PASSWORD` in root `.env` file
+
+**Verify passwords match:**
+```bash
+# Check root .env
+cat /opt/masstock/.env | grep REDIS_PASSWORD
+
+# Check backend .env.production
+cat /opt/masstock/backend/.env.production | grep REDIS_PASSWORD
+
+# They MUST be identical!
 ```
 
 **Fix:**
@@ -526,6 +547,11 @@ docker compose -f docker-compose.production.yml restart worker
 
 # If Redis has issues
 docker compose -f docker-compose.production.yml restart redis worker
+
+# If password mismatch - ensure both .env files have same REDIS_PASSWORD
+# then restart all services:
+docker compose -f docker-compose.production.yml down
+docker compose -f docker-compose.production.yml up -d
 ```
 
 #### 6. Port 8080 Already in Use
@@ -807,7 +833,8 @@ docker compose -f docker-compose.production.yml up -d
 
 ```
 /opt/masstock/                           # Project root
-/opt/masstock/backend/.env.production    # Backend secrets
+/opt/masstock/.env                       # Docker Compose env (REDIS_PASSWORD)
+/opt/masstock/backend/.env.production    # Backend secrets (REDIS_PASSWORD must match!)
 /opt/masstock/deploy/*.sh                # Deployment scripts
 /etc/nginx/sites-available/masstock.conf # nginx config
 /etc/letsencrypt/live/dorian-gonzalez.fr/ # SSL certificates
@@ -815,6 +842,27 @@ docker compose -f docker-compose.production.yml up -d
 /var/log/nginx/                          # nginx logs
 /var/backups/masstock/                   # Backups
 ```
+
+### Redis Configuration
+
+**IMPORTANT:** Redis uses password authentication. The password must be synchronized:
+
+1. **Root `.env`** (for Docker Compose):
+   ```env
+   REDIS_PASSWORD=your_strong_password_here
+   ```
+
+2. **`backend/.env.production`** (for API and Worker):
+   ```env
+   REDIS_PASSWORD=your_strong_password_here  # MUST be identical!
+   ```
+
+3. **`docker-compose.production.yml`** (uses the variable):
+   ```yaml
+   command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+   ```
+
+**If passwords don't match:** Worker fails to connect → API returns 500 on workflow execution
 
 ### Service URLs
 

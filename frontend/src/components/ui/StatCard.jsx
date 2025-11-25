@@ -1,80 +1,60 @@
 /**
- * StatCard - Reusable Statistics Card Component
- * Used for displaying metrics on Dashboard and AdminDashboard
- *
- * Mediterranean Design System with Bento Grid style
+ * StatCard - Neumorphism (Soft UI) Design
+ * Soft extruded cards with double shadows
  */
 
-export function StatCard({ label, value, change, trend = 'neutral', glow = false }) {
+export function StatCard({
+  label,
+  value,
+  change,
+  trend = 'neutral',
+  icon,
+  glow = false,
+  variant = 'default',
+  delay = 0
+}) {
+  const getVariantClass = () => {
+    switch (variant) {
+      case 'highlight': return 'stat-card--highlight'
+      case 'success': return 'stat-card--success'
+      case 'accent': return 'stat-card--accent'
+      default: return ''
+    }
+  }
+
   return (
     <div
-      className="card-bento"
-      style={{
-        background: 'var(--canvas-pure)',
-        padding: '32px',
-        cursor: 'default',
-        transition: 'all 0.2s ease-out',
-        boxShadow: glow
-          ? '0 0 20px rgba(42, 157, 143, 0.3)' // Verdigris glow
-          : 'var(--shadow-md)'
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translateY(-4px)'
-        e.currentTarget.style.boxShadow = glow
-          ? '0 0 30px rgba(42, 157, 143, 0.5)'
-          : 'var(--shadow-lg)'
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translateY(0)'
-        e.currentTarget.style.boxShadow = glow
-          ? '0 0 20px rgba(42, 157, 143, 0.3)'
-          : 'var(--shadow-md)'
-      }}
+      className={`stat-card ${getVariantClass()}`}
+      style={{ animationDelay: `${delay}ms` }}
     >
+      {/* Icon in neumorphic container */}
+      {icon && (
+        <div className="stat-card__icon-wrap">
+          <span className="stat-card__icon">{icon}</span>
+        </div>
+      )}
+
       {/* Label */}
-      <div style={{ marginBottom: '16px' }}>
-        <p
-          className="font-body"
-          style={{
-            fontSize: '14px',
-            color: 'var(--text-secondary)',
-            fontWeight: 500,
-            textTransform: 'uppercase',
-            letterSpacing: '0.05em'
-          }}
-        >
-          {label}
-        </p>
-      </div>
+      <div className="stat-card__label">{label}</div>
 
-      {/* Value and Change */}
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
-        {/* Main Value */}
-        <div
-          className="font-mono"
-          style={{
-            fontSize: '28px',
-            fontWeight: 700,
-            color: 'var(--text-primary)',
-            lineHeight: 1.2
-          }}
-        >
-          {value}
-        </div>
+      {/* Value */}
+      <div className="stat-card__value">{value}</div>
 
-        {/* Change / Trend Indicator */}
-        <div
-          className="font-body"
-          style={{
-            fontSize: '12px',
-            fontWeight: 500,
-            color: trend === 'up' ? 'var(--success-main)' :
-                   trend === 'down' ? 'var(--error-main)' :
-                   'var(--neutral-500)'
-          }}
-        >
-          {change}
-        </div>
+      {/* Trend with inset effect */}
+      <div className={`stat-card__trend stat-card__trend--${trend}`}>
+        {trend === 'up' && (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="23 6 13.5 15.5 8.5 10.5 1 18" />
+            <polyline points="17 6 23 6 23 12" />
+          </svg>
+        )}
+        {trend === 'down' && (
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <polyline points="23 18 13.5 8.5 8.5 13.5 1 6" />
+            <polyline points="17 18 23 18 23 12" />
+          </svg>
+        )}
+        <span>{change}</span>
       </div>
     </div>
   )

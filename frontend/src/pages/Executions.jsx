@@ -6,10 +6,10 @@ import { workflowService } from '../services/workflows'
 import { BatchResultsView } from '../components/workflows/BatchResultsView'
 import logger from '@/utils/logger';
 
-
 /**
- * Executions Page - "The Organic Factory" Design
- * Timeline verticale avec status glows et Bento cards
+ * Executions Page - "The Trusted Magician" - Electric Trust
+ * Premium glassmorphism, Electric Indigo + Bright Cyan, rich animations
+ * Inspirations: Linear, Vercel, Stripe - Confident, sophisticated, magic through motion
  */
 export function Executions() {
   const navigate = useNavigate()
@@ -204,12 +204,7 @@ export function Executions() {
     logger.debug('⏳ Executions.render: Showing loading state')
     return (
       <ClientLayout>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '60vh'
-        }}>
+        <div className="flex justify-center items-center" style={{ minHeight: '60vh' }}>
           <Spinner size="lg" />
         </div>
       </ClientLayout>
@@ -218,45 +213,68 @@ export function Executions() {
 
   return (
     <ClientLayout>
-      <div style={{ padding: '48px', maxWidth: '1400px', margin: '0 auto' }}>
-        {/* Header */}
-        <div style={{ marginBottom: '48px' }}>
-          <h1
-            className="font-display"
-            style={{
-              fontSize: '36px',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              marginBottom: '8px',
-              letterSpacing: '-0.02em'
-            }}
-          >
-            Executions
-          </h1>
-          <p
-            className="font-body"
-            style={{
-              fontSize: '16px',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            Monitor and review all your workflow execution history
-          </p>
+      {/* Main Container */}
+      <div className="executions-page">
+
+        {/* Hero Header - Space Grotesk Display */}
+        <div className="executions-hero">
+          <div className="executions-hero-content">
+            <h1 className="executions-hero-title">
+              Executions
+            </h1>
+            <p className="executions-hero-subtitle">
+              Monitor and review all your workflow execution history
+            </p>
+          </div>
         </div>
 
-        {/* Stats Cards - Bento Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '16px',
-          marginBottom: '32px'
-        }}>
+        {/* Stats Bento Grid - Glassmorphism with Glow Effects */}
+        <div className="executions-stats-bento">
           {[
-            { label: 'Total', value: statusCounts.all, color: 'var(--primary-600)', filter: 'all' },
-            { label: 'Completed', value: statusCounts.completed, color: 'var(--success-main)', glow: 'var(--shadow-glow-primary)', filter: 'completed' },
-            { label: 'Processing', value: statusCounts.processing, color: 'var(--primary-600)', glow: 'var(--shadow-glow-primary)', filter: 'processing' },
-            { label: 'Pending', value: statusCounts.pending, color: 'var(--neutral-500)', filter: 'pending' },
-            { label: 'Failed', value: statusCounts.failed, color: 'var(--error-main)', glow: '0 0 20px rgba(216, 74, 42, 0.3)', filter: 'failed' }
+            {
+              label: 'Total',
+              value: statusCounts.all,
+              icon: '📊',
+              gradient: 'indigo',
+              filter: 'all',
+              delay: '0ms'
+            },
+            {
+              label: 'Completed',
+              value: statusCounts.completed,
+              icon: '✓',
+              gradient: 'success',
+              filter: 'completed',
+              delay: '75ms',
+              glow: statusCounts.completed > 0
+            },
+            {
+              label: 'Processing',
+              value: statusCounts.processing,
+              icon: '⚡',
+              gradient: 'cyan',
+              filter: 'processing',
+              delay: '150ms',
+              glow: statusCounts.processing > 0,
+              pulse: statusCounts.processing > 0
+            },
+            {
+              label: 'Pending',
+              value: statusCounts.pending,
+              icon: '⏱',
+              gradient: 'muted',
+              filter: 'pending',
+              delay: '225ms'
+            },
+            {
+              label: 'Failed',
+              value: statusCounts.failed,
+              icon: '✗',
+              gradient: 'error',
+              filter: 'failed',
+              delay: '300ms',
+              glow: statusCounts.failed > 0
+            }
           ].map((stat, index) => (
             <div
               key={index}
@@ -264,78 +282,22 @@ export function Executions() {
                 logger.debug('🔍 Executions: Status filter set to:', stat.filter)
                 setStatusFilter(stat.filter)
               }}
-              className="card-bento"
-              style={{
-                background: statusFilter === stat.filter ? 'var(--primary-50)' : 'var(--canvas-pure)',
-                padding: '24px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease-out',
-                borderLeft: statusFilter === stat.filter ? '4px solid var(--primary-500)' : 'none',
-                boxShadow: stat.glow && stat.value > 0 ? stat.glow : 'var(--shadow-md)'
-              }}
-              onMouseEnter={(e) => {
-                if (statusFilter !== stat.filter) {
-                  e.currentTarget.style.transform = 'translateY(-4px)'
-                  e.currentTarget.style.boxShadow = 'var(--shadow-lg)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (statusFilter !== stat.filter) {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = stat.glow && stat.value > 0 ? stat.glow : 'var(--shadow-md)'
-                }
-              }}
+              className={`execution-stat-bento ${statusFilter === stat.filter ? 'active' : ''} ${stat.glow ? 'has-glow' : ''} ${stat.pulse ? 'has-pulse' : ''}`}
+              data-gradient={stat.gradient}
+              style={{ animationDelay: stat.delay }}
             >
-              <div
-                className="font-body"
-                style={{
-                  fontSize: '12px',
-                  color: 'var(--text-secondary)',
-                  fontWeight: 500,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '8px'
-                }}
-              >
-                {stat.label}
-              </div>
-              <div
-                className="font-mono"
-                style={{
-                  fontSize: '32px',
-                  fontWeight: 700,
-                  color: stat.color,
-                  lineHeight: 1
-                }}
-              >
-                {stat.value}
-              </div>
+              <div className="execution-stat-icon">{stat.icon}</div>
+              <div className="execution-stat-value">{stat.value}</div>
+              <div className="execution-stat-label">{stat.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Filters - Bento Card */}
-        <div className="card-bento" style={{
-          background: 'var(--canvas-pure)',
-          padding: '24px',
-          marginBottom: '32px'
-        }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px'
-          }}>
-            <div>
-              <label
-                className="font-body"
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: 'var(--text-primary)',
-                  marginBottom: '8px'
-                }}
-              >
+        {/* Filters Card - Premium Glassmorphism */}
+        <div className="executions-filters-card">
+          <div className="executions-filters-grid">
+            <div className="filter-field">
+              <label className="filter-field-label">
                 Filter by Workflow
               </label>
               <select
@@ -344,12 +306,7 @@ export function Executions() {
                   setWorkflowFilter(e.target.value)
                   logger.debug('🔍 Executions: Workflow filter changed to:', e.target.value)
                 }}
-                className="input-field"
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  fontSize: '14px'
-                }}
+                className="filter-field-select"
               >
                 <option value="all">All Workflows</option>
                 {workflows.map(workflow => (
@@ -360,17 +317,8 @@ export function Executions() {
               </select>
             </div>
 
-            <div>
-              <label
-                className="font-body"
-                style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: 500,
-                  color: 'var(--text-primary)',
-                  marginBottom: '8px'
-                }}
-              >
+            <div className="filter-field">
+              <label className="filter-field-label">
                 Sort By
               </label>
               <select
@@ -379,12 +327,7 @@ export function Executions() {
                   setSortBy(e.target.value)
                   logger.debug('🔍 Executions: Sort changed to:', e.target.value)
                 }}
-                className="input-field"
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  fontSize: '14px'
-                }}
+                className="filter-field-select"
               >
                 <option value="newest">Newest First</option>
                 <option value="oldest">Oldest First</option>
@@ -393,7 +336,7 @@ export function Executions() {
             </div>
 
             {(statusFilter !== 'all' || workflowFilter !== 'all' || sortBy !== 'newest') && (
-              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+              <div className="filter-field-action">
                 <button
                   onClick={() => {
                     setStatusFilter('all')
@@ -401,8 +344,7 @@ export function Executions() {
                     setSortBy('newest')
                     logger.debug('🔄 Executions: Filters cleared')
                   }}
-                  className="btn btn-secondary"
-                  style={{ width: '100%' }}
+                  className="filter-clear-btn"
                 >
                   Clear Filters
                 </button>
@@ -411,15 +353,32 @@ export function Executions() {
           </div>
         </div>
 
-        {/* Executions Timeline */}
+        {/* Executions List - Premium Cards */}
         {filteredExecutions.length > 0 ? (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {filteredExecutions.map((execution) => {
+          <div className="executions-list">
+            {filteredExecutions.map((execution, index) => {
               const statusConfig = {
-                completed: { color: 'var(--success-main)', bg: 'var(--success-light)', glow: 'var(--shadow-glow-primary)' },
-                failed: { color: 'var(--error-main)', bg: 'var(--error-light)', glow: '0 0 20px rgba(216, 74, 42, 0.3)' },
-                processing: { color: 'var(--primary-600)', bg: 'var(--primary-50)', glow: 'var(--shadow-glow-primary)' },
-                pending: { color: 'var(--neutral-500)', bg: 'var(--neutral-100)', glow: 'none' }
+                completed: {
+                  gradient: 'success',
+                  icon: '✓',
+                  glow: true
+                },
+                failed: {
+                  gradient: 'error',
+                  icon: '✗',
+                  glow: true
+                },
+                processing: {
+                  gradient: 'cyan',
+                  icon: '⚡',
+                  glow: true,
+                  pulse: true
+                },
+                pending: {
+                  gradient: 'muted',
+                  icon: '⏱',
+                  glow: false
+                }
               }
               const config = statusConfig[execution.status] || statusConfig.pending
 
@@ -427,97 +386,53 @@ export function Executions() {
                 <div
                   key={execution.id}
                   onClick={() => viewExecutionDetails(execution.id)}
-                  className="card-bento card-interactive"
-                  style={{
-                    background: 'var(--canvas-pure)',
-                    padding: '24px',
-                    cursor: 'pointer',
-                    borderLeft: `4px solid ${config.color}`,
-                    boxShadow: config.glow !== 'none' ? config.glow : 'var(--shadow-md)'
-                  }}
+                  className={`execution-item ${config.glow ? 'has-glow' : ''} ${config.pulse ? 'has-pulse' : ''}`}
+                  data-gradient={config.gradient}
+                  style={{ animationDelay: `${Math.min(index * 50, 400)}ms` }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: '16px' }}>
-                    {/* Left: Icon + Info */}
-                    <div style={{ display: 'flex', alignItems: 'start', gap: '16px', flex: 1 }}>
-                      <div
-                        style={{
-                          width: '48px',
-                          height: '48px',
-                          borderRadius: '12px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '24px',
-                          background: config.bg,
-                          color: config.color,
-                          flexShrink: 0
-                        }}
+                  <div className="execution-item-icon">
+                    {config.icon}
+                  </div>
+
+                  <div className="execution-item-content">
+                    <div className="execution-item-header">
+                      <h3 className="execution-item-title">
+                        {execution.workflow_name}
+                      </h3>
+                      <span
+                        className="execution-item-badge"
+                        data-gradient={config.gradient}
                       >
-                        {execution.status === 'completed' && '✓'}
-                        {execution.status === 'failed' && '✗'}
-                        {execution.status === 'processing' && '⚡'}
-                        {execution.status === 'pending' && '⏱'}
-                      </div>
-
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                          <h3
-                            className="font-display"
-                            style={{
-                              fontSize: '18px',
-                              fontWeight: 600,
-                              color: 'var(--text-primary)'
-                            }}
-                          >
-                            {execution.workflow_name}
-                          </h3>
-                          <span
-                            style={{
-                              padding: '4px 12px',
-                              fontSize: '12px',
-                              fontWeight: 500,
-                              borderRadius: '6px',
-                              background: config.bg,
-                              color: config.color
-                            }}
-                          >
-                            {execution.status}
-                          </span>
-                        </div>
-
-                        <div
-                          className="font-body"
-                          style={{
-                            fontSize: '14px',
-                            color: 'var(--text-secondary)',
-                            marginBottom: '8px'
-                          }}
-                        >
-                          {new Date(execution.created_at).toLocaleString()}
-                        </div>
-
-                        {execution.duration_seconds && (
-                          <div
-                            className="font-mono"
-                            style={{
-                              fontSize: '12px',
-                              color: 'var(--neutral-500)'
-                            }}
-                          >
-                            Duration: {execution.duration_seconds}s
-                          </div>
-                        )}
-                      </div>
+                        {execution.status}
+                      </span>
                     </div>
 
-                    {/* Right: Arrow */}
+                    <div className="execution-item-meta">
+                      <span className="execution-item-date">
+                        {new Date(execution.created_at).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+
+                      {execution.duration_seconds && (
+                        <>
+                          <span className="execution-item-separator">•</span>
+                          <span className="execution-item-duration">
+                            {execution.duration_seconds}s
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="execution-item-arrow">
                     <svg
-                      style={{
-                        width: '24px',
-                        height: '24px',
-                        color: 'var(--neutral-300)',
-                        flexShrink: 0
-                      }}
+                      width="20"
+                      height="20"
                       fill="none"
                       strokeWidth={2}
                       stroke="currentColor"
@@ -531,34 +446,12 @@ export function Executions() {
             })}
           </div>
         ) : (
-          <div
-            className="card-bento"
-            style={{
-              background: 'var(--canvas-pure)',
-              padding: '64px',
-              textAlign: 'center'
-            }}
-          >
-            <div style={{ fontSize: '64px', marginBottom: '16px' }}>📭</div>
-            <h3
-              className="font-display"
-              style={{
-                fontSize: '24px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                marginBottom: '8px'
-              }}
-            >
+          <div className="executions-empty">
+            <div className="executions-empty-icon">📭</div>
+            <h3 className="executions-empty-title">
               No executions found
             </h3>
-            <p
-              className="font-body"
-              style={{
-                fontSize: '16px',
-                color: 'var(--text-secondary)',
-                marginBottom: '24px'
-              }}
-            >
+            <p className="executions-empty-text">
               {statusFilter !== 'all' || workflowFilter !== 'all'
                 ? 'Try adjusting your filters to see more results'
                 : 'Execute a workflow to see results here'}
@@ -570,7 +463,7 @@ export function Executions() {
                   setWorkflowFilter('all')
                   logger.debug('🔄 Executions: Filters cleared from empty state')
                 }}
-                className="btn btn-secondary"
+                className="executions-empty-btn"
               >
                 Clear Filters
               </button>
@@ -579,52 +472,22 @@ export function Executions() {
         )}
       </div>
 
-      {/* Execution Detail Modal - Glassmorphism */}
+      {/* Execution Detail Modal - Premium Glassmorphism */}
       {selectedExecution && (
         <div
-          className="modal-overlay"
+          className="execution-modal-overlay"
           onClick={() => {
             setSelectedExecution(null)
             logger.debug('🔒 Executions: Modal closed')
           }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.4)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '24px'
-          }}
         >
           <div
-            className="card-glass"
+            className="execution-modal"
             onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: '900px',
-              width: '100%',
-              maxHeight: '90vh',
-              overflowY: 'auto',
-              animation: 'scale-in 300ms var(--ease-spring)'
-            }}
           >
-            {/* Header */}
-            <div style={{
-              padding: '24px',
-              borderBottom: '1px solid var(--neutral-200)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between'
-            }}>
-              <h2
-                className="font-display"
-                style={{
-                  fontSize: '24px',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)'
-                }}
-              >
+            {/* Modal Header */}
+            <div className="execution-modal-header">
+              <h2 className="execution-modal-title">
                 Execution Details
               </h2>
               <button
@@ -632,150 +495,90 @@ export function Executions() {
                   setSelectedExecution(null)
                   logger.debug('🔒 Executions: Modal closed via button')
                 }}
-                className="btn-icon"
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '8px'
-                }}
+                className="execution-modal-close"
               >
-                <svg style={{ width: '20px', height: '20px' }} fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+                <svg width={20} height={20} fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
-            {/* Body */}
-            <div style={{ padding: '24px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {/* Status Overview */}
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-                  gap: '16px'
-                }}>
-                  <div className="card-bento" style={{ padding: '16px' }}>
-                    <div className="font-body" style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Status</div>
-                    <div className="font-display" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                      {selectedExecution.status}
-                    </div>
-                  </div>
-
-                  {selectedExecution.duration_seconds && (
-                    <div className="card-bento" style={{ padding: '16px' }}>
-                      <div className="font-body" style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Duration</div>
-                      <div className="font-mono" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {selectedExecution.duration_seconds}s
-                      </div>
-                    </div>
-                  )}
-
-                  {selectedExecution.progress !== undefined && selectedExecution.progress !== null && (
-                    <div className="card-bento" style={{ padding: '16px' }}>
-                      <div className="font-body" style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '4px' }}>Progress</div>
-                      <div className="font-mono" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)' }}>
-                        {selectedExecution.progress}%
-                      </div>
-                    </div>
-                  )}
+            {/* Modal Body */}
+            <div className="execution-modal-body">
+              {/* Quick Stats */}
+              <div className="execution-modal-stats">
+                <div className="execution-modal-stat">
+                  <div className="execution-modal-stat-label">Status</div>
+                  <div className="execution-modal-stat-value">{selectedExecution.status}</div>
                 </div>
 
-                {/* Error Message */}
-                {selectedExecution.error_message && (
-                  <div style={{
-                    background: 'var(--error-light)',
-                    border: '2px solid var(--error-main)',
-                    borderRadius: '12px',
-                    padding: '16px'
-                  }}>
-                    <h3 className="font-display" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--error-dark)', marginBottom: '8px' }}>
-                      Error Details
-                    </h3>
-                    <pre className="font-mono" style={{
-                      fontSize: '14px',
-                      color: 'var(--text-primary)',
-                      background: 'var(--canvas-pure)',
-                      padding: '16px',
-                      borderRadius: '8px',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word'
-                    }}>
-                      {selectedExecution.error_message}
-                    </pre>
+                {selectedExecution.duration_seconds && (
+                  <div className="execution-modal-stat">
+                    <div className="execution-modal-stat-label">Duration</div>
+                    <div className="execution-modal-stat-value">{selectedExecution.duration_seconds}s</div>
                   </div>
                 )}
 
-                {/* Batch Results for nano_banana workflows */}
-                {selectedExecution.workflow_id &&
-                 workflowsMap[selectedExecution.workflow_id]?.config?.workflow_type === 'nano_banana' &&
-                 selectedExecution.status === 'completed' && (
-                  <div>
-                    <h3 className="font-display" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
-                      Batch Results
-                    </h3>
-                    <BatchResultsView executionId={selectedExecution.id} />
-                  </div>
-                )}
-
-                {/* Output Data for standard workflows */}
-                {selectedExecution.output_data &&
-                 Object.keys(selectedExecution.output_data).length > 0 &&
-                 (!workflowsMap[selectedExecution.workflow_id] ||
-                  workflowsMap[selectedExecution.workflow_id]?.config?.workflow_type !== 'nano_banana') && (
-                  <div>
-                    <h3 className="font-display" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
-                      Output Data
-                    </h3>
-                    <pre className="font-mono" style={{
-                      fontSize: '14px',
-                      color: 'var(--primary-300)',
-                      background: 'var(--neutral-900)',
-                      padding: '16px',
-                      borderRadius: '12px',
-                      overflow: 'auto',
-                      maxHeight: '400px'
-                    }}>
-                      {JSON.stringify(selectedExecution.output_data, null, 2)}
-                    </pre>
-                  </div>
-                )}
-
-                {/* Input Data */}
-                {selectedExecution.input_data && Object.keys(selectedExecution.input_data).length > 0 && (
-                  <div>
-                    <h3 className="font-display" style={{ fontSize: '18px', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '16px' }}>
-                      Input Data
-                    </h3>
-                    <pre className="font-mono" style={{
-                      fontSize: '14px',
-                      color: 'var(--primary-300)',
-                      background: 'var(--neutral-900)',
-                      padding: '16px',
-                      borderRadius: '12px',
-                      overflow: 'auto',
-                      maxHeight: '300px'
-                    }}>
-                      {JSON.stringify(selectedExecution.input_data, null, 2)}
-                    </pre>
+                {selectedExecution.progress !== undefined && selectedExecution.progress !== null && (
+                  <div className="execution-modal-stat">
+                    <div className="execution-modal-stat-label">Progress</div>
+                    <div className="execution-modal-stat-value">{selectedExecution.progress}%</div>
                   </div>
                 )}
               </div>
+
+              {/* Error Message */}
+              {selectedExecution.error_message && (
+                <div className="execution-modal-section execution-modal-error">
+                  <h3 className="execution-modal-section-title">Error Details</h3>
+                  <pre className="execution-modal-code">
+                    {selectedExecution.error_message}
+                  </pre>
+                </div>
+              )}
+
+              {/* Batch Results for nano_banana workflows */}
+              {selectedExecution.workflow_id &&
+               workflowsMap[selectedExecution.workflow_id]?.config?.workflow_type === 'nano_banana' &&
+               selectedExecution.status === 'completed' && (
+                <div className="execution-modal-section">
+                  <h3 className="execution-modal-section-title">Batch Results</h3>
+                  <BatchResultsView executionId={selectedExecution.id} />
+                </div>
+              )}
+
+              {/* Output Data for standard workflows */}
+              {selectedExecution.output_data &&
+               Object.keys(selectedExecution.output_data).length > 0 &&
+               (!workflowsMap[selectedExecution.workflow_id] ||
+                workflowsMap[selectedExecution.workflow_id]?.config?.workflow_type !== 'nano_banana') && (
+                <div className="execution-modal-section">
+                  <h3 className="execution-modal-section-title">Output Data</h3>
+                  <pre className="execution-modal-code">
+                    {JSON.stringify(selectedExecution.output_data, null, 2)}
+                  </pre>
+                </div>
+              )}
+
+              {/* Input Data */}
+              {selectedExecution.input_data && Object.keys(selectedExecution.input_data).length > 0 && (
+                <div className="execution-modal-section">
+                  <h3 className="execution-modal-section-title">Input Data</h3>
+                  <pre className="execution-modal-code">
+                    {JSON.stringify(selectedExecution.input_data, null, 2)}
+                  </pre>
+                </div>
+              )}
             </div>
 
-            {/* Footer */}
-            <div style={{
-              padding: '24px',
-              borderTop: '1px solid var(--neutral-200)',
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end'
-            }}>
+            {/* Modal Footer */}
+            <div className="execution-modal-footer">
               <button
                 onClick={() => {
                   setSelectedExecution(null)
                   logger.debug('🔒 Executions: Modal closed from footer')
                 }}
-                className="btn btn-secondary"
+                className="execution-modal-btn-secondary"
               >
                 Close
               </button>
@@ -786,7 +589,7 @@ export function Executions() {
                     setSelectedExecution(null)
                     navigate(`/workflows/${selectedExecution.workflow_id}/execute`)
                   }}
-                  className="btn btn-primary"
+                  className="execution-modal-btn-primary"
                 >
                   View Workflow
                 </button>

@@ -1,48 +1,37 @@
 import { Sidebar } from './Sidebar'
 
 /**
- * ClientLayout - "The Organic Factory" Design
- * Ghost White background, minimal header, clean layout
+ * ClientLayout - Neumorphism (Soft UI) Design
+ * Soft extruded sidebar + seamless content area
+ *
+ * Features:
+ * - Neumorphic background (#E8EEF5 light / #1E293B dark)
+ * - Soft shadows everywhere
+ * - No harsh borders, just shadow depth
  */
 export function ClientLayout({ children }) {
   return (
     <div style={{
       display: 'flex',
       minHeight: '100vh',
-      background: 'var(--canvas-base)', // Ghost White
+      background: 'var(--neu-bg)',
+      transition: 'background-color 300ms ease-out'
     }}>
       <Sidebar />
 
       <div style={{
         flex: 1,
-        marginLeft: '280px', // Sidebar width
+        marginLeft: '280px',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'
       }}>
-        {/* Header - Optional, minimal */}
-        <header style={{
-          background: 'var(--canvas-pure)',
-          borderBottom: '1px solid var(--neutral-200)',
-          padding: '16px 32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          minHeight: '72px'
-        }}>
-          <div style={{ flex: 1 }}>
-            {/* Header content can be added here */}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Header actions can be added here */}
-          </div>
-        </header>
-
-        {/* Main Content */}
+        {/* Main Content - no header for cleaner neumorphic look */}
         <main style={{
           flex: 1,
           overflow: 'auto',
-          background: 'var(--canvas-base)' // Ghost White
+          background: 'var(--neu-bg)',
+          transition: 'background-color 300ms ease-out'
         }}>
           {children}
         </main>
