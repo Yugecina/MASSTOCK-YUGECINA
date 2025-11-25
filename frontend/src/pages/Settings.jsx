@@ -4,12 +4,10 @@ import { useAuth } from '../hooks/useAuth'
 import { settingsService } from '../services/settings'
 import { Spinner } from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
-import logger from '@/utils/logger';
-
+import logger from '@/utils/logger'
 
 /**
- * Settings Page - "The Organic Factory" Design
- * Complete user and company settings with collaborator management
+ * Settings Page - Dark Premium Style
  */
 export function Settings() {
   const { user } = useAuth()
@@ -20,7 +18,6 @@ export function Settings() {
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviting, setInviting] = useState(false)
 
-  // Load profile and collaborators on mount
   useEffect(() => {
     loadData()
   }, [])
@@ -30,12 +27,10 @@ export function Settings() {
       logger.debug('📋 Settings: Loading profile and collaborators')
       setLoading(true)
 
-      // Load profile
       const profileResponse = await settingsService.getProfile()
       logger.debug('✅ Settings: Profile loaded:', profileResponse)
       setProfile(profileResponse.data)
 
-      // Load collaborators if user has a client
       if (profileResponse.data.client) {
         const collabResponse = await settingsService.getCollaborators()
         logger.debug('✅ Settings: Collaborators loaded:', collabResponse)
@@ -71,24 +66,14 @@ export function Settings() {
       })
 
       logger.debug('✅ Settings: Invitation sent:', response)
+      toast.success(`Invitation envoyée à ${inviteEmail}`, { duration: 5000 })
 
-      toast.success(
-        `Invitation envoyée à ${inviteEmail}`,
-        { duration: 5000 }
-      )
-
-      // Show temp password in toast (in production, should be sent via email)
       if (response.data.temp_password) {
-        toast.success(
-          `Mot de passe temporaire: ${response.data.temp_password}`,
-          { duration: 10000 }
-        )
+        toast.success(`Mot de passe temporaire: ${response.data.temp_password}`, { duration: 10000 })
       }
 
       setInviteEmail('')
       setShowInviteForm(false)
-
-      // Reload collaborators
       await loadData()
     } catch (error) {
       logger.error('❌ Settings: Invitation failed:', {
@@ -96,7 +81,6 @@ export function Settings() {
         message: error.message,
         response: error.response
       })
-
       const errorMessage = error.response?.data?.message || error.message || 'Échec de l\'invitation'
       toast.error(errorMessage)
     } finally {
@@ -111,13 +95,9 @@ export function Settings() {
 
     try {
       logger.debug('🗑️ Settings: Removing collaborator:', collaborator.id)
-
       await settingsService.removeCollaborator(collaborator.id)
-
       logger.debug('✅ Settings: Collaborator removed')
       toast.success(`${collaborator.email} a été retiré`)
-
-      // Reload collaborators
       await loadData()
     } catch (error) {
       logger.error('❌ Settings: Failed to remove collaborator:', {
@@ -125,54 +105,8 @@ export function Settings() {
         message: error.message,
         response: error.response
       })
-
       const errorMessage = error.response?.data?.message || error.message || 'Échec du retrait'
       toast.error(errorMessage)
-    }
-  }
-
-  const getRoleBadgeColor = (role) => {
-    switch (role) {
-      case 'admin':
-        return {
-          background: 'var(--error-light)',
-          color: 'var(--error-dark)'
-        }
-      case 'owner':
-        return {
-          background: 'var(--primary-light)',
-          color: 'var(--primary-dark)'
-        }
-      case 'collaborator':
-        return {
-          background: 'var(--neutral-100)',
-          color: 'var(--neutral-700)'
-        }
-      default:
-        return {
-          background: 'var(--neutral-100)',
-          color: 'var(--neutral-700)'
-        }
-    }
-  }
-
-  const getStatusBadgeColor = (status) => {
-    switch (status) {
-      case 'active':
-        return {
-          background: 'var(--success-light)',
-          color: 'var(--success-dark)'
-        }
-      case 'suspended':
-        return {
-          background: 'var(--warning-light)',
-          color: 'var(--warning-dark)'
-        }
-      default:
-        return {
-          background: 'var(--neutral-100)',
-          color: 'var(--neutral-700)'
-        }
     }
   }
 
@@ -180,337 +114,94 @@ export function Settings() {
 
   return (
     <ClientLayout>
-      <div style={{ padding: '48px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div className="settings-page">
         {/* Header */}
-        <div style={{ marginBottom: '48px' }}>
-          <h1
-            className="font-display"
-            style={{
-              fontSize: '36px',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              marginBottom: '8px',
-              letterSpacing: '-0.02em'
-            }}
-          >
-            Settings
-          </h1>
-          <p
-            className="font-body"
-            style={{
-              fontSize: '16px',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            Manage your account, company, and team
-          </p>
-        </div>
+        <header className="settings-header">
+          <h1 className="settings-title">Settings</h1>
+          <p className="settings-subtitle">Manage your account, company, and team</p>
+        </header>
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '48px' }}>
+          <div className="settings-loading">
             <Spinner size="lg" />
           </div>
         ) : (
-          <>
+          <div className="settings-content">
             {/* User Information */}
-            <div className="card-bento" style={{
-              background: 'var(--canvas-pure)',
-              padding: '32px',
-              marginBottom: '24px'
-            }}>
-              <h2
-                className="font-display"
-                style={{
-                  fontSize: '24px',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  marginBottom: '24px'
-                }}
-              >
-                User Information
-              </h2>
+            <section className="settings-card">
+              <h2 className="settings-card-title">User Information</h2>
 
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px' }}>
-                <div>
-                  <label
-                    className="font-body"
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--neutral-500)',
-                      marginBottom: '8px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}
-                  >
-                    Email
-                  </label>
-                  <p
-                    className="font-mono"
-                    style={{
-                      fontSize: '14px',
-                      color: 'var(--text-primary)',
-                      fontWeight: 500
-                    }}
-                  >
-                    {profile?.user?.email}
-                  </p>
+              <div className="settings-grid">
+                <div className="settings-field">
+                  <label className="settings-label">Email</label>
+                  <p className="settings-value settings-value--mono">{profile?.user?.email}</p>
                 </div>
 
-                <div>
-                  <label
-                    className="font-body"
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--neutral-500)',
-                      marginBottom: '8px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}
-                  >
-                    Platform Role
-                  </label>
-                  <span
-                    className="badge"
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      borderRadius: '6px',
-                      ...getRoleBadgeColor(profile?.user?.role),
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}
-                  >
+                <div className="settings-field">
+                  <label className="settings-label">Platform Role</label>
+                  <span className={`settings-badge ${profile?.user?.role === 'admin' ? 'settings-badge--danger' : 'settings-badge--primary'}`}>
                     {profile?.user?.role}
                   </span>
                 </div>
 
                 {profile?.user?.client_role && (
-                  <div>
-                    <label
-                      className="font-body"
-                      style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: 'var(--neutral-500)',
-                        marginBottom: '8px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}
-                    >
-                      Company Role
-                    </label>
-                    <span
-                      className="badge"
-                      style={{
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        borderRadius: '6px',
-                        ...getRoleBadgeColor(profile?.user?.client_role)
-                      }}
-                    >
+                  <div className="settings-field">
+                    <label className="settings-label">Company Role</label>
+                    <span className={`settings-badge ${profile?.user?.client_role === 'owner' ? 'settings-badge--primary' : ''}`}>
                       {profile?.user?.client_role}
                     </span>
                   </div>
                 )}
 
-                <div>
-                  <label
-                    className="font-body"
-                    style={{
-                      display: 'block',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      color: 'var(--neutral-500)',
-                      marginBottom: '8px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}
-                  >
-                    Status
-                  </label>
-                  <span
-                    className="badge"
-                    style={{
-                      padding: '6px 12px',
-                      fontSize: '12px',
-                      fontWeight: 600,
-                      borderRadius: '6px',
-                      ...getStatusBadgeColor(profile?.user?.status)
-                    }}
-                  >
+                <div className="settings-field">
+                  <label className="settings-label">Status</label>
+                  <span className={`settings-badge ${profile?.user?.status === 'active' ? 'settings-badge--success' : 'settings-badge--warning'}`}>
                     {profile?.user?.status}
                   </span>
                 </div>
               </div>
-            </div>
+            </section>
 
             {/* Company Information */}
             {profile?.client && (
-              <div className="card-bento" style={{
-                background: 'var(--canvas-pure)',
-                padding: '32px',
-                marginBottom: '24px'
-              }}>
-                <h2
-                  className="font-display"
-                  style={{
-                    fontSize: '24px',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)',
-                    marginBottom: '24px'
-                  }}
-                >
-                  Company Information
-                </h2>
+              <section className="settings-card">
+                <h2 className="settings-card-title">Company Information</h2>
 
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px', marginBottom: '24px' }}>
-                  <div>
-                    <label
-                      className="font-body"
-                      style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: 'var(--neutral-500)',
-                        marginBottom: '8px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}
-                    >
-                      Company Name
-                    </label>
-                    <p
-                      className="font-display"
-                      style={{
-                        fontSize: '18px',
-                        color: 'var(--text-primary)',
-                        fontWeight: 600
-                      }}
-                    >
+                <div className="settings-grid">
+                  <div className="settings-field">
+                    <label className="settings-label">Company Name</label>
+                    <p className="settings-value settings-value--large">
                       {profile.client.company_name || profile.client.name}
                     </p>
                   </div>
 
-                  <div>
-                    <label
-                      className="font-body"
-                      style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: 'var(--neutral-500)',
-                        marginBottom: '8px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}
-                    >
-                      Plan
-                    </label>
-                    <span
-                      className="badge"
-                      style={{
-                        padding: '6px 12px',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        borderRadius: '6px',
-                        background: 'var(--primary-light)',
-                        color: 'var(--primary-dark)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}
-                    >
+                  <div className="settings-field">
+                    <label className="settings-label">Plan</label>
+                    <span className="settings-badge settings-badge--primary">
                       {profile.client.plan}
                     </span>
                   </div>
 
-                  <div>
-                    <label
-                      className="font-body"
-                      style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: 'var(--neutral-500)',
-                        marginBottom: '8px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}
-                    >
-                      Owner
-                    </label>
-                    <p
-                      className="font-mono"
-                      style={{
-                        fontSize: '14px',
-                        color: 'var(--text-primary)',
-                        fontWeight: 500
-                      }}
-                    >
-                      {profile.client.owner?.email}
-                    </p>
+                  <div className="settings-field">
+                    <label className="settings-label">Owner</label>
+                    <p className="settings-value settings-value--mono">{profile.client.owner?.email}</p>
                   </div>
 
-                  <div>
-                    <label
-                      className="font-body"
-                      style={{
-                        display: 'block',
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: 'var(--neutral-500)',
-                        marginBottom: '8px',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}
-                    >
-                      Team Members
-                    </label>
-                    <p
-                      className="font-mono"
-                      style={{
-                        fontSize: '18px',
-                        color: 'var(--text-primary)',
-                        fontWeight: 700
-                      }}
-                    >
-                      {profile.client.collaborators_count || 0}
-                    </p>
+                  <div className="settings-field">
+                    <label className="settings-label">Team Members</label>
+                    <p className="settings-value settings-value--large">{profile.client.collaborators_count || 0}</p>
                   </div>
                 </div>
-              </div>
+              </section>
             )}
 
-            {/* Collaborators Management (Only for owners) */}
+            {/* Collaborators Management */}
             {isOwner && (
-              <div className="card-bento" style={{
-                background: 'var(--canvas-pure)',
-                padding: '32px',
-                marginBottom: '24px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '24px' }}>
-                  <h2
-                    className="font-display"
-                    style={{
-                      fontSize: '24px',
-                      fontWeight: 600,
-                      color: 'var(--text-primary)'
-                    }}
-                  >
-                    Team Management
-                  </h2>
+              <section className="settings-card">
+                <div className="settings-card-header">
+                  <h2 className="settings-card-title">Team Management</h2>
                   {!showInviteForm && (
-                    <button
-                      className="btn btn-primary-lime"
-                      style={{ padding: '10px 20px', fontSize: '14px' }}
-                      onClick={() => setShowInviteForm(true)}
-                    >
+                    <button className="btn btn-primary" onClick={() => setShowInviteForm(true)}>
                       + Invite Collaborator
                     </button>
                   )}
@@ -518,53 +209,23 @@ export function Settings() {
 
                 {/* Invite Form */}
                 {showInviteForm && (
-                  <form
-                    onSubmit={handleInviteCollaborator}
-                    style={{
-                      padding: '20px',
-                      background: 'var(--neutral-50)',
-                      borderRadius: '12px',
-                      marginBottom: '24px',
-                      border: '2px solid var(--primary)'
-                    }}
-                  >
-                    <h3
-                      className="font-display"
-                      style={{
-                        fontSize: '16px',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)',
-                        marginBottom: '16px'
-                      }}
-                    >
-                      Invite New Collaborator
-                    </h3>
-                    <div style={{ display: 'flex', gap: '12px' }}>
+                  <form onSubmit={handleInviteCollaborator} className="settings-invite-form">
+                    <h3 className="settings-invite-title">Invite New Collaborator</h3>
+                    <div className="settings-invite-row">
                       <input
                         type="email"
                         value={inviteEmail}
                         onChange={(e) => setInviteEmail(e.target.value)}
                         placeholder="collaborator@email.com"
-                        className="input-field"
-                        style={{
-                          flex: 1,
-                          padding: '12px 16px',
-                          fontSize: '14px'
-                        }}
+                        className="settings-input"
                         disabled={inviting}
                       />
-                      <button
-                        type="submit"
-                        className="btn btn-primary-lime"
-                        style={{ padding: '12px 24px', fontSize: '14px' }}
-                        disabled={inviting}
-                      >
+                      <button type="submit" className="btn btn-primary" disabled={inviting}>
                         {inviting ? 'Sending...' : 'Send Invitation'}
                       </button>
                       <button
                         type="button"
-                        className="btn btn-ghost"
-                        style={{ padding: '12px 24px', fontSize: '14px' }}
+                        className="btn btn-secondary"
                         onClick={() => {
                           setShowInviteForm(false)
                           setInviteEmail('')
@@ -578,74 +239,27 @@ export function Settings() {
                 )}
 
                 {/* Collaborators List */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div className="settings-collaborators">
                   {collaborators.map((collab) => (
-                    <div
-                      key={collab.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '16px 20px',
-                        background: 'var(--neutral-50)',
-                        borderRadius: '12px',
-                        border: '1px solid var(--neutral-200)'
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <p
-                          className="font-mono"
-                          style={{
-                            fontSize: '14px',
-                            fontWeight: 500,
-                            color: 'var(--text-primary)',
-                            marginBottom: '4px'
-                          }}
-                        >
-                          {collab.email}
-                        </p>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                          <span
-                            className="badge"
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              borderRadius: '4px',
-                              ...getRoleBadgeColor(collab.client_role)
-                            }}
-                          >
+                    <div key={collab.id} className="settings-collaborator">
+                      <div className="settings-collaborator-info">
+                        <p className="settings-collaborator-email">{collab.email}</p>
+                        <div className="settings-collaborator-badges">
+                          <span className={`settings-badge-sm ${collab.client_role === 'owner' ? 'settings-badge-sm--primary' : ''}`}>
                             {collab.client_role}
                           </span>
-                          <span
-                            className="badge"
-                            style={{
-                              padding: '4px 8px',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              borderRadius: '4px',
-                              ...getStatusBadgeColor(collab.status)
-                            }}
-                          >
+                          <span className={`settings-badge-sm ${collab.status === 'active' ? 'settings-badge-sm--success' : 'settings-badge-sm--warning'}`}>
                             {collab.status}
                           </span>
                         </div>
                       </div>
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <p
-                          className="font-body"
-                          style={{
-                            fontSize: '12px',
-                            color: 'var(--text-tertiary)',
-                            marginRight: '12px'
-                          }}
-                        >
+                      <div className="settings-collaborator-actions">
+                        <span className="settings-collaborator-date">
                           Joined {new Date(collab.created_at).toLocaleDateString()}
-                        </p>
+                        </span>
                         {collab.client_role !== 'owner' && (
                           <button
-                            className="btn btn-danger"
-                            style={{ padding: '6px 16px', fontSize: '12px' }}
+                            className="btn btn-danger btn-sm"
                             onClick={() => handleRemoveCollaborator(collab)}
                           >
                             Remove
@@ -656,72 +270,32 @@ export function Settings() {
                   ))}
 
                   {collaborators.length === 0 && (
-                    <div
-                      style={{
-                        padding: '32px',
-                        textAlign: 'center',
-                        color: 'var(--text-tertiary)'
-                      }}
-                    >
-                      <p className="font-body" style={{ fontSize: '14px' }}>
-                        No team members yet. Invite your first collaborator!
-                      </p>
+                    <div className="settings-empty">
+                      <p>No team members yet. Invite your first collaborator!</p>
                     </div>
                   )}
                 </div>
-              </div>
+              </section>
             )}
 
             {/* Security */}
-            <div className="card-bento" style={{
-              background: 'var(--canvas-pure)',
-              padding: '32px'
-            }}>
-              <h2
-                className="font-display"
-                style={{
-                  fontSize: '24px',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  marginBottom: '24px'
-                }}
-              >
-                Security
-              </h2>
+            <section className="settings-card">
+              <h2 className="settings-card-title">Security</h2>
 
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div>
-                  <p
-                    className="font-body"
-                    style={{
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: 'var(--text-primary)',
-                      marginBottom: '4px'
-                    }}
-                  >
-                    Change Password
-                  </p>
-                  <p
-                    className="font-body"
-                    style={{
-                      fontSize: '12px',
-                      color: 'var(--text-tertiary)'
-                    }}
-                  >
-                    Update your password regularly to keep your account secure
-                  </p>
+              <div className="settings-security-row">
+                <div className="settings-security-info">
+                  <p className="settings-security-title">Change Password</p>
+                  <p className="settings-security-desc">Update your password regularly to keep your account secure</p>
                 </div>
                 <button
                   className="btn btn-secondary"
-                  style={{ padding: '10px 24px', fontSize: '14px' }}
                   onClick={() => toast.info('Change password feature coming soon')}
                 >
                   Change
                 </button>
               </div>
-            </div>
-          </>
+            </section>
+          </div>
         )}
       </div>
     </ClientLayout>

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClientLayout } from '../components/layout/ClientLayout'
 import { Spinner } from '../components/ui/Spinner'
-import { StatCard } from '../components/ui/StatCard'
 import { useAuth } from '../hooks/useAuth'
 import { workflowService } from '../services/workflows'
 import logger from '@/utils/logger'
@@ -47,43 +46,6 @@ export function Dashboard() {
     loadData()
   }, [])
 
-  const metrics = [
-    {
-      label: 'Active Workflows',
-      value: stats.active_workflows.toString(),
-      change: 'Total active',
-      trend: 'neutral',
-      icon: '⚡',
-      variant: 'highlight',
-      glow: true
-    },
-    {
-      label: 'Total Executions',
-      value: stats.total_executions.toString(),
-      change: 'All time',
-      trend: 'up',
-      icon: '🚀',
-      variant: 'accent'
-    },
-    {
-      label: 'Success Rate',
-      value: stats.success_rate,
-      change: 'Average',
-      trend: 'up',
-      icon: '✨',
-      variant: 'success',
-      glow: true
-    },
-    {
-      label: 'Time Saved',
-      value: stats.time_saved,
-      change: 'Estimated',
-      trend: 'up',
-      icon: '⏱️',
-      variant: 'default'
-    },
-  ]
-
   const recentWorkflows = workflows.slice(0, 6)
 
   const getGreeting = () => {
@@ -122,21 +84,24 @@ export function Dashboard() {
           </p>
         </header>
 
-        {/* Stats Grid */}
+        {/* Stats Cards - Clean & Simple */}
         <div className="dashboard__stats-grid">
-          {metrics.map((metric, index) => (
-            <StatCard
-              key={index}
-              label={metric.label}
-              value={metric.value}
-              change={metric.change}
-              trend={metric.trend}
-              icon={metric.icon}
-              variant={metric.variant}
-              glow={metric.glow || false}
-              delay={index * 50}
-            />
-          ))}
+          <div className="dashboard__stat-card">
+            <span className="dashboard__stat-label">Workflows</span>
+            <span className="dashboard__stat-value">{stats.active_workflows}</span>
+          </div>
+          <div className="dashboard__stat-card">
+            <span className="dashboard__stat-label">Executions</span>
+            <span className="dashboard__stat-value">{stats.total_executions}</span>
+          </div>
+          <div className="dashboard__stat-card">
+            <span className="dashboard__stat-label">Success Rate</span>
+            <span className="dashboard__stat-value dashboard__stat-value--success">{stats.success_rate}</span>
+          </div>
+          <div className="dashboard__stat-card">
+            <span className="dashboard__stat-label">Time Saved</span>
+            <span className="dashboard__stat-value">{stats.time_saved}</span>
+          </div>
         </div>
 
         {/* Quick Actions */}
@@ -180,7 +145,7 @@ export function Dashboard() {
           </div>
 
           {recentWorkflows.length > 0 ? (
-            <div className="dashboard__workflows-grid">
+            <div className="workflows-grid">
               {recentWorkflows.map((workflow, index) => (
                 <WorkflowCard
                   key={workflow.id}
@@ -206,39 +171,27 @@ function WorkflowCard({ workflow, index, onClick }) {
       onClick={onClick}
       style={{ animationDelay: `${index * 60}ms` }}
     >
-      <div className="workflow-card__accent" />
-
-      <div className="workflow-card__header">
-        <div
-          className="workflow-card__icon"
-          style={{ background: getWorkflowGradient(index) }}
-        >
-          {getWorkflowIcon(workflow.name, index)}
+      <div className="workflow-card-header">
+        <div className="workflow-card-icon">
+          {getWorkflowIcon(workflow.name)}
         </div>
-
-        <span className={`workflow-card__badge ${workflow.status === 'deployed' ? 'workflow-card__badge--active' : 'workflow-card__badge--inactive'}`}>
+        <span className={`workflow-card-badge ${workflow.status === 'deployed' ? 'workflow-card-badge--active' : ''}`}>
           {workflow.status === 'deployed' ? 'Active' : 'Inactive'}
         </span>
       </div>
 
-      <h3 className="workflow-card__title">{workflow.name}</h3>
-      <p className="workflow-card__description">
+      <h3 className="workflow-card-title">{workflow.name}</h3>
+      <p className="workflow-card-description">
         {workflow.description || 'No description available'}
       </p>
 
-      <div className="workflow-card__footer">
-        <div className="workflow-card__runs">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polygon points="5 3 19 12 5 21 5 3" />
-          </svg>
+      <div className="workflow-card-footer">
+        <span className="workflow-card-runs">
           {workflow.execution_count || 0} runs
-        </div>
-
-        <div className="workflow-card__arrow">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M5 12h14M12 5l7 7-7 7" />
-          </svg>
-        </div>
+        </span>
+        <svg className="workflow-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M5 12h14M12 5l7 7-7 7" />
+        </svg>
       </div>
     </article>
   )
@@ -262,38 +215,27 @@ function EmptyState({ onNavigate }) {
   )
 }
 
-function getWorkflowIcon(workflowName, index) {
+function getWorkflowIcon(workflowName) {
   if (workflowName === 'Image Factory') {
     return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <rect x="3" y="3" width="18" height="18" rx="2" />
         <circle cx="8.5" cy="8.5" r="1.5" />
         <path d="M21 15l-5-5L5 21" />
       </svg>
     )
   }
-
   if (workflowName === 'Nano Banana') {
     return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
         <line x1="4" y1="22" x2="4" y2="15" />
       </svg>
     )
   }
-
-  const icons = ['⚡', '🔮', '🎨', '📊', '🔧', '💫']
-  return icons[index % icons.length]
-}
-
-function getWorkflowGradient(index) {
-  const gradients = [
-    'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-    'linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%)',
-    'linear-gradient(135deg, #10B981 0%, #06B6D4 100%)',
-    'linear-gradient(135deg, #F59E0B 0%, #EF4444 100%)',
-    'linear-gradient(135deg, #EC4899 0%, #8B5CF6 100%)',
-    'linear-gradient(135deg, #14B8A6 0%, #6366F1 100%)',
-  ]
-  return gradients[index % gradients.length]
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+    </svg>
+  )
 }

@@ -1,37 +1,38 @@
 import { Sidebar } from './Sidebar'
 
 /**
- * ClientLayout - Neumorphism (Soft UI) Design
- * Soft extruded sidebar + seamless content area
+ * ClientLayout - Solid Card Design (Linear/Vercel)
+ * Clean, minimal, professional
  *
  * Features:
- * - Neumorphic background (#E8EEF5 light / #1E293B dark)
- * - Soft shadows everywhere
- * - No harsh borders, just shadow depth
+ * - Light gray background
+ * - White cards with subtle shadows
+ * - Clean borders
+ * - Professional aesthetic
  */
 export function ClientLayout({ children }) {
   return (
     <div style={{
       display: 'flex',
       minHeight: '100vh',
-      background: 'var(--neu-bg)',
-      transition: 'background-color 300ms ease-out'
+      background: 'var(--background)',
+      transition: 'background-color 200ms ease-out'
     }}>
       <Sidebar />
 
       <div style={{
         flex: 1,
-        marginLeft: '280px',
+        marginLeft: '240px',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'
       }}>
-        {/* Main Content - no header for cleaner neumorphic look */}
+        {/* Main Content */}
         <main style={{
           flex: 1,
           overflow: 'auto',
-          background: 'var(--neu-bg)',
-          transition: 'background-color 300ms ease-out'
+          background: 'var(--background)',
+          transition: 'background-color 200ms ease-out'
         }}>
           {children}
         </main>

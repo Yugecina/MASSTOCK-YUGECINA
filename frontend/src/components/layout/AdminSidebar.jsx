@@ -1,199 +1,170 @@
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
+import DarkModeToggle from '../ui/DarkModeToggle'
 
 /**
- * AdminSidebar - "The Organic Factory" Design
- * Pure CSS styling, Verdigris border on active nav
- * Uses monochrome dark logo for admin distinction
+ * AdminSidebar - Dark Premium Style
+ * Mirrors Sidebar but with admin navigation
  */
 export function AdminSidebar() {
   const { user, logout } = useAuth()
 
   const adminNavItems = [
-    { path: '/admin/dashboard', label: 'Dashboard', icon: '📊' },
-    { path: '/admin/users', label: 'Users', icon: '👥' },
-    { path: '/admin/clients', label: 'Clients', icon: '🏢' },
-    { path: '/admin/workflows', label: 'Workflows', icon: '🔄' },
-    { path: '/admin/tickets', label: 'Tickets', icon: '💬' },
-    { path: '/admin/errors', label: 'Errors', icon: '🔥' },
-    { path: '/admin/finances', label: 'Finances', icon: '💰' },
-    { path: '/admin/settings', label: 'Settings', icon: '⚙️' },
+    { path: '/admin/dashboard', label: 'Dashboard', icon: DashboardIcon },
+    { path: '/admin/users', label: 'Users', icon: UsersIcon },
+    { path: '/admin/clients', label: 'Clients', icon: ClientsIcon },
+    { path: '/admin/workflows', label: 'Workflows', icon: WorkflowsIcon },
+    { path: '/admin/tickets', label: 'Tickets', icon: TicketsIcon },
+    { path: '/admin/errors', label: 'Errors', icon: ErrorsIcon },
+    { path: '/admin/finances', label: 'Finances', icon: FinancesIcon },
+    { path: '/admin/settings', label: 'Settings', icon: SettingsIcon },
   ]
 
   return (
-    <aside style={{
-      position: 'fixed',
-      left: 0,
-      top: 0,
-      bottom: 0,
-      width: '280px',
-      background: 'var(--canvas-pure)',
-      borderRight: '1px solid var(--neutral-200)',
-      display: 'flex',
-      flexDirection: 'column',
-      zIndex: 30
-    }}>
-      {/* Logo - Monochrome Dark for Admin distinction */}
-      <div style={{
-        padding: '24px',
-        borderBottom: '1px solid var(--neutral-200)'
-      }}>
-        <img
-          src="/logo-monochrome-dark.svg"
-          alt="MasStock Admin"
-          style={{ height: '40px', width: 'auto' }}
-        />
+    <aside className="sidebar">
+      {/* Logo */}
+      <div className="sidebar-header">
+        <div className="sidebar-logo">
+          <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+            <rect width="40" height="40" rx="10" fill="var(--primary)" />
+            <path d="M12 28V12h4.5l3.5 10.5L23.5 12H28v16h-3v-11l-3.5 11h-3L15 17v11h-3z" fill="white" />
+          </svg>
+          <span className="sidebar-logo-text">Admin</span>
+        </div>
       </div>
 
       {/* Navigation */}
-      <nav style={{
-        flex: 1,
-        padding: '24px 12px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '4px'
-      }}>
+      <nav className="sidebar-nav">
         {adminNavItems.map((item) => (
           <NavLink
             key={item.path}
             to={item.path}
-            style={({ isActive }) => ({
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 16px',
-              borderRadius: '8px',
-              fontSize: '14px',
-              fontWeight: 500,
-              transition: 'all 0.2s ease-out',
-              textDecoration: 'none',
-              background: isActive ? 'var(--primary-50)' : 'transparent',
-              color: isActive ? 'var(--primary-600)' : 'var(--neutral-600)',
-              borderLeft: isActive ? '4px solid var(--primary-500)' : '4px solid transparent',
-              paddingLeft: isActive ? '12px' : '16px'
-            })}
-            onMouseEnter={(e) => {
-              if (!e.currentTarget.classList.contains('active')) {
-                e.currentTarget.style.background = 'var(--neutral-100)'
-                e.currentTarget.style.color = 'var(--neutral-900)'
-              }
-            }}
-            onMouseLeave={(e) => {
-              const isActive = e.currentTarget.getAttribute('aria-current') === 'page'
-              if (!isActive) {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = 'var(--neutral-600)'
-              }
-            }}
+            className={({ isActive }) =>
+              `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
+            }
           >
-            <span style={{ fontSize: '18px' }}>{item.icon}</span>
-            {item.label}
+            <item.icon />
+            <span>{item.label}</span>
           </NavLink>
         ))}
       </nav>
 
-      {/* User Section */}
-      <div
-        style={{
-          borderTop: '1px solid var(--neutral-200)',
-          padding: '16px',
-          background: 'linear-gradient(to bottom, transparent, var(--neutral-50))'
-        }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '12px',
-            marginBottom: '12px',
-            padding: '12px',
-            borderRadius: '8px',
-            background: 'var(--canvas-pure)',
-            border: '1px solid var(--neutral-200)'
-          }}
-        >
-          {/* Avatar */}
-          <div
-            style={{
-              width: '40px',
-              height: '40px',
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--primary-500) 0%, var(--secondary-500) 100%)',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              color: 'white',
-              fontSize: '16px',
-              fontWeight: 600,
-              flexShrink: 0
-            }}
-          >
+      {/* Footer */}
+      <div className="sidebar-footer">
+        {/* Dark Mode Toggle */}
+        <div className="sidebar-theme">
+          <DarkModeToggle />
+        </div>
+
+        {/* User */}
+        <div className="sidebar-user">
+          <div className="sidebar-user-avatar">
             {(user?.name || 'A').charAt(0).toUpperCase()}
           </div>
-
-          {/* User Info */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div
-              style={{
-                fontSize: '14px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                marginBottom: '2px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {user?.name || 'Admin'}
-            </div>
-            <div
-              style={{
-                fontSize: '12px',
-                color: 'var(--text-tertiary)',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap'
-              }}
-            >
-              {user?.email || 'admin@masstock.com'}
-            </div>
+          <div className="sidebar-user-info">
+            <span className="sidebar-user-name">{user?.name || 'Admin'}</span>
+            <span className="sidebar-user-email">{user?.email || 'admin@masstock.com'}</span>
           </div>
         </div>
 
-        {/* Logout Button */}
-        <button
-          onClick={logout}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            padding: '10px 16px',
-            fontSize: '14px',
-            fontWeight: 500,
-            color: 'var(--text-secondary)',
-            background: 'transparent',
-            border: '1px solid var(--neutral-200)',
-            borderRadius: '8px',
-            cursor: 'pointer',
-            transition: 'all 0.2s ease-out'
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.background = 'var(--neutral-100)'
-            e.currentTarget.style.borderColor = 'var(--neutral-300)'
-            e.currentTarget.style.color = 'var(--text-primary)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.background = 'transparent'
-            e.currentTarget.style.borderColor = 'var(--neutral-200)'
-            e.currentTarget.style.color = 'var(--text-secondary)'
-          }}
-        >
-          <span style={{ fontSize: '16px' }}>🚪</span>
-          Logout
+        {/* Logout */}
+        <button onClick={logout} className="sidebar-logout">
+          <LogoutIcon />
+          <span>Logout</span>
         </button>
       </div>
     </aside>
+  )
+}
+
+// Icons
+function DashboardIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <rect x="3" y="3" width="7" height="7" rx="1" />
+      <rect x="14" y="3" width="7" height="7" rx="1" />
+      <rect x="3" y="14" width="7" height="7" rx="1" />
+      <rect x="14" y="14" width="7" height="7" rx="1" />
+    </svg>
+  )
+}
+
+function UsersIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+  )
+}
+
+function ClientsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 21h18" />
+      <path d="M9 8h1" />
+      <path d="M9 12h1" />
+      <path d="M9 16h1" />
+      <path d="M14 8h1" />
+      <path d="M14 12h1" />
+      <path d="M14 16h1" />
+      <path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" />
+    </svg>
+  )
+}
+
+function WorkflowsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
+    </svg>
+  )
+}
+
+function TicketsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  )
+}
+
+function ErrorsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+      <line x1="12" y1="9" x2="12" y2="13" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  )
+}
+
+function FinancesIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="12" y1="1" x2="12" y2="23" />
+      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+    </svg>
+  )
+}
+
+function SettingsIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </svg>
+  )
+}
+
+function LogoutIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+      <polyline points="16 17 21 12 16 7" />
+      <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
   )
 }

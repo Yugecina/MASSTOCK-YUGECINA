@@ -37,65 +37,49 @@ const MoonIcon = ({ size = 14 }) => (
 /**
  * DarkModeToggle Component
  *
- * Handles theme switching between light and dark modes.
- * - Detects system preference on first load
- * - Persists user choice in localStorage
- * - Smooth transitions with rich animations
- * - Accessible with keyboard navigation
+ * Default is DARK mode. Toggle switches to light.
+ * - Dark mode = default (no .dark class)
+ * - Light mode = .dark class added (inverted naming for compatibility)
  */
 function DarkModeToggle() {
-  const [isDark, setIsDark] = useState(() => {
-    // Check localStorage first
+  // isLight = true means light mode is active (.dark class present)
+  const [isLight, setIsLight] = useState(() => {
     const saved = localStorage.getItem('theme');
     if (saved) {
-      return saved === 'dark';
+      return saved === 'light';
     }
-    // Fall back to system preference
-    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    // Default to dark mode (isLight = false)
+    return false;
   });
 
   useEffect(() => {
-    // Apply theme to document
-    if (isDark) {
+    // .dark class = light mode (inverted for compatibility)
+    if (isLight) {
       document.documentElement.classList.add('dark');
-      localStorage.setItem('theme', 'dark');
+      localStorage.setItem('theme', 'light');
     } else {
       document.documentElement.classList.remove('dark');
-      localStorage.setItem('theme', 'light');
+      localStorage.setItem('theme', 'dark');
     }
-  }, [isDark]);
-
-  // Listen for system theme changes
-  useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e) => {
-      // Only apply system preference if user hasn't manually set a theme
-      if (!localStorage.getItem('theme')) {
-        setIsDark(e.matches);
-      }
-    };
-
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
+  }, [isLight]);
 
   const toggleTheme = () => {
-    setIsDark(!isDark);
+    setIsLight(!isLight);
   };
 
   return (
     <button
       onClick={toggleTheme}
       className="dark-mode-toggle"
-      aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-      title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+      aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+      title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
     >
       <div className="dark-mode-toggle-track">
-        <div className={`dark-mode-toggle-thumb ${isDark ? 'dark' : 'light'}`}>
-          {isDark ? (
-            <MoonIcon size={14} />
-          ) : (
+        <div className={`dark-mode-toggle-thumb ${isLight ? 'light' : 'dark'}`}>
+          {isLight ? (
             <SunIcon size={14} />
+          ) : (
+            <MoonIcon size={14} />
           )}
         </div>
       </div>

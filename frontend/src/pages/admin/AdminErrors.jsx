@@ -2,13 +2,10 @@ import { useState, useEffect } from 'react'
 import { Spinner } from '../../components/ui/Spinner'
 import { AdminLayout } from '../../components/layout/AdminLayout'
 import { adminService } from '../../services/admin'
-import logger from '@/utils/logger';
-
+import logger from '@/utils/logger'
 
 /**
- * AdminErrors - "The Organic Factory" Design
- * Error logs with terminal-style code blocks
- * Severity badges: Critical=Red glow, Error=Red, Warning=Orange
+ * AdminErrors - Dark Premium Style
  */
 export function AdminErrors() {
   const [errors, setErrors] = useState([])
@@ -22,11 +19,7 @@ export function AdminErrors() {
         logger.debug('✅ AdminErrors: Data loaded:', data)
         setErrors(data.errors || [])
       } catch (err) {
-        logger.error('❌ AdminErrors: Failed to fetch errors:', {
-          error: err,
-          message: err.message,
-          response: err.response
-        })
+        logger.error('❌ AdminErrors: Failed to fetch errors:', err)
       } finally {
         setLoading(false)
       }
@@ -34,306 +27,86 @@ export function AdminErrors() {
     loadErrors()
   }, [])
 
-  const getSeverityStyle = (severity) => {
+  const getSeverityClass = (severity) => {
     switch (severity?.toLowerCase()) {
-      case 'critical':
-        return {
-          bg: 'var(--error-light)',
-          color: 'var(--error-dark)',
-          glow: '0 0 20px rgba(255, 59, 48, 0.3)'
-        }
-      case 'error':
-        return {
-          bg: 'var(--error-light)',
-          color: 'var(--error-dark)',
-          glow: 'none'
-        }
-      case 'warning':
-        return {
-          bg: 'var(--warning-light)',
-          color: 'var(--warning-dark)',
-          glow: 'none'
-        }
-      default:
-        return {
-          bg: 'var(--neutral-100)',
-          color: 'var(--neutral-600)',
-          glow: 'none'
-        }
+      case 'critical': return 'admin-badge--danger'
+      case 'error': return 'admin-badge--danger'
+      case 'warning': return 'admin-badge--warning'
+      default: return ''
     }
   }
 
+  const criticalCount = errors.filter(e => e.severity?.toLowerCase() === 'critical').length
+  const warningCount = errors.filter(e => e.severity?.toLowerCase() === 'warning').length
+
   return (
     <AdminLayout>
-      <div style={{ padding: '48px', maxWidth: '1400px', margin: '0 auto' }}>
+      <div className="admin-page">
         {/* Header */}
-        <div style={{ marginBottom: '48px' }}>
-          <h1
-            className="font-display"
-            style={{
-              fontSize: '36px',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              marginBottom: '8px',
-              letterSpacing: '-0.02em'
-            }}
-          >
-            Errors & Logs
-          </h1>
-          <p
-            className="font-body"
-            style={{
-              fontSize: '16px',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            System errors and performance monitoring
-          </p>
-        </div>
+        <header className="admin-header">
+          <div>
+            <h1 className="admin-title">Errors & Logs</h1>
+            <p className="admin-subtitle">System errors and performance monitoring</p>
+          </div>
+        </header>
 
         {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: '48px' }}>
+          <div className="admin-loading">
             <Spinner size="lg" />
           </div>
         ) : errors.length === 0 ? (
-          <div
-            className="card-bento"
-            style={{
-              background: 'var(--canvas-pure)',
-              padding: '64px',
-              textAlign: 'center'
-            }}
-          >
-            <div style={{ fontSize: '64px', marginBottom: '16px' }}>✅</div>
-            <h3
-              className="font-display"
-              style={{
-                fontSize: '24px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                marginBottom: '8px'
-              }}
-            >
-              No errors detected
-            </h3>
-            <p
-              className="font-body"
-              style={{
-                fontSize: '16px',
-                color: 'var(--text-secondary)'
-              }}
-            >
-              System is running smoothly with no logged errors
-            </p>
+          <div className="admin-card">
+            <div className="admin-empty">
+              <div className="admin-empty-icon">✅</div>
+              <h3 className="admin-empty-title">No errors detected</h3>
+              <p className="admin-empty-text">System is running smoothly with no logged errors</p>
+            </div>
           </div>
         ) : (
           <>
-            {/* Error Count Summary */}
-            <div
-              className="card-bento"
-              style={{
-                background: 'var(--canvas-pure)',
-                padding: '32px',
-                marginBottom: '24px'
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '32px' }}>
-                <div>
-                  <p
-                    className="font-body"
-                    style={{
-                      fontSize: '14px',
-                      color: 'var(--text-secondary)',
-                      fontWeight: 500,
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em',
-                      marginBottom: '8px'
-                    }}
-                  >
-                    Total Errors
-                  </p>
-                  <div
-                    className="font-mono"
-                    style={{
-                      fontSize: '32px',
-                      fontWeight: 700,
-                      color: 'var(--text-primary)'
-                    }}
-                  >
-                    {errors.length}
-                  </div>
+            {/* Summary */}
+            <div className="admin-errors-summary">
+              <div className="admin-errors-total">
+                <span className="admin-errors-total-label">Total Errors</span>
+                <span className="admin-errors-total-value">{errors.length}</span>
+              </div>
+              <div className="admin-errors-breakdown">
+                <div className="admin-errors-breakdown-item admin-errors-breakdown-item--critical">
+                  <span className="admin-errors-breakdown-label">CRITICAL</span>
+                  <span className="admin-errors-breakdown-value">{criticalCount}</span>
                 </div>
-
-                <div style={{ flex: 1, display: 'flex', gap: '16px' }}>
-                  <div
-                    style={{
-                      flex: 1,
-                      padding: '16px',
-                      background: 'var(--error-light)',
-                      borderRadius: '8px'
-                    }}
-                  >
-                    <p
-                      className="font-body"
-                      style={{
-                        fontSize: '12px',
-                        color: 'var(--error-dark)',
-                        marginBottom: '4px',
-                        fontWeight: 600
-                      }}
-                    >
-                      CRITICAL
-                    </p>
-                    <p
-                      className="font-mono"
-                      style={{
-                        fontSize: '20px',
-                        fontWeight: 700,
-                        color: 'var(--error-dark)'
-                      }}
-                    >
-                      {errors.filter(e => e.severity?.toLowerCase() === 'critical').length}
-                    </p>
-                  </div>
-
-                  <div
-                    style={{
-                      flex: 1,
-                      padding: '16px',
-                      background: 'var(--warning-light)',
-                      borderRadius: '8px'
-                    }}
-                  >
-                    <p
-                      className="font-body"
-                      style={{
-                        fontSize: '12px',
-                        color: 'var(--warning-dark)',
-                        marginBottom: '4px',
-                        fontWeight: 600
-                      }}
-                    >
-                      WARNING
-                    </p>
-                    <p
-                      className="font-mono"
-                      style={{
-                        fontSize: '20px',
-                        fontWeight: 700,
-                        color: 'var(--warning-dark)'
-                      }}
-                    >
-                      {errors.filter(e => e.severity?.toLowerCase() === 'warning').length}
-                    </p>
-                  </div>
+                <div className="admin-errors-breakdown-item admin-errors-breakdown-item--warning">
+                  <span className="admin-errors-breakdown-label">WARNING</span>
+                  <span className="admin-errors-breakdown-value">{warningCount}</span>
                 </div>
               </div>
             </div>
 
             {/* Error List */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {errors.map((error, idx) => {
-                const severityStyle = getSeverityStyle(error.severity)
-
-                return (
-                  <div
-                    key={idx}
-                    className="card-bento"
-                    style={{
-                      background: 'var(--canvas-pure)',
-                      padding: '24px',
-                      boxShadow: severityStyle.glow !== 'none' ? severityStyle.glow : 'var(--shadow-md)'
-                    }}
-                  >
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
-                          <h3
-                            className="font-display"
-                            style={{
-                              fontSize: '18px',
-                              fontWeight: 600,
-                              color: 'var(--text-primary)'
-                            }}
-                          >
-                            {error.type}
-                          </h3>
-
-                          {/* Severity Badge */}
-                          <span
-                            className="badge"
-                            style={{
-                              padding: '6px 12px',
-                              fontSize: '11px',
-                              fontWeight: 600,
-                              borderRadius: '6px',
-                              background: severityStyle.bg,
-                              color: severityStyle.color,
-                              textTransform: 'uppercase',
-                              letterSpacing: '0.05em'
-                            }}
-                          >
-                            {error.severity}
-                          </span>
-                        </div>
-
-                        <p
-                          className="font-body"
-                          style={{
-                            fontSize: '14px',
-                            color: 'var(--text-secondary)',
-                            lineHeight: 1.6,
-                            marginBottom: '12px'
-                          }}
-                        >
-                          {error.message}
-                        </p>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                          <span
-                            className="font-mono"
-                            style={{
-                              fontSize: '12px',
-                              color: 'var(--neutral-500)'
-                            }}
-                          >
-                            Occurrences: <strong style={{ color: 'var(--text-primary)' }}>{error.count}</strong>
-                          </span>
-                          <span
-                            className="font-mono"
-                            style={{
-                              fontSize: '12px',
-                              color: 'var(--neutral-500)'
-                            }}
-                          >
-                            Last seen: {new Date(error.last_seen).toLocaleString()}
-                          </span>
-                        </div>
+            <div className="admin-errors-list">
+              {errors.map((error, idx) => (
+                <article key={idx} className={`admin-error-card ${error.severity?.toLowerCase() === 'critical' ? 'admin-error-card--critical' : ''}`}>
+                  <div className="admin-error-header">
+                    <div>
+                      <div className="admin-error-title-row">
+                        <h3 className="admin-error-type">{error.type}</h3>
+                        <span className={`admin-badge ${getSeverityClass(error.severity)}`}>
+                          {error.severity}
+                        </span>
+                      </div>
+                      <p className="admin-error-message">{error.message}</p>
+                      <div className="admin-error-meta">
+                        <span>Occurrences: <strong>{error.count}</strong></span>
+                        <span>Last seen: {new Date(error.last_seen).toLocaleString()}</span>
                       </div>
                     </div>
-
-                    {/* Terminal-style code block */}
-                    {error.stack && (
-                      <div
-                        className="font-mono"
-                        style={{
-                          background: 'var(--neutral-900)',
-                          color: 'var(--lime-500)',
-                          padding: '16px',
-                          borderRadius: '8px',
-                          fontSize: '12px',
-                          overflow: 'auto',
-                          lineHeight: 1.6,
-                          whiteSpace: 'pre-wrap',
-                          wordBreak: 'break-all'
-                        }}
-                      >
-                        {error.stack}
-                      </div>
-                    )}
                   </div>
-                )
-              })}
+
+                  {error.stack && (
+                    <pre className="admin-error-stack">{error.stack}</pre>
+                  )}
+                </article>
+              ))}
             </div>
           </>
         )}

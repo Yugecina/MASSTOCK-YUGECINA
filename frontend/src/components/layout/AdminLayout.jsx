@@ -1,49 +1,32 @@
 import { AdminSidebar } from './AdminSidebar'
 
 /**
- * AdminLayout - "The Organic Factory" Design
- * Ghost White background, minimal header, clean layout
- * Identical structure to ClientLayout but uses AdminSidebar
+ * AdminLayout - Dark Premium Style
+ * Mirrors ClientLayout but for admin interface
  */
 export function AdminLayout({ children }) {
   return (
     <div style={{
       display: 'flex',
       minHeight: '100vh',
-      background: 'var(--canvas-base)', // Ghost White
+      background: 'var(--background)',
+      transition: 'background-color 200ms ease-out'
     }}>
       <AdminSidebar />
 
       <div style={{
         flex: 1,
-        marginLeft: '280px', // Sidebar width
+        marginLeft: '240px',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden'
       }}>
-        {/* Header - Optional, minimal */}
-        <header style={{
-          background: 'var(--canvas-pure)',
-          borderBottom: '1px solid var(--neutral-200)',
-          padding: '16px 32px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          minHeight: '72px'
-        }}>
-          <div style={{ flex: 1 }}>
-            {/* Header content can be added here */}
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            {/* Header actions can be added here */}
-          </div>
-        </header>
-
         {/* Main Content */}
         <main style={{
           flex: 1,
           overflow: 'auto',
-          background: 'var(--canvas-base)' // Ghost White
+          background: 'var(--background)',
+          transition: 'background-color 200ms ease-out'
         }}>
           {children}
         </main>

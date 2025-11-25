@@ -3,14 +3,10 @@ import toast from 'react-hot-toast'
 import { Spinner } from '../../components/ui/Spinner'
 import { AdminLayout } from '../../components/layout/AdminLayout'
 import { adminService } from '../../services/admin'
-import logger from '@/utils/logger';
-
+import logger from '@/utils/logger'
 
 /**
- * AdminSettings - "The Organic Factory" Design
- * Horizontal tabs with Indigo active state
- * Save Changes button in Lime (critical CTA)
- * Toggle switches with Lime when active
+ * AdminSettings - Dark Premium Style
  */
 export function AdminSettings() {
   const [settings, setSettings] = useState(null)
@@ -33,11 +29,7 @@ export function AdminSettings() {
         logger.debug('✅ AdminSettings: Settings loaded:', response)
         setSettings(response.data)
       } catch (error) {
-        logger.error('❌ AdminSettings: Failed to load settings:', {
-          error,
-          message: error.message,
-          response: error.response
-        })
+        logger.error('❌ AdminSettings: Failed to load settings:', error)
         toast.error('Failed to load settings')
       } finally {
         setLoading(false)
@@ -54,11 +46,7 @@ export function AdminSettings() {
       logger.debug('✅ AdminSettings: Settings saved successfully')
       toast.success('Settings saved successfully')
     } catch (error) {
-      logger.error('❌ AdminSettings: Failed to save settings:', {
-        error,
-        message: error.message,
-        response: error.response
-      })
+      logger.error('❌ AdminSettings: Failed to save settings:', error)
       toast.error('Failed to save settings')
     } finally {
       setSaving(false)
@@ -68,12 +56,7 @@ export function AdminSettings() {
   if (loading) {
     return (
       <AdminLayout>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '60vh'
-        }}>
+        <div className="admin-page admin-loading">
           <Spinner size="lg" />
         </div>
       </AdminLayout>
@@ -82,70 +65,22 @@ export function AdminSettings() {
 
   return (
     <AdminLayout>
-      <div style={{ padding: '48px', maxWidth: '1400px', margin: '0 auto' }}>
+      <div className="admin-page">
         {/* Header */}
-        <div style={{ marginBottom: '48px' }}>
-          <h1
-            className="font-display"
-            style={{
-              fontSize: '36px',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              marginBottom: '8px',
-              letterSpacing: '-0.02em'
-            }}
-          >
-            Settings & Configuration
-          </h1>
-          <p
-            className="font-body"
-            style={{
-              fontSize: '16px',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            Manage platform settings and configurations
-          </p>
-        </div>
+        <header className="admin-header">
+          <div>
+            <h1 className="admin-title">Settings & Configuration</h1>
+            <p className="admin-subtitle">Manage platform settings and configurations</p>
+          </div>
+        </header>
 
         {/* Tabs */}
-        <div style={{
-          display: 'flex',
-          gap: '8px',
-          marginBottom: '32px',
-          borderBottom: '2px solid var(--neutral-200)',
-          paddingBottom: '0'
-        }}>
+        <div className="admin-tabs">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                padding: '12px 24px',
-                border: 'none',
-                borderBottom: activeTab === tab.id ? '3px solid var(--indigo-600)' : '3px solid transparent',
-                background: activeTab === tab.id ? 'var(--indigo-50)' : 'transparent',
-                color: activeTab === tab.id ? 'var(--indigo-600)' : 'var(--neutral-600)',
-                fontSize: '14px',
-                fontWeight: activeTab === tab.id ? 600 : 500,
-                cursor: 'pointer',
-                transition: 'all 0.2s ease-out',
-                marginBottom: '-2px',
-                borderRadius: '8px 8px 0 0'
-              }}
-              onMouseEnter={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.background = 'var(--neutral-50)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (activeTab !== tab.id) {
-                  e.currentTarget.style.background = 'transparent'
-                }
-              }}
+              className={`admin-tab ${activeTab === tab.id ? 'admin-tab--active' : ''}`}
             >
               <span>{tab.icon}</span>
               {tab.label}
@@ -155,41 +90,14 @@ export function AdminSettings() {
 
         {/* Tab Content */}
         {activeTab === 'general' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          <div className="admin-settings-content">
             {/* System Settings */}
-            <div
-              className="card-bento"
-              style={{
-                background: 'var(--canvas-pure)',
-                padding: '32px'
-              }}
-            >
-              <h2
-                className="font-display"
-                style={{
-                  fontSize: '20px',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  marginBottom: '24px'
-                }}
-              >
-                System Settings
-              </h2>
+            <div className="admin-card">
+              <h2 className="admin-card-title">System Settings</h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <label
-                    className="font-body"
-                    style={{
-                      display: 'block',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: 'var(--text-primary)',
-                      marginBottom: '8px'
-                    }}
-                  >
-                    Application Name
-                  </label>
+              <div className="admin-settings-fields">
+                <div className="admin-settings-field">
+                  <label className="admin-settings-label">Application Name</label>
                   <input
                     type="text"
                     value={settings?.system?.appName || ''}
@@ -197,32 +105,12 @@ export function AdminSettings() {
                       ...settings,
                       system: { ...settings?.system, appName: e.target.value }
                     })}
-                    className="input-field"
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      fontSize: '14px',
-                      border: '1px solid var(--neutral-200)',
-                      borderRadius: '8px',
-                      background: 'var(--canvas-pure)',
-                      color: 'var(--text-primary)'
-                    }}
+                    className="admin-settings-input"
                   />
                 </div>
 
-                <div>
-                  <label
-                    className="font-body"
-                    style={{
-                      display: 'block',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: 'var(--text-primary)',
-                      marginBottom: '8px'
-                    }}
-                  >
-                    Version
-                  </label>
+                <div className="admin-settings-field">
+                  <label className="admin-settings-label">Version</label>
                   <input
                     type="text"
                     value={settings?.system?.appVersion || ''}
@@ -230,49 +118,15 @@ export function AdminSettings() {
                       ...settings,
                       system: { ...settings?.system, appVersion: e.target.value }
                     })}
-                    className="input-field"
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      fontSize: '14px',
-                      border: '1px solid var(--neutral-200)',
-                      borderRadius: '8px',
-                      background: 'var(--canvas-pure)',
-                      color: 'var(--text-primary)'
-                    }}
+                    className="admin-settings-input"
                   />
                 </div>
 
-                {/* Toggle Switches */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  background: 'var(--neutral-50)',
-                  borderRadius: '8px'
-                }}>
-                  <div>
-                    <div
-                      className="font-body"
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        color: 'var(--text-primary)',
-                        marginBottom: '4px'
-                      }}
-                    >
-                      Maintenance Mode
-                    </div>
-                    <div
-                      className="font-body"
-                      style={{
-                        fontSize: '12px',
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      Put system in maintenance mode
-                    </div>
+                {/* Toggles */}
+                <div className="admin-settings-toggle">
+                  <div className="admin-settings-toggle-info">
+                    <span className="admin-settings-toggle-title">Maintenance Mode</span>
+                    <span className="admin-settings-toggle-desc">Put system in maintenance mode</span>
                   </div>
                   <input
                     type="checkbox"
@@ -281,44 +135,14 @@ export function AdminSettings() {
                       ...settings,
                       system: { ...settings?.system, maintenanceMode: e.target.checked }
                     })}
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      cursor: 'pointer',
-                      accentColor: 'var(--lime-500)'
-                    }}
+                    className="admin-settings-checkbox"
                   />
                 </div>
 
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  padding: '16px',
-                  background: 'var(--neutral-50)',
-                  borderRadius: '8px'
-                }}>
-                  <div>
-                    <div
-                      className="font-body"
-                      style={{
-                        fontSize: '14px',
-                        fontWeight: 500,
-                        color: 'var(--text-primary)',
-                        marginBottom: '4px'
-                      }}
-                    >
-                      Allow Registration
-                    </div>
-                    <div
-                      className="font-body"
-                      style={{
-                        fontSize: '12px',
-                        color: 'var(--text-secondary)'
-                      }}
-                    >
-                      Enable new user registration
-                    </div>
+                <div className="admin-settings-toggle">
+                  <div className="admin-settings-toggle-info">
+                    <span className="admin-settings-toggle-title">Allow Registration</span>
+                    <span className="admin-settings-toggle-desc">Enable new user registration</span>
                   </div>
                   <input
                     type="checkbox"
@@ -327,51 +151,19 @@ export function AdminSettings() {
                       ...settings,
                       system: { ...settings?.system, allowRegistration: e.target.checked }
                     })}
-                    style={{
-                      width: '20px',
-                      height: '20px',
-                      cursor: 'pointer',
-                      accentColor: 'var(--lime-500)'
-                    }}
+                    className="admin-settings-checkbox"
                   />
                 </div>
               </div>
             </div>
 
             {/* Email Configuration */}
-            <div
-              className="card-bento"
-              style={{
-                background: 'var(--canvas-pure)',
-                padding: '32px'
-              }}
-            >
-              <h2
-                className="font-display"
-                style={{
-                  fontSize: '20px',
-                  fontWeight: 600,
-                  color: 'var(--text-primary)',
-                  marginBottom: '24px'
-                }}
-              >
-                Email Configuration
-              </h2>
+            <div className="admin-card">
+              <h2 className="admin-card-title">Email Configuration</h2>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                <div>
-                  <label
-                    className="font-body"
-                    style={{
-                      display: 'block',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: 'var(--text-primary)',
-                      marginBottom: '8px'
-                    }}
-                  >
-                    SMTP Host
-                  </label>
+              <div className="admin-settings-fields">
+                <div className="admin-settings-field">
+                  <label className="admin-settings-label">SMTP Host</label>
                   <input
                     type="text"
                     value={settings?.email?.smtpHost || ''}
@@ -379,32 +171,12 @@ export function AdminSettings() {
                       ...settings,
                       email: { ...settings?.email, smtpHost: e.target.value }
                     })}
-                    className="input-field"
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      fontSize: '14px',
-                      border: '1px solid var(--neutral-200)',
-                      borderRadius: '8px',
-                      background: 'var(--canvas-pure)',
-                      color: 'var(--text-primary)'
-                    }}
+                    className="admin-settings-input"
                   />
                 </div>
 
-                <div>
-                  <label
-                    className="font-body"
-                    style={{
-                      display: 'block',
-                      fontSize: '14px',
-                      fontWeight: 500,
-                      color: 'var(--text-primary)',
-                      marginBottom: '8px'
-                    }}
-                  >
-                    From Email
-                  </label>
+                <div className="admin-settings-field">
+                  <label className="admin-settings-label">From Email</label>
                   <input
                     type="email"
                     value={settings?.email?.fromEmail || ''}
@@ -412,16 +184,7 @@ export function AdminSettings() {
                       ...settings,
                       email: { ...settings?.email, fromEmail: e.target.value }
                     })}
-                    className="input-field"
-                    style={{
-                      width: '100%',
-                      padding: '12px 16px',
-                      fontSize: '14px',
-                      border: '1px solid var(--neutral-200)',
-                      borderRadius: '8px',
-                      background: 'var(--canvas-pure)',
-                      color: 'var(--text-primary)'
-                    }}
+                    className="admin-settings-input"
                   />
                 </div>
               </div>
@@ -430,119 +193,41 @@ export function AdminSettings() {
         )}
 
         {activeTab === 'api' && (
-          <div
-            className="card-bento"
-            style={{
-              background: 'var(--canvas-pure)',
-              padding: '64px',
-              textAlign: 'center'
-            }}
-          >
-            <div style={{ fontSize: '64px', marginBottom: '16px' }}>🔑</div>
-            <h3
-              className="font-display"
-              style={{
-                fontSize: '24px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                marginBottom: '8px'
-              }}
-            >
-              API Keys Management
-            </h3>
-            <p
-              className="font-body"
-              style={{
-                fontSize: '16px',
-                color: 'var(--text-secondary)'
-              }}
-            >
-              Feature coming soon
-            </p>
+          <div className="admin-card">
+            <div className="admin-empty">
+              <div className="admin-empty-icon">🔑</div>
+              <h3 className="admin-empty-title">API Keys Management</h3>
+              <p className="admin-empty-text">Feature coming soon</p>
+            </div>
           </div>
         )}
 
         {activeTab === 'integrations' && (
-          <div
-            className="card-bento"
-            style={{
-              background: 'var(--canvas-pure)',
-              padding: '64px',
-              textAlign: 'center'
-            }}
-          >
-            <div style={{ fontSize: '64px', marginBottom: '16px' }}>🔗</div>
-            <h3
-              className="font-display"
-              style={{
-                fontSize: '24px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                marginBottom: '8px'
-              }}
-            >
-              Third-party Integrations
-            </h3>
-            <p
-              className="font-body"
-              style={{
-                fontSize: '16px',
-                color: 'var(--text-secondary)'
-              }}
-            >
-              Feature coming soon
-            </p>
+          <div className="admin-card">
+            <div className="admin-empty">
+              <div className="admin-empty-icon">🔗</div>
+              <h3 className="admin-empty-title">Third-party Integrations</h3>
+              <p className="admin-empty-text">Feature coming soon</p>
+            </div>
           </div>
         )}
 
         {activeTab === 'billing' && (
-          <div
-            className="card-bento"
-            style={{
-              background: 'var(--canvas-pure)',
-              padding: '64px',
-              textAlign: 'center'
-            }}
-          >
-            <div style={{ fontSize: '64px', marginBottom: '16px' }}>💳</div>
-            <h3
-              className="font-display"
-              style={{
-                fontSize: '24px',
-                fontWeight: 600,
-                color: 'var(--text-primary)',
-                marginBottom: '8px'
-              }}
-            >
-              Billing & Payments
-            </h3>
-            <p
-              className="font-body"
-              style={{
-                fontSize: '16px',
-                color: 'var(--text-secondary)'
-              }}
-            >
-              Feature coming soon
-            </p>
+          <div className="admin-card">
+            <div className="admin-empty">
+              <div className="admin-empty-icon">💳</div>
+              <h3 className="admin-empty-title">Billing & Payments</h3>
+              <p className="admin-empty-text">Feature coming soon</p>
+            </div>
           </div>
         )}
 
-        {/* Save Button (Lime - Critical CTA) */}
-        <div style={{ marginTop: '32px', display: 'flex', gap: '16px', justifyContent: 'flex-end' }}>
-          <button
-            className="btn btn-secondary"
-            style={{ padding: '12px 24px' }}
-            onClick={() => toast.info('Reset feature coming soon')}
-          >
+        {/* Save Button */}
+        <div className="admin-settings-actions">
+          <button className="btn btn-secondary" onClick={() => toast.info('Reset feature coming soon')}>
             Reset to Defaults
           </button>
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="btn btn-primary-lime"
-            style={{ padding: '12px 32px', fontSize: '16px' }}
-          >
+          <button onClick={handleSave} disabled={saving} className="btn btn-primary">
             {saving ? 'Saving...' : 'Save Changes'}
           </button>
         </div>

@@ -2,7 +2,7 @@
 
 **Standard Operating Procedure for deploying MasStock to production VPS**
 
-Last updated: 2025-11-25
+Last updated: 2025-11-25 (v2.1 - Added ENCRYPTION_KEY troubleshooting)
 
 ---
 
@@ -168,6 +168,50 @@ curl https://api.dorian-gonzalez.fr/health
 - All containers status: `Up` and `healthy`
 - Frontend: HTTP 200
 - API: `{"status":"ok","timestamp":"...","services":{...}}`
+
+### Step 4: Verify Secrets Configuration (CRITICAL)
+
+**Before testing workflows, verify ALL secrets are properly configured:**
+
+```bash
+# Check for placeholder values that should have been replaced
+grep -E "(CHANGE_ME|your-)" /opt/masstock/backend/.env.production
+
+# If any output, those values MUST be replaced!
+
+# Verify critical secrets format:
+
+# 1. ENCRYPTION_KEY must be exactly 64 hex characters
+cat backend/.env.production | grep ENCRYPTION_KEY | cut -d'=' -f2 | wc -c
+# Expected: 65 (64 chars + newline)
+
+# 2. JWT_SECRET should be long random string
+cat backend/.env.production | grep JWT_SECRET
+
+# 3. REDIS_PASSWORD must match in both files
+diff <(grep REDIS_PASSWORD .env) <(grep REDIS_PASSWORD backend/.env.production)
+# Expected: no output (files match)
+
+# 4. Supabase keys should be set (not placeholders)
+cat backend/.env.production | grep SUPABASE
+```
+
+**Generate missing secrets:**
+```bash
+# ENCRYPTION_KEY (64 hex chars)
+node -e "console.log('ENCRYPTION_KEY=' + require('crypto').randomBytes(32).toString('hex'))"
+
+# JWT_SECRET (128 hex chars)
+node -e "console.log('JWT_SECRET=' + require('crypto').randomBytes(64).toString('hex'))"
+
+# REDIS_PASSWORD (base64)
+node -e "console.log('REDIS_PASSWORD=' + require('crypto').randomBytes(32).toString('base64'))"
+```
+
+**After updating secrets, restart services:**
+```bash
+docker compose -f docker-compose.production.yml restart api worker
+```
 
 ---
 
@@ -554,7 +598,61 @@ docker compose -f docker-compose.production.yml down
 docker compose -f docker-compose.production.yml up -d
 ```
 
-#### 6. Port 8080 Already in Use
+#### 6. Workflow Execution Returns 500 - ENCRYPTION_KEY Error
+
+**Symptom:** API returns 500 Internal Server Error when executing a workflow. Error in logs:
+```
+Encryption failed: ENCRYPTION_KEY must be 64 hex characters (32 bytes)
+```
+
+**Root Cause:** The `ENCRYPTION_KEY` in `backend/.env.production` is either:
+- Still the placeholder value (`CHANGE_ME_GENERATE_WITH_CRYPTO_RANDOMBYTES_32`)
+- Not exactly 64 hexadecimal characters
+- Contains invalid characters (must be 0-9, a-f only)
+
+**Diagnosis:**
+```bash
+# Check the current ENCRYPTION_KEY
+cat /opt/masstock/backend/.env.production | grep ENCRYPTION_KEY
+
+# Verify it's exactly 64 hex characters
+cat /opt/masstock/backend/.env.production | grep ENCRYPTION_KEY | cut -d'=' -f2 | wc -c
+# Should output: 65 (64 chars + newline)
+```
+
+**Fix:**
+```bash
+# 1. Generate a valid 64-character hex key
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+
+# 2. Copy the output (e.g., 461aa584a485acf8194db5337b1dc9454c3dc82cff1148338dc4d88434563de1)
+
+# 3. Update the .env.production file
+nano /opt/masstock/backend/.env.production
+# Replace ENCRYPTION_KEY=... with the generated key
+
+# 4. Restart services
+docker compose -f docker-compose.production.yml restart api worker
+
+# 5. Verify
+docker logs masstock_api --tail 20
+```
+
+**One-liner fix (replace KEY with your generated key):**
+```bash
+cd /opt/masstock && \
+sed -i 's/ENCRYPTION_KEY=.*/ENCRYPTION_KEY=YOUR_64_CHAR_HEX_KEY_HERE/' backend/.env.production && \
+docker compose -f docker-compose.production.yml restart api worker
+```
+
+**Prevention:**
+- NEVER deploy with placeholder values in `.env.production`
+- Always verify secrets after deployment: `grep -E "(CHANGE_ME|your-)" backend/.env.production`
+- The ENCRYPTION_KEY is used to encrypt user API keys (e.g., Gemini API key) before storing them
+
+---
+
+#### 7. Port 8080 Already in Use
 
 **Symptom:** `failed to bind host port 0.0.0.0:8080/tcp: address already in use`
 

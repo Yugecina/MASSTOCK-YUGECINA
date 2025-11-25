@@ -7,16 +7,14 @@ import { NanoBananaForm } from '../components/workflows/NanoBananaForm';
 import { BatchResultsView } from '../components/workflows/BatchResultsView';
 import logger from '@/utils/logger';
 
-
 /**
- * WorkflowExecute Page - "The Organic Factory" Design
- * Steps indicator avec glows Indigo + Loading avec gradient Indigo→Lime animé
- * ⚠️ NanoBananaForm reste INCHANGÉ (déjà redesigné)
+ * WorkflowExecute Page - Dark Premium Style
+ * Clean CSS classes, minimal inline styles
  */
 export function WorkflowExecute() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [step, setStep] = useState(1); // 1=configure, 2=processing, 3=results
+  const [step, setStep] = useState(1);
   const [workflow, setWorkflow] = useState(null);
   const [formData, setFormData] = useState({});
   const [execution, setExecution] = useState(null);
@@ -49,7 +47,6 @@ export function WorkflowExecute() {
     loadWorkflow();
   }, [id]);
 
-  // Elapsed time counter
   useEffect(() => {
     if (step === 2 && startTime) {
       const timer = setInterval(() => {
@@ -76,9 +73,7 @@ export function WorkflowExecute() {
         dataKeys: result.data.data ? Object.keys(result.data.data) : []
       });
 
-      // Backend returns { success: true, data: { execution_id, status, message } }
       const executionData = result.data.data || result.data;
-
       setExecution(executionData);
       setStep(2);
       logger.debug('✅ WorkflowExecute: Execution started, execution_id:', executionData.execution_id);
@@ -114,7 +109,6 @@ export function WorkflowExecute() {
           hasData: !!response.data
         });
 
-        // Backend returns { success: true, data: { id, status, progress, ... } }
         const status = response.data.data || response.data;
 
         logger.debug('📊 WorkflowExecute: Execution status:', {
@@ -127,7 +121,6 @@ export function WorkflowExecute() {
         setExecution(status);
         setProgress(status.progress || 0);
 
-        // Parse batch stats from output_data if available
         if (status.output_data?.batch_results) {
           const results = status.output_data.batch_results;
           const succeeded = results.filter(r => r.status === 'completed').length;
@@ -159,12 +152,10 @@ export function WorkflowExecute() {
     logger.debug('🛑 WorkflowExecute: User requested cancellation');
     setShowCancelModal(false);
 
-    // Clear polling
     if (pollingIntervalRef.current) {
       clearInterval(pollingIntervalRef.current);
     }
 
-    // Reset state
     setStep(1);
     setFormData({});
     setExecution(null);
@@ -183,27 +174,22 @@ export function WorkflowExecute() {
 
     logger.debug('🔍 WorkflowExecute: Parsing error:', { status, message });
 
-    // API key errors
     if (message?.toLowerCase().includes('api key') || message?.toLowerCase().includes('authentication')) {
       return 'Invalid API key. Get a new key from Google AI Studio → https://aistudio.google.com/app/apikey';
     }
 
-    // Rate limit errors
     if (status === 429 || message?.toLowerCase().includes('rate limit')) {
       return 'Rate limit exceeded. Please try again in 5 minutes.';
     }
 
-    // Network errors
     if (message?.toLowerCase().includes('network') || message?.toLowerCase().includes('timeout')) {
       return 'Network timeout. Check your internet connection and retry in 30 seconds.';
     }
 
-    // File size errors
     if (message?.toLowerCase().includes('file') && message?.toLowerCase().includes('size')) {
       return 'File size exceeds limit. Ensure each image is under 10MB.';
     }
 
-    // Generic fallback
     return `Error: ${message}`;
   };
 
@@ -223,20 +209,16 @@ export function WorkflowExecute() {
     return formatElapsedTime(estimatedSeconds);
   };
 
-  if (!workflow) {
-    return (
-      <ClientLayout>
-        <div style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          minHeight: '60vh'
-        }}>
-          <Spinner size="lg" />
-        </div>
-      </ClientLayout>
-    );
-  }
+  const resetExecution = () => {
+    setStep(1);
+    setFormData({});
+    setExecution(null);
+    setProgress(0);
+    setError(null);
+    setStartTime(null);
+    setElapsedTime(0);
+    setProgressStats({ current: 0, total: 0, succeeded: 0, failed: 0 });
+  };
 
   const stepLabels = [
     { name: 'Configure', desc: 'Set up your workflow' },
@@ -244,94 +226,55 @@ export function WorkflowExecute() {
     { name: 'Results', desc: 'View your results' }
   ];
 
+  if (!workflow) {
+    return (
+      <ClientLayout>
+        <div className="workflow-execute" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+          <Spinner size="lg" />
+        </div>
+      </ClientLayout>
+    );
+  }
+
   return (
     <ClientLayout>
-      <div style={{ padding: '48px', maxWidth: '1000px', margin: '0 auto' }}>
+      <div className="workflow-execute">
         {/* Back Button */}
-        <button
-          onClick={() => navigate('/workflows')}
-          className="btn-ghost"
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '8px 12px',
-            fontSize: '14px',
-            color: 'var(--text-secondary)',
-            marginBottom: '32px'
-          }}
-        >
-          <svg style={{ width: '16px', height: '16px' }} fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
+        <button onClick={() => navigate('/workflows')} className="workflow-execute-back">
+          <svg width="16" height="16" fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
           </svg>
           Back to Workflows
         </button>
 
         {/* Header */}
-        <div style={{ marginBottom: '32px' }}>
-          <h1
-            className="font-display"
-            style={{
-              fontSize: '36px',
-              fontWeight: 700,
-              color: 'var(--text-primary)',
-              marginBottom: '8px',
-              letterSpacing: '-0.02em'
-            }}
-          >
-            {workflow.name}
-          </h1>
-          <p
-            className="font-body"
-            style={{
-              fontSize: '16px',
-              color: 'var(--text-secondary)'
-            }}
-          >
-            {workflow.description}
-          </p>
-        </div>
+        <header className="workflow-execute-header">
+          <h1 className="workflow-execute-title">{workflow.name}</h1>
+          <p className="workflow-execute-description">{workflow.description}</p>
+        </header>
 
-        {/* Enhanced Step Indicator with Mediterranean Flow */}
-        <div style={{ marginBottom: '32px' }}>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-            {stepLabels.map((label, i) => (
-              <div key={i} style={{ flex: 1 }}>
-                <div style={{
-                  height: '4px',
-                  borderRadius: '2px',
-                  background: step > i ? 'var(--primary-500)' : step === i + 1 ? 'var(--primary-500)' : 'var(--neutral-200)',
-                  boxShadow: step === i + 1 ? '0 0 20px rgba(42, 157, 143, 0.4)' : 'none',
-                  transition: 'all 0.3s ease-out'
-                }} />
-              </div>
+        {/* Step Indicator */}
+        <div className="workflow-steps">
+          <div className="workflow-steps-bars">
+            {stepLabels.map((_, i) => (
+              <div
+                key={i}
+                className={`workflow-step-bar ${step > i ? 'workflow-step-bar--completed' : ''} ${step === i + 1 ? 'workflow-step-bar--active' : ''}`}
+              />
             ))}
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
+          <div className="workflow-steps-labels">
             {stepLabels.map((label, i) => (
-              <div key={i} style={{ flex: 1, textAlign: 'center' }}>
-                <div
-                  className="font-body"
-                  style={{
-                    fontSize: '14px',
-                    fontWeight: 600,
-                    color: step === i + 1 ? 'var(--primary-600)' : step > i ? 'var(--success-main)' : 'var(--neutral-400)'
-                  }}
-                >
+              <div
+                key={i}
+                className={`workflow-step-label ${step === i + 1 ? 'workflow-step-label--active' : ''} ${step > i ? 'workflow-step-label--completed' : ''}`}
+              >
+                <div className="workflow-step-label-name">
                   {step > i && '✓ '}
                   {label.name}
                 </div>
-                <div
-                  className="font-body"
-                  style={{
-                    fontSize: '12px',
-                    color: 'var(--neutral-500)',
-                    marginTop: '4px'
-                  }}
-                >
-                  {label.desc}
-                </div>
+                <div className="workflow-step-label-desc">{label.desc}</div>
               </div>
             ))}
           </div>
@@ -339,52 +282,37 @@ export function WorkflowExecute() {
 
         {/* Error */}
         {error && (
-          <div style={{
-            background: 'var(--error-light)',
-            border: '2px solid var(--error-main)',
-            borderRadius: '12px',
-            padding: '16px',
-            marginBottom: '24px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'start', gap: '12px' }}>
-              <svg style={{ width: '20px', height: '20px', color: 'var(--error-main)', flexShrink: 0 }} fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              <div style={{ flex: 1 }}>
-                <p className="font-body" style={{ fontSize: '14px', fontWeight: 600, color: 'var(--error-dark)', marginBottom: '4px' }}>Error</p>
-                <p className="font-body" style={{ fontSize: '14px', color: 'var(--error-dark)' }}>{error}</p>
-              </div>
+          <div className="workflow-error">
+            <svg className="workflow-error-icon" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <div className="workflow-error-content">
+              <p className="workflow-error-title">Error</p>
+              <p className="workflow-error-message">{error}</p>
             </div>
           </div>
         )}
 
-        {/* Step 1: Configure - NanoBananaForm reste INCHANGÉ */}
+        {/* Step 1: Configure */}
         {step === 1 && (
-          <div className="card-bento" style={{
-            background: 'var(--canvas-pure)',
-            padding: '32px'
-          }}>
+          <div className="workflow-form-card">
             {isNanoBanana ? (
               <>
-                <h2 className="font-display" style={{ fontSize: '24px', fontWeight: 600, marginBottom: '24px' }}>
-                  Configure Batch Image Generation
-                </h2>
+                <h2 className="workflow-form-title">Configure Batch Image Generation</h2>
                 <NanoBananaForm onSubmit={handleExecute} loading={loading} workflow={workflow} />
               </>
             ) : (
               <>
-                <h2 className="font-display" style={{ fontSize: '24px', fontWeight: 600, marginBottom: '24px' }}>
-                  Configure Workflow
-                </h2>
+                <h2 className="workflow-form-title">Configure Workflow</h2>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                   {workflow.config?.fields?.length > 0 ? (
                     workflow.config.fields.map((field) => (
                       <div key={field.name}>
-                        <label className="font-body" style={{
+                        <label style={{
                           display: 'block',
                           fontSize: '14px',
                           fontWeight: 500,
-                          color: 'var(--text-primary)',
+                          color: 'var(--foreground)',
                           marginBottom: '8px'
                         }}>
                           {field.label || field.name}
@@ -393,38 +321,21 @@ export function WorkflowExecute() {
                           type={field.type || 'text'}
                           placeholder={field.placeholder}
                           value={formData[field.name] || ''}
-                          onChange={(e) => {
-                            setFormData({ ...formData, [field.name]: e.target.value });
-                          }}
+                          onChange={(e) => setFormData({ ...formData, [field.name]: e.target.value })}
                           required={field.required}
-                          className="input-field"
-                          style={{
-                            width: '100%',
-                            padding: '12px 16px',
-                            fontSize: '14px'
-                          }}
+                          className="workflows-search-input"
+                          style={{ paddingLeft: '14px' }}
                         />
                       </div>
                     ))
                   ) : (
-                    <p className="font-body" style={{
-                      fontSize: '16px',
-                      color: 'var(--text-secondary)',
-                      textAlign: 'center',
-                      padding: '32px 0'
-                    }}>
-                      No configuration required for this workflow
-                    </p>
+                    <p className="workflow-form-empty">No configuration required for this workflow</p>
                   )}
                   <button
                     onClick={handleStandardExecute}
                     disabled={loading}
-                    className="btn btn-primary-lime"
-                    style={{
-                      width: '100%',
-                      padding: '14px 24px',
-                      fontSize: '16px'
-                    }}
+                    className="btn btn-primary"
+                    style={{ width: '100%', padding: '14px 24px' }}
                   >
                     {loading ? 'Executing...' : 'Execute Workflow'}
                   </button>
@@ -434,360 +345,106 @@ export function WorkflowExecute() {
           </div>
         )}
 
-        {/* Step 2: Processing with Mediterranean Flow */}
+        {/* Step 2: Processing */}
         {step === 2 && (
-          <div className="card-bento" style={{
-            background: 'var(--canvas-pure)',
-            padding: '48px',
-            position: 'relative',
-            overflow: 'hidden'
-          }}>
-            {/* Organic Background Glow */}
-            <div style={{
-              position: 'absolute',
-              top: '-50%',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              width: '400px',
-              height: '400px',
-              background: 'radial-gradient(circle, rgba(42, 157, 143, 0.12) 0%, transparent 70%)',
-              pointerEvents: 'none',
-              animation: 'pulse-glow 3s ease-in-out infinite'
-            }} />
+          <div className="workflow-processing">
+            <div className="workflow-processing-glow" />
 
-            <div style={{ position: 'relative', textAlign: 'center' }}>
-              {/* Elegant Spinner with Verdigris Glow */}
-              <div style={{
-                width: '100px',
-                height: '100px',
-                margin: '0 auto 32px',
-                position: 'relative'
-              }}>
-                <div style={{
-                  position: 'absolute',
-                  inset: 0,
-                  background: 'radial-gradient(circle, rgba(42, 157, 143, 0.3) 0%, transparent 70%)',
-                  borderRadius: '50%',
-                  filter: 'blur(30px)',
-                  animation: 'pulse-slow 2s ease-in-out infinite'
-                }} />
+            <div style={{ position: 'relative' }}>
+              <div className="workflow-processing-spinner">
                 <Spinner size="lg" />
               </div>
 
-              <h3 className="font-display" style={{
-                fontSize: '28px',
-                fontWeight: 700,
-                color: 'var(--text-primary)',
-                marginBottom: '12px',
-                letterSpacing: '-0.02em'
-              }}>
-                Processing Workflow
-              </h3>
+              <h3 className="workflow-processing-title">Processing Workflow</h3>
+              <p className="workflow-processing-subtitle">Generating your results...</p>
 
-              <p className="font-body" style={{
-                fontSize: '16px',
-                color: 'var(--text-secondary)',
-                marginBottom: '32px'
-              }}>
-                Generating your results...
-              </p>
-
-              {/* Progress Stats Cards */}
+              {/* Progress Stats */}
               {isNanoBanana && progressStats.total > 0 && (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-                  gap: '16px',
-                  maxWidth: '500px',
-                  margin: '0 auto 32px'
-                }}>
-                  <div style={{
-                    background: 'var(--primary-50)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    border: '1px solid var(--primary-200)'
-                  }}>
-                    <div className="font-mono" style={{
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      color: 'var(--primary-600)',
-                      marginBottom: '4px'
-                    }}>
-                      {progressStats.current}
-                    </div>
-                    <div className="font-body" style={{
-                      fontSize: '12px',
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Current
-                    </div>
+                <div className="workflow-progress-stats">
+                  <div className="workflow-progress-stat workflow-progress-stat--primary">
+                    <div className="workflow-progress-stat-value">{progressStats.current}</div>
+                    <div className="workflow-progress-stat-label">Current</div>
                   </div>
 
-                  <div style={{
-                    background: 'var(--success-bg)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    border: '1px solid var(--success-light)'
-                  }}>
-                    <div className="font-mono" style={{
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      color: 'var(--success-main)',
-                      marginBottom: '4px'
-                    }}>
-                      {progressStats.succeeded}
-                    </div>
-                    <div className="font-body" style={{
-                      fontSize: '12px',
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Success
-                    </div>
+                  <div className="workflow-progress-stat workflow-progress-stat--success">
+                    <div className="workflow-progress-stat-value">{progressStats.succeeded}</div>
+                    <div className="workflow-progress-stat-label">Success</div>
                   </div>
 
                   {progressStats.failed > 0 && (
-                    <div style={{
-                      background: 'var(--error-bg)',
-                      borderRadius: '12px',
-                      padding: '16px',
-                      border: '1px solid var(--error-light)'
-                    }}>
-                      <div className="font-mono" style={{
-                        fontSize: '24px',
-                        fontWeight: 700,
-                        color: 'var(--error-main)',
-                        marginBottom: '4px'
-                      }}>
-                        {progressStats.failed}
-                      </div>
-                      <div className="font-body" style={{
-                        fontSize: '12px',
-                        color: 'var(--text-secondary)',
-                        textTransform: 'uppercase',
-                        letterSpacing: '0.05em'
-                      }}>
-                        Failed
-                      </div>
+                    <div className="workflow-progress-stat workflow-progress-stat--error">
+                      <div className="workflow-progress-stat-value">{progressStats.failed}</div>
+                      <div className="workflow-progress-stat-label">Failed</div>
                     </div>
                   )}
 
-                  <div style={{
-                    background: 'var(--neutral-100)',
-                    borderRadius: '12px',
-                    padding: '16px',
-                    border: '1px solid var(--neutral-200)'
-                  }}>
-                    <div className="font-mono" style={{
-                      fontSize: '24px',
-                      fontWeight: 700,
-                      color: 'var(--text-primary)',
-                      marginBottom: '4px'
-                    }}>
-                      {progressStats.total}
-                    </div>
-                    <div className="font-body" style={{
-                      fontSize: '12px',
-                      color: 'var(--text-secondary)',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Total
-                    </div>
+                  <div className="workflow-progress-stat">
+                    <div className="workflow-progress-stat-value">{progressStats.total}</div>
+                    <div className="workflow-progress-stat-label">Total</div>
                   </div>
                 </div>
               )}
 
-              {/* Progress Bar with Gradient */}
+              {/* Progress Bar */}
               {progress > 0 && (
-                <div style={{ maxWidth: '500px', margin: '0 auto 24px' }}>
-                  <div style={{
-                    background: 'var(--neutral-200)',
-                    borderRadius: '999px',
-                    height: '12px',
-                    overflow: 'hidden',
-                    position: 'relative'
-                  }}>
-                    <div style={{
-                      background: 'var(--gradient-primary)',
-                      height: '100%',
-                      width: `${progress}%`,
-                      transition: 'width 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-                      borderRadius: '999px',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}>
-                      {/* Shimmer effect */}
-                      <div style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: '-100%',
-                        width: '100%',
-                        height: '100%',
-                        background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)',
-                        animation: 'shimmer 2s infinite'
-                      }} />
+                <div className="workflow-progress-bar">
+                  <div className="workflow-progress-track">
+                    <div className="workflow-progress-fill" style={{ width: `${progress}%` }}>
+                      <div className="workflow-progress-shimmer" />
                     </div>
                   </div>
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    marginTop: '12px'
-                  }}>
-                    <span className="font-mono" style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: 600 }}>
-                      {progress}%
-                    </span>
+                  <div className="workflow-progress-info">
+                    <span className="workflow-progress-percent">{progress}%</span>
                     {isNanoBanana && (
-                      <span className="font-body" style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>
+                      <span className="workflow-progress-text">
                         {progressStats.current < progressStats.total
                           ? `Processing image ${progressStats.current + 1} of ${progressStats.total}`
-                          : 'Finalizing...'
-                        }
+                          : 'Finalizing...'}
                       </span>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Time Information */}
-              <div style={{
-                display: 'flex',
-                justifyContent: 'center',
-                gap: '32px',
-                marginBottom: '24px',
-                paddingTop: '16px',
-                borderTop: '1px solid var(--neutral-200)'
-              }}>
-                <div>
-                  <div className="font-body" style={{
-                    fontSize: '12px',
-                    color: 'var(--text-tertiary)',
-                    marginBottom: '4px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Elapsed
-                  </div>
-                  <div className="font-mono" style={{
-                    fontSize: '18px',
-                    fontWeight: 600,
-                    color: 'var(--text-primary)'
-                  }}>
-                    {formatElapsedTime(elapsedTime)}
-                  </div>
+              {/* Time Stats */}
+              <div className="workflow-time-stats">
+                <div className="workflow-time-stat">
+                  <div className="workflow-time-label">Elapsed</div>
+                  <div className="workflow-time-value">{formatElapsedTime(elapsedTime)}</div>
                 </div>
                 {progressStats.current > 0 && estimateTimeRemaining() && (
-                  <div>
-                    <div className="font-body" style={{
-                      fontSize: '12px',
-                      color: 'var(--text-tertiary)',
-                      marginBottom: '4px',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.05em'
-                    }}>
-                      Remaining
-                    </div>
-                    <div className="font-mono" style={{
-                      fontSize: '18px',
-                      fontWeight: 600,
-                      color: 'var(--primary-600)'
-                    }}>
-                      ~{estimateTimeRemaining()}
-                    </div>
+                  <div className="workflow-time-stat">
+                    <div className="workflow-time-label">Remaining</div>
+                    <div className="workflow-time-value workflow-time-value--accent">~{estimateTimeRemaining()}</div>
                   </div>
                 )}
               </div>
 
               {/* Cancel Button */}
               {isNanoBanana && (
-                <button
-                  onClick={() => setShowCancelModal(true)}
-                  className="btn btn-secondary"
-                  style={{ padding: '12px 28px', fontSize: '14px' }}
-                >
+                <button onClick={() => setShowCancelModal(true)} className="btn btn-secondary">
                   Cancel Batch
                 </button>
               )}
             </div>
-
-            <style>{`
-              @keyframes pulse-glow {
-                0%, 100% { opacity: 0.6; transform: translateX(-50%) scale(1); }
-                50% { opacity: 1; transform: translateX(-50%) scale(1.05); }
-              }
-              @keyframes pulse-slow {
-                0%, 100% { opacity: 0.4; }
-                50% { opacity: 0.8; }
-              }
-              @keyframes shimmer {
-                0% { left: -100%; }
-                100% { left: 200%; }
-              }
-            `}</style>
           </div>
         )}
 
-        {/* Step 3: Results - Mediterranean Celebration */}
+        {/* Step 3: Results */}
         {step === 3 && execution && (
           <>
             {execution.status === 'completed' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                {/* Success Banner with Verdigris Glow */}
-                <div style={{
-                  background: 'linear-gradient(135deg, var(--success-bg) 0%, var(--primary-50) 100%)',
-                  border: '2px solid var(--success-main)',
-                  borderRadius: '16px',
-                  padding: '24px',
-                  position: 'relative',
-                  overflow: 'hidden',
-                  boxShadow: '0 4px 20px rgba(42, 157, 143, 0.15)'
-                }}>
-                  {/* Decorative glow */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '-50%',
-                    right: '-20%',
-                    width: '300px',
-                    height: '300px',
-                    background: 'radial-gradient(circle, rgba(42, 157, 143, 0.15) 0%, transparent 70%)',
-                    pointerEvents: 'none'
-                  }} />
-
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                    <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '12px',
-                      background: 'var(--success-main)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <svg style={{ width: '28px', height: '28px', color: 'white' }} fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <h3 className="font-display" style={{
-                        fontSize: '20px',
-                        fontWeight: 700,
-                        color: 'var(--success-dark)',
-                        marginBottom: '4px',
-                        letterSpacing: '-0.01em'
-                      }}>
-                        Workflow Completed Successfully!
-                      </h3>
-                      <p className="font-body" style={{
-                        fontSize: '14px',
-                        color: 'var(--text-secondary)'
-                      }}>
-                        All tasks finished • Runtime: {formatElapsedTime(elapsedTime)}
-                      </p>
-                    </div>
+                {/* Success Banner */}
+                <div className="workflow-success-banner">
+                  <div className="workflow-success-icon">
+                    <svg width="28" height="28" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="workflow-success-content">
+                    <h3 className="workflow-success-title">Workflow Completed Successfully!</h3>
+                    <p className="workflow-success-subtitle">All tasks finished • Runtime: {formatElapsedTime(elapsedTime)}</p>
                   </div>
                 </div>
 
@@ -798,107 +455,36 @@ export function WorkflowExecute() {
                     <BatchResultsView executionId={execution.id} />
                   </>
                 ) : (
-                  <div className="card-bento" style={{
-                    background: 'var(--canvas-pure)',
-                    padding: '32px'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      marginBottom: '20px',
-                      paddingBottom: '16px',
-                      borderBottom: '1px solid var(--neutral-200)'
-                    }}>
-                      <div style={{
-                        width: '32px',
-                        height: '32px',
-                        borderRadius: '8px',
-                        background: 'var(--primary-100)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}>
-                        <svg style={{ width: '18px', height: '18px', color: 'var(--primary-600)' }} fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="workflow-results-card">
+                    <div className="workflow-results-header">
+                      <div className="workflow-results-icon">
+                        <svg width="18" height="18" fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                         </svg>
                       </div>
-                      <h3 className="font-display" style={{
-                        fontSize: '20px',
-                        fontWeight: 600,
-                        color: 'var(--text-primary)'
-                      }}>
-                        Workflow Output
-                      </h3>
+                      <h3 className="workflow-results-title">Workflow Output</h3>
                     </div>
                     {execution.output_data ? (
-                      <pre className="font-mono" style={{
-                        fontSize: '13px',
-                        color: 'var(--primary-600)',
-                        background: 'var(--neutral-100)',
-                        padding: '20px',
-                        borderRadius: '12px',
-                        overflow: 'auto',
-                        maxHeight: '400px',
-                        border: '1px solid var(--neutral-200)',
-                        lineHeight: 1.6
-                      }}>
+                      <pre className="workflow-results-code">
                         {JSON.stringify(execution.output_data, null, 2)}
                       </pre>
                     ) : (
-                      <div style={{
-                        padding: '40px',
-                        textAlign: 'center',
-                        background: 'var(--neutral-50)',
-                        borderRadius: '12px',
-                        border: '1px dashed var(--neutral-300)'
-                      }}>
-                        <p className="font-body" style={{
-                          fontSize: '14px',
-                          color: 'var(--text-secondary)'
-                        }}>
-                          No output data available
-                        </p>
+                      <div className="workflow-results-empty">
+                        <p className="workflow-results-empty-text">No output data available</p>
                       </div>
                     )}
                   </div>
                 )}
 
                 {/* Action Buttons */}
-                <div style={{
-                  display: 'flex',
-                  gap: '12px',
-                  paddingTop: '8px'
-                }}>
-                  <button
-                    onClick={() => {
-                      setStep(1);
-                      setFormData({});
-                      setExecution(null);
-                      setProgress(0);
-                      setError(null);
-                      setStartTime(null);
-                      setElapsedTime(0);
-                      setProgressStats({ current: 0, total: 0, succeeded: 0, failed: 0 });
-                    }}
-                    className="btn btn-primary"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '12px 24px'
-                    }}
-                  >
-                    <svg style={{ width: '16px', height: '16px' }} fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24">
+                <div className="workflow-actions">
+                  <button onClick={resetExecution} className="btn btn-primary">
+                    <svg width="16" height="16" fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24" style={{ marginRight: '8px' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     Run Again
                   </button>
-                  <button
-                    onClick={() => navigate('/workflows')}
-                    className="btn btn-secondary"
-                    style={{ padding: '12px 24px' }}
-                  >
+                  <button onClick={() => navigate('/workflows')} className="btn btn-secondary">
                     Back to Workflows
                   </button>
                 </div>
@@ -906,81 +492,27 @@ export function WorkflowExecute() {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 {/* Error Banner */}
-                <div style={{
-                  background: 'var(--error-light)',
-                  border: '2px solid var(--error-main)',
-                  borderRadius: '16px',
-                  padding: '24px',
-                  position: 'relative',
-                  overflow: 'hidden'
-                }}>
-                  <div style={{ position: 'relative', display: 'flex', alignItems: 'start', gap: '16px' }}>
-                    <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '12px',
-                      background: 'var(--error-main)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0
-                    }}>
-                      <svg style={{ width: '28px', height: '28px', color: 'white' }} fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                      </svg>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <h3 className="font-display" style={{
-                        fontSize: '20px',
-                        fontWeight: 700,
-                        color: 'var(--error-dark)',
-                        marginBottom: '8px',
-                        letterSpacing: '-0.01em'
-                      }}>
-                        Workflow Failed
-                      </h3>
-                      <p className="font-body" style={{
-                        fontSize: '14px',
-                        color: 'var(--error-dark)',
-                        lineHeight: 1.6
-                      }}>
-                        {execution.error_message}
-                      </p>
-                    </div>
+                <div className="workflow-failed-banner">
+                  <div className="workflow-failed-icon">
+                    <svg width="28" height="28" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                  <div className="workflow-failed-content">
+                    <h3 className="workflow-failed-title">Workflow Failed</h3>
+                    <p className="workflow-failed-message">{execution.error_message}</p>
                   </div>
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '12px' }}>
-                  <button
-                    onClick={() => {
-                      setStep(1);
-                      setFormData({});
-                      setExecution(null);
-                      setProgress(0);
-                      setError(null);
-                      setStartTime(null);
-                      setElapsedTime(0);
-                      setProgressStats({ current: 0, total: 0, succeeded: 0, failed: 0 });
-                    }}
-                    className="btn btn-primary"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      padding: '12px 24px'
-                    }}
-                  >
-                    <svg style={{ width: '16px', height: '16px' }} fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24">
+                <div className="workflow-actions">
+                  <button onClick={resetExecution} className="btn btn-primary">
+                    <svg width="16" height="16" fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24" style={{ marginRight: '8px' }}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     Try Again
                   </button>
-                  <button
-                    onClick={() => navigate('/workflows')}
-                    className="btn btn-secondary"
-                    style={{ padding: '12px 24px' }}
-                  >
+                  <button onClick={() => navigate('/workflows')} className="btn btn-secondary">
                     Back to Workflows
                   </button>
                 </div>
@@ -990,175 +522,56 @@ export function WorkflowExecute() {
         )}
       </div>
 
-      {/* Cancel Confirmation Modal - Mediterranean Style */}
+      {/* Cancel Confirmation Modal */}
       {showCancelModal && (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            background: 'rgba(0, 0, 0, 0.5)',
-            backdropFilter: 'blur(4px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 9999,
-            padding: '24px',
-            animation: 'fadeIn 200ms ease-out'
-          }}
-          onClick={() => setShowCancelModal(false)}
-        >
-          <div
-            className="card-glass"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              maxWidth: '520px',
-              width: '100%',
-              animation: 'scale-in 300ms var(--ease-spring)',
-              position: 'relative',
-              overflow: 'hidden'
-            }}
-          >
-            {/* Warning accent */}
-            <div style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              height: '4px',
-              background: 'var(--warning-main)'
-            }} />
+        <div className="workflow-modal-overlay" onClick={() => setShowCancelModal(false)}>
+          <div className="workflow-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="workflow-modal-accent" />
 
-            {/* Header */}
-            <div style={{
-              padding: '28px 28px 20px',
-              borderBottom: '1px solid var(--neutral-200)'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '16px',
-                marginBottom: '12px'
-              }}>
-                <div style={{
-                  width: '48px',
-                  height: '48px',
-                  borderRadius: '12px',
-                  background: 'var(--warning-light)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0
-                }}>
-                  <svg style={{ width: '24px', height: '24px', color: 'var(--warning-main)' }} fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24">
+            <div className="workflow-modal-header">
+              <div className="workflow-modal-header-content">
+                <div className="workflow-modal-icon">
+                  <svg width="24" height="24" fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                 </div>
-                <div style={{ flex: 1 }}>
-                  <h3 className="font-display" style={{
-                    fontSize: '22px',
-                    fontWeight: 700,
-                    color: 'var(--text-primary)',
-                    letterSpacing: '-0.01em',
-                    marginBottom: '4px'
-                  }}>
-                    Cancel Batch Generation?
-                  </h3>
-                  <p className="font-body" style={{
-                    fontSize: '14px',
-                    color: 'var(--text-secondary)'
-                  }}>
-                    This action cannot be undone
-                  </p>
+                <div>
+                  <h3 className="workflow-modal-title">Cancel Batch Generation?</h3>
+                  <p className="workflow-modal-subtitle">This action cannot be undone</p>
                 </div>
-                <button
-                  onClick={() => setShowCancelModal(false)}
-                  className="btn-icon"
-                  style={{
-                    width: '36px',
-                    height: '36px',
-                    borderRadius: '8px',
-                    flexShrink: 0
-                  }}
-                >
-                  <svg style={{ width: '18px', height: '18px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
+                <button onClick={() => setShowCancelModal(false)} className="workflow-modal-close">
+                  <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
             </div>
 
-            {/* Body */}
-            <div style={{ padding: '28px' }}>
-              <p className="font-body" style={{
-                fontSize: '15px',
-                color: 'var(--text-primary)',
-                lineHeight: 1.6,
-                marginBottom: '20px'
-              }}>
+            <div className="workflow-modal-body">
+              <p className="workflow-modal-text">
                 Are you sure you want to stop this batch execution? All progress will be lost and you'll need to restart from the beginning.
               </p>
 
-              {/* Warning Box */}
-              <div style={{
-                background: 'linear-gradient(135deg, var(--warning-bg) 0%, var(--secondary-50) 100%)',
-                border: '1px solid var(--warning-main)',
-                borderRadius: '12px',
-                padding: '16px',
-                display: 'flex',
-                gap: '12px'
-              }}>
-                <svg style={{ width: '20px', height: '20px', color: 'var(--warning-main)', flexShrink: 0, marginTop: '2px' }} fill="currentColor" viewBox="0 0 20 20">
+              <div className="workflow-modal-warning">
+                <svg className="workflow-modal-warning-icon" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                 </svg>
-                <div style={{ flex: 1 }}>
-                  <p className="font-body" style={{
-                    fontSize: '13px',
-                    fontWeight: 600,
-                    color: 'var(--warning-dark)',
-                    marginBottom: '4px'
-                  }}>
-                    Warning
-                  </p>
-                  <p className="font-body" style={{
-                    fontSize: '13px',
-                    color: 'var(--warning-dark)',
-                    lineHeight: 1.5
-                  }}>
+                <div>
+                  <p className="workflow-modal-warning-title">Warning</p>
+                  <p className="workflow-modal-warning-text">
                     Images generated so far will be lost. You'll need to restart the entire batch generation process.
                   </p>
                 </div>
               </div>
 
-              {/* Stats if available */}
               {progressStats.total > 0 && (
-                <div style={{
-                  marginTop: '16px',
-                  padding: '12px 16px',
-                  background: 'var(--neutral-50)',
-                  borderRadius: '8px',
-                  border: '1px solid var(--neutral-200)'
-                }}>
-                  <div className="font-body" style={{
-                    fontSize: '12px',
-                    color: 'var(--text-tertiary)',
-                    marginBottom: '4px',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em'
-                  }}>
-                    Current Progress
-                  </div>
-                  <div style={{ display: 'flex', gap: '16px', alignItems: 'baseline' }}>
-                    <span className="font-mono" style={{
-                      fontSize: '20px',
-                      fontWeight: 700,
-                      color: 'var(--text-primary)'
-                    }}>
+                <div className="workflow-modal-progress">
+                  <div className="workflow-modal-progress-label">Current Progress</div>
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '8px' }}>
+                    <span className="workflow-modal-progress-value">
                       {progressStats.current} / {progressStats.total}
                     </span>
-                    <span className="font-body" style={{
-                      fontSize: '13px',
-                      color: 'var(--text-secondary)'
-                    }}>
+                    <span className="workflow-modal-progress-detail">
                       ({progressStats.succeeded} successful, {progressStats.failed} failed)
                     </span>
                   </div>
@@ -1166,38 +579,12 @@ export function WorkflowExecute() {
               )}
             </div>
 
-            {/* Footer */}
-            <div style={{
-              padding: '20px 28px 28px',
-              borderTop: '1px solid var(--neutral-200)',
-              display: 'flex',
-              gap: '12px',
-              justifyContent: 'flex-end'
-            }}>
-              <button
-                onClick={() => setShowCancelModal(false)}
-                className="btn btn-secondary"
-                style={{
-                  padding: '12px 24px',
-                  fontSize: '14px',
-                  fontWeight: 600
-                }}
-              >
+            <div className="workflow-modal-footer">
+              <button onClick={() => setShowCancelModal(false)} className="btn btn-secondary">
                 Continue Processing
               </button>
-              <button
-                onClick={handleCancelExecution}
-                className="btn btn-danger"
-                style={{
-                  padding: '12px 24px',
-                  fontSize: '14px',
-                  fontWeight: 600,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px'
-                }}
-              >
-                <svg style={{ width: '16px', height: '16px' }} fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24">
+              <button onClick={handleCancelExecution} className="btn btn-danger">
+                <svg width="16" height="16" fill="none" strokeWidth={2.5} stroke="currentColor" viewBox="0 0 24 24" style={{ marginRight: '8px' }}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
                 Cancel Batch
@@ -1206,13 +593,6 @@ export function WorkflowExecute() {
           </div>
         </div>
       )}
-
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-      `}</style>
     </ClientLayout>
   );
 }
