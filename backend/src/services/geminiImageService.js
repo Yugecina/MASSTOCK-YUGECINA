@@ -92,8 +92,8 @@ class GeminiImageService {
       throw new Error('Prompt is too short (minimum 3 characters)');
     }
 
-    if (referenceImages.length > 3) {
-      logger.warn(`Too many reference images provided (${referenceImages.length}). Gemini recommends up to 3 images.`);
+    if (referenceImages.length > 14) {
+      logger.warn(`Too many reference images provided (${referenceImages.length}). Gemini API supports up to 14 images (6 objects + 5 humans).`);
     }
 
     const startTime = Date.now();

@@ -1,18 +1,133 @@
 # MasStock - Database Schema
 
-**Last Updated:** 2025-11-25
+**Last Updated:** 2025-11-28 ⚡ (Shared Workflows Architecture)
 **Database:** PostgreSQL (Supabase)
 **RLS Enabled:** ✅ All tables
 
 ## 📋 Table of Contents
 
-1. [Overview](#overview)
-2. [Entity Relationship Diagram](#entity-relationship-diagram)
-3. [Tables](#tables)
-4. [Row Level Security (RLS)](#row-level-security-rls)
-5. [Indexes](#indexes)
-6. [Storage Buckets](#storage-buckets)
-7. [Common Queries](#common-queries)
+1. [Users vs Clients - Core Concepts](#users-vs-clients---core-concepts)
+2. [Overview](#overview)
+3. [Entity Relationship Diagram](#entity-relationship-diagram)
+4. [Tables](#tables)
+5. [Row Level Security (RLS)](#row-level-security-rls)
+6. [Indexes](#indexes)
+7. [Storage Buckets](#storage-buckets)
+8. [Common Queries](#common-queries)
+
+---
+
+## Users vs Clients - Core Concepts
+
+### ⚠️ IMPORTANT: Ne pas confondre Users et Clients
+
+| Concept | Description | Exemple |
+|---------|-------------|---------|
+| **User** | Compte utilisateur individuel (une personne) | Jean Dupont, Marie Martin |
+| **Client** | Entreprise/organisation cliente (une entité) | Estee Agency, Acme Corp |
+
+### Architecture Relationnelle
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        CLIENTS                               │
+│                    (Entreprises)                             │
+│                                                              │
+│   ┌─────────────┐      ┌─────────────┐      ┌─────────────┐ │
+│   │ Estee Agency│      │  Acme Corp  │      │  Beta Inc   │ │
+│   └──────┬──────┘      └──────┬──────┘      └──────┬──────┘ │
+└──────────┼─────────────────────┼─────────────────────┼──────┘
+           │                     │                     │
+           │  client_members     │  client_members     │
+           │  (junction N:N)     │  (junction N:N)     │
+           │                     │                     │
+           ▼                     ▼                     ▼
+┌─────────────────────────────────────────────────────────────┐
+│                         USERS                                │
+│                    (Personnes)                               │
+│                                                              │
+│   ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────────────┐│
+│   │  Jean   │  │  Marie  │  │  Pierre │  │ Admin MasStock  ││
+│   │ (user)  │  │ (user)  │  │ (user)  │  │    (admin)      ││
+│   │ owner   │  │ collab  │  │ owner   │  │  PAS de client  ││
+│   └─────────┘  └─────────┘  └─────────┘  └─────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Règles de Création
+
+| Action | Règle |
+|--------|-------|
+| **Créer un Admin** | PAS de client associé (role='admin' dans `users`) |
+| **Créer un User** | Client OBLIGATOIRE - doit être assigné à un client existant via `client_members` |
+| **Créer un Client** | Création indépendante - on peut ajouter des membres après |
+
+### Rôles dans client_members
+
+| Rôle | Accès |
+|------|-------|
+| **owner** | Accès complet : workflows, exécutions, facturation, gestion des membres |
+| **collaborator** | Accès limité : workflows et résultats d'exécution uniquement |
+
+### Exemples Concrets
+
+**Scénario 1 : Agence avec équipe**
+```
+Client: "Estee Agency"
+└── Members:
+    ├── estee@agency.com (owner) - Peut tout faire
+    ├── designer@agency.com (collaborator) - Lance les workflows
+    └── assistant@agency.com (collaborator) - Voit les résultats
+```
+
+**Scénario 2 : Freelance seul**
+```
+Client: "John Freelance"
+└── Members:
+    └── john@freelance.com (owner) - Seul membre
+```
+
+**Scénario 3 : Admin MasStock**
+```
+User: admin@masstock.com (role='admin')
+└── PAS de client associé
+└── A accès à TOUT via les politiques RLS admin
+```
+
+### Flux de Création (Admin Panel)
+
+```
+1. CRÉER UN CLIENT (AdminClients)
+   └── Créer l'entreprise (nom, plan, abonnement)
+   └── Pas d'utilisateur créé automatiquement
+
+2. CRÉER UN USER (AdminUsers)
+   ├── Si role='admin' → Pas de client nécessaire
+   └── Si role='user' → Client OBLIGATOIRE
+       └── Sélectionner le client existant
+       └── Choisir le rôle (owner/collaborator)
+       └── Entrée créée dans client_members
+```
+
+### Requêtes Utiles
+
+**Trouver tous les membres d'un client :**
+```sql
+SELECT u.email, u.name, cm.role
+FROM client_members cm
+JOIN users u ON u.id = cm.user_id
+WHERE cm.client_id = 'client-uuid-here'
+AND cm.status = 'active';
+```
+
+**Trouver tous les clients d'un user :**
+```sql
+SELECT c.name, cm.role
+FROM client_members cm
+JOIN clients c ON c.id = cm.client_id
+WHERE cm.user_id = 'user-uuid-here'
+AND cm.status = 'active';
+```
 
 ---
 
@@ -29,15 +144,17 @@ MasStock uses **Supabase** (PostgreSQL) with the following features:
 
 1. **Multi-tenancy**: Users can belong to multiple clients via `client_members` junction table
 2. **Client Roles**: Users have roles within clients (owner, collaborator)
-3. **Soft deletes**: Status field instead of DELETE (users, clients)
-4. **Audit trails**: created_at, updated_at, last_login timestamps
-5. **Encryption**: Sensitive data (API keys) encrypted in database
-6. **Normalization**: Separate tables for entities (users, clients, workflows)
-7. **Templates**: Workflow templates system for easy workflow assignment
+3. **Shared Workflows ⚡ NEW**: Workflows can be shared across multiple clients via `client_workflows` junction table
+4. **Per-Client Executions**: Even for shared workflows, executions remain isolated per client
+5. **Soft deletes**: Status field instead of DELETE (users, clients)
+6. **Audit trails**: created_at, updated_at, last_login timestamps
+7. **Encryption**: Sensitive data (API keys) encrypted in database
+8. **Normalization**: Separate tables for entities (users, clients, workflows)
+9. **Templates**: Workflow templates system for easy workflow assignment
 
 ---
 
-## Entity Relationship Diagram
+## Entity Relationship Diagram ⚡ UPDATED (2025-11-28)
 
 ```
 ┌─────────────────┐          ┌─────────────────┐
@@ -69,24 +186,38 @@ MasStock uses **Supabase** (PostgreSQL) with the following features:
               ┌───────────────────────┼───────────────────────┐
               │                       │                       │
               ▼                       ▼                       ▼
-     ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-     │   WORKFLOWS     │    │ WORKFLOW_       │    │ SUPPORT_TICKETS │
-     │─────────────────│    │  REQUESTS       │    │─────────────────│
-     │ id (PK)         │    │─────────────────│    │ id (PK)         │
-     │ name            │    │ id (PK)         │    │ client_id (FK)  │
-     │ description     │    │ client_id (FK)  │    │ user_id (FK)    │
-     │ status          │    │ workflow_id (FK)│    │ subject         │
-     │ config          │    │ status          │    │ description     │
-     │ client_id (FK)  │    │ notes           │    │ status          │
-     │ template_id (FK)│    │ created_at      │    │ priority        │
-     │ created_at      │    └─────────────────┘    │ created_at      │
-     │ updated_at      │                           │ updated_at      │
-     └────────┬────────┘                           └─────────────────┘
+     ┌──────────────────┐   ┌─────────────────┐   ┌─────────────────┐
+     │CLIENT_WORKFLOWS⭐│   │ WORKFLOW_       │   │ SUPPORT_TICKETS │
+     │──────────────────│   │  REQUESTS       │   │─────────────────│
+     │id (PK)           │   │─────────────────│   │ id (PK)         │
+     │client_id (FK)    │   │ id (PK)         │   │ client_id (FK)  │
+     │workflow_id (FK)  │   │ client_id (FK)  │   │ user_id (FK)    │
+     │is_active         │   │ workflow_id (FK)│   │ subject         │
+     │assigned_at       │   │ status          │   │ description     │
+     │assigned_by (FK)  │   │ notes           │   │ status          │
+     └────────┬─────────┘   └─────────────────┘   └─────────────────┘
+              │  N:N
+              │
+              ▼
+     ┌─────────────────┐
+     │   WORKFLOWS⚡   │  (SHARED across clients)
+     │─────────────────│
+     │ id (PK)         │
+     │ name            │
+     │ description     │
+     │ status          │
+     │ config          │
+     │ client_id       │  ⚠️ NULLABLE (NULL = shared)
+     │ is_shared       │  ⭐ NEW
+     │ template_id (FK)│
+     │ created_at      │
+     │ updated_at      │
+     └────────┬────────┘
               │
               ▼
      ┌─────────────────┐
      │  WORKFLOW_      │
-     │  EXECUTIONS     │
+     │  EXECUTIONS     │  (Per client, even for shared workflows)
      │─────────────────│
      │ id (PK)         │
      │ workflow_id (FK)│
@@ -136,7 +267,7 @@ MasStock uses **Supabase** (PostgreSQL) with the following features:
 └─────────────────────┘
 ```
 
-### Relationship Summary
+### Relationship Summary ⚡ UPDATED
 
 | Relationship | Type | Description |
 |-------------|------|-------------|
@@ -144,9 +275,15 @@ MasStock uses **Supabase** (PostgreSQL) with the following features:
 | Users → client_members | 1:N | One user can be member of many clients |
 | Clients → client_members | 1:N | One client can have many members |
 | client_members.role | - | `owner` (full access) or `collaborator` (workflows only) |
-| Clients → Workflows | 1:N | Each workflow belongs to one client |
+| **Clients ↔ Workflows** | **N:N** | **Via `client_workflows` junction table (NEW)** |
+| Clients → client_workflows | 1:N | One client can access many workflows |
+| Workflows → client_workflows | 1:N | One workflow can be shared with many clients |
+| client_workflows.is_active | - | Controls whether access is active or revoked |
 | Workflows → template_id | N:1 | Workflow can reference source template |
 | Templates → Workflows | 1:N | One template can create many workflows |
+| Workflows.client_id (LEGACY) | N:1 | **Deprecated for shared workflows. Use client_workflows instead.** |
+| Workflow_Executions → Workflows | N:1 | Each execution belongs to one workflow (can be shared) |
+| Workflow_Executions → Clients | N:1 | Each execution is performed by one client |
 
 ---
 
@@ -335,21 +472,28 @@ Pre-defined workflow templates for assignment to clients
 
 ---
 
-### 5. `workflows`
+### 5. `workflows` ⚡ UPDATED (Shared Workflows Architecture)
 
-Workflow instances (assigned to clients from templates)
+Workflow instances - **NOW SHARED across multiple clients**
 
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | uuid | PK, DEFAULT uuid_generate_v4() | Workflow ID |
 | `name` | text | NOT NULL | Workflow name |
 | `description` | text | NULL | Workflow description |
-| `status` | text | NOT NULL, DEFAULT 'active', CHECK (status IN ('active', 'inactive')) | Workflow status |
+| `status` | text | NOT NULL, DEFAULT 'active', CHECK (status IN ('active', 'inactive', 'deployed', 'archived')) | Workflow status |
 | `config` | jsonb | NOT NULL, DEFAULT '{}'::jsonb | Workflow configuration |
-| `client_id` | uuid | FK → clients(id), NULL | Client this workflow belongs to |
+| `client_id` | uuid | FK → clients(id), **NULLABLE** | **DEPRECATED for shared workflows. NULL = shared workflow. Use client_workflows junction for access control.** |
+| `is_shared` | boolean | DEFAULT false | **NEW: True if workflow is shared across multiple clients** |
 | `template_id` | uuid | FK → workflow_templates(id), NULL | Source template (if assigned from template) |
 | `created_at` | timestamptz | DEFAULT now() | Creation timestamp |
 | `updated_at` | timestamptz | DEFAULT now() | Last update timestamp |
+
+**⚠️ ARCHITECTURE CHANGE (2025-11-28):**
+- `client_id` is now **NULLABLE** (was NOT NULL)
+- **Shared workflows** have `client_id = NULL` and `is_shared = true`
+- Client access is managed via **`client_workflows` junction table** (see below)
+- Legacy single-client workflows still have `client_id` set
 
 **Config Schema** (jsonb):
 ```json
@@ -366,29 +510,120 @@ Workflow instances (assigned to clients from templates)
 - `idx_workflows_status` ON status
 - `idx_workflows_client_id` ON client_id
 - `idx_workflows_template_id` ON template_id
+- `idx_workflows_is_shared` ON is_shared (NEW)
 
 **RLS Policies:**
-- Users can view workflows for their clients
+- Users can view workflows via `client_workflows` junction table OR legacy `client_id`
 - Admins can view all workflows
 - Only admins can create/update/delete workflows
 
-**Example Row:**
+**Example Row (Shared Workflow):**
 ```json
 {
-  "id": "789e1234-e89b-12d3-a456-426614174002",
-  "name": "Acme Corp - Nano Banana",
+  "id": "f8b20b59-7d06-4599-8413-64da74225b0c",
+  "name": "Image Factory",
   "description": "Generate AI images using Gemini 2.5 Flash",
-  "status": "active",
+  "status": "deployed",
   "config": {
     "workflow_type": "nano_banana",
     "model": "gemini-2.5-flash-image",
     "requires_api_key": true
   },
-  "client_id": "456e7890-e89b-12d3-a456-426614174001",
-  "template_id": "tpl12345-e89b-12d3-a456-426614174008",
-  "created_at": "2025-01-05T08:00:00Z",
-  "updated_at": "2025-01-05T08:00:00Z"
+  "client_id": null,
+  "is_shared": true,
+  "template_id": "60a1ad1a-6bfe-4852-994f-9deb1a9a78df",
+  "created_at": "2025-11-18T21:18:18.946+00",
+  "updated_at": "2025-11-25T22:24:14.773377+00"
 }
+```
+
+---
+
+### 5.1. `client_workflows` ⭐ NEW (Junction Table)
+
+Links clients to shared workflows (N:N relationship)
+
+| Column | Type | Constraints | Description |
+|--------|------|-------------|-------------|
+| `id` | uuid | PK, DEFAULT gen_random_uuid() | Access record ID |
+| `client_id` | uuid | FK → clients(id) ON DELETE CASCADE, NOT NULL | Client with access |
+| `workflow_id` | uuid | FK → workflows(id) ON DELETE CASCADE, NOT NULL | Workflow accessible |
+| `assigned_at` | timestamptz | DEFAULT now() | When access was granted |
+| `assigned_by` | uuid | FK → users(id) ON DELETE SET NULL | Admin who granted access |
+| `is_active` | boolean | DEFAULT true | Whether access is currently active |
+| `created_at` | timestamptz | DEFAULT now() | Record creation timestamp |
+| `updated_at` | timestamptz | DEFAULT now() | Last update timestamp |
+
+**Purpose:** Manages which clients have access to which shared workflows.
+
+**Key Points:**
+- One workflow can be accessed by multiple clients
+- One client can access multiple workflows
+- `is_active = false` revokes access without deleting history
+- UNIQUE constraint on (client_id, workflow_id)
+
+**Indexes:**
+- `idx_client_workflows_client_id` ON client_id
+- `idx_client_workflows_workflow_id` ON workflow_id
+- `idx_client_workflows_is_active` ON is_active
+- UNIQUE constraint on (client_id, workflow_id)
+
+**RLS Policies:**
+- Admins can manage all access records
+- Users can view access records for their clients
+- Only admins can grant/revoke access
+
+**Example Rows:**
+```json
+[
+  {
+    "id": "15189b77-bfa6-4152-b7bf-0efe6a594977",
+    "client_id": "a76e631c-4dc4-4abc-b759-9f7c225c142b",
+    "workflow_id": "f8b20b59-7d06-4599-8413-64da74225b0c",
+    "assigned_at": "2025-11-28T10:05:13.652+00",
+    "assigned_by": "41a89d39-3db3-43a8-a8b0-8ada8bb4bdcf",
+    "is_active": true,
+    "created_at": "2025-11-28T10:05:13.652+00",
+    "updated_at": "2025-11-28T10:05:13.652+00"
+  },
+  {
+    "id": "a763bcf0-027d-46d1-972e-b7ff68b818c1",
+    "client_id": "f14a2f20-f81f-4d8b-93ec-96d6e59cff06",
+    "workflow_id": "f8b20b59-7d06-4599-8413-64da74225b0c",
+    "assigned_at": "2025-11-28T10:05:13.652+00",
+    "assigned_by": "41a89d39-3db3-43a8-a8b0-8ada8bb4bdcf",
+    "is_active": true,
+    "created_at": "2025-11-28T10:05:13.652+00",
+    "updated_at": "2025-11-28T10:05:13.652+00"
+  }
+]
+```
+
+**Common Queries:**
+
+```sql
+-- Get all workflows accessible by a client
+SELECT w.*
+FROM workflows w
+JOIN client_workflows cw ON cw.workflow_id = w.id
+WHERE cw.client_id = $1 AND cw.is_active = true;
+
+-- Get all clients with access to a workflow
+SELECT c.*
+FROM clients c
+JOIN client_workflows cw ON cw.client_id = c.id
+WHERE cw.workflow_id = $1 AND cw.is_active = true;
+
+-- Grant workflow access to client
+INSERT INTO client_workflows (client_id, workflow_id, assigned_by, is_active)
+VALUES ($1, $2, $3, true)
+ON CONFLICT (client_id, workflow_id)
+DO UPDATE SET is_active = true, updated_at = NOW();
+
+-- Revoke workflow access
+UPDATE client_workflows
+SET is_active = false, updated_at = NOW()
+WHERE client_id = $1 AND workflow_id = $2;
 ```
 
 ---
@@ -753,7 +988,7 @@ CREATE POLICY "Clients can access their results"
 
 ## Common Queries
 
-### Get User with Client Info
+### Get User with Client Memberships (via client_members)
 
 ```sql
 SELECT
@@ -762,12 +997,59 @@ SELECT
   u.name,
   u.role,
   u.status,
-  c.id AS client_id,
-  c.name AS client_name,
-  c.email AS client_email
+  json_agg(
+    json_build_object(
+      'client_id', c.id,
+      'client_name', c.name,
+      'client_email', c.email,
+      'role', cm.role,
+      'joined_at', cm.created_at
+    )
+  ) AS client_memberships
 FROM users u
-LEFT JOIN clients c ON u.client_id = c.id
-WHERE u.id = $1;
+LEFT JOIN client_members cm ON u.id = cm.user_id AND cm.status = 'active'
+LEFT JOIN clients c ON cm.client_id = c.id
+WHERE u.id = $1
+GROUP BY u.id, u.email, u.name, u.role, u.status;
+```
+
+### Get Workflows Accessible by Client ⚡ NEW
+
+```sql
+-- Get all workflows a client has access to (via junction table)
+SELECT
+  w.id,
+  w.name,
+  w.description,
+  w.status,
+  w.is_shared,
+  cw.assigned_at,
+  cw.is_active,
+  wt.name AS template_name
+FROM workflows w
+JOIN client_workflows cw ON cw.workflow_id = w.id
+LEFT JOIN workflow_templates wt ON w.template_id = wt.id
+WHERE cw.client_id = $1
+  AND cw.is_active = true
+ORDER BY cw.assigned_at DESC;
+```
+
+### Get All Clients with Access to a Workflow ⚡ NEW
+
+```sql
+-- See which clients have access to a specific workflow
+SELECT
+  c.id,
+  c.name,
+  c.email,
+  cw.assigned_at,
+  cw.is_active,
+  u.name AS assigned_by_name
+FROM clients c
+JOIN client_workflows cw ON cw.client_id = c.id
+LEFT JOIN users u ON cw.assigned_by = u.id
+WHERE cw.workflow_id = $1
+ORDER BY cw.assigned_at DESC;
 ```
 
 ### Get Executions with Workflow Details

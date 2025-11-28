@@ -1,6 +1,6 @@
 # MasStock Documentation
 
-**Last Updated:** 2025-11-25
+**Last Updated:** 2025-11-28 (Security Audit v2.2.2)
 
 Welcome to the MasStock documentation hub. This folder contains all technical documentation for developers working on the MasStock platform.
 
@@ -19,6 +19,9 @@ Welcome to the MasStock documentation hub. This folder contains all technical do
 │   ├── add_migration.md         # How to add database migrations
 │   ├── add_route.md             # How to add API endpoints
 │   ├── add_component.md         # How to add React components
+│   ├── token_refresh.md         # Automatic token refresh system ⭐ v2.2.1
+│   ├── workflows_executions.md  # Workflow system architecture
+│   ├── security_audit_2025_11.md # Security audit & fixes ⭐ NEW (v2.2.2)
 │   └── deployment.md            # Production deployment
 └── tasks/                       # Feature PRDs & implementation plans
     └── image_factory_workflow.md  # Nano Banana workflow guide
@@ -179,6 +182,45 @@ Welcome to the MasStock documentation hub. This folder contains all technical do
   - Understanding execution ownership
   - Implementing filters by collaborator
   - Debugging visibility issues
+
+### [SOP: Automatic Token Refresh](./SOP/token_refresh.md) ⭐ v2.2.1
+
+**Complete guide to the token refresh system:**
+
+- **What you'll learn:**
+  - Token lifecycle (access token 15min, refresh token 7d)
+  - Automatic refresh flow (interceptor-based)
+  - Request queuing and retry logic
+  - Security considerations (httpOnly cookies, token rotation)
+  - Configuration and tuning
+  - Testing and debugging techniques
+  - Common issues and solutions
+
+- **When to use:**
+  - Understanding authentication flow
+  - Debugging logout issues
+  - Implementing similar refresh systems
+  - Adjusting token durations
+  - Troubleshooting 401 errors
+
+### [SOP: Security Audit](./SOP/security_audit_2025_11.md) ⭐ NEW (v2.2.2)
+
+**Complete security audit results and fixes:**
+
+- **What you'll learn:**
+  - 16 security issues identified and fixed (6 critical, 6 medium, 4 minor)
+  - Authentication security patterns (httpOnly cookies, rate limiting)
+  - Code quality improvements (DRY, helper extraction)
+  - Production logging best practices
+  - Security testing checklist
+  - Lessons learned and future improvements
+
+- **When to use:**
+  - Understanding security architecture
+  - Planning security audits
+  - Reviewing authentication flow
+  - Implementing similar security patterns
+  - Before production deployment
 
 ### [SOP: Add React Component](./SOP/add_component.md)
 
@@ -364,7 +406,7 @@ The `tasks/` folder contains feature-specific documentation:
 
 ## 📊 Documentation Health
 
-**Last Full Review:** 2025-11-25
+**Last Full Review:** 2025-11-28
 **Coverage:** ✅ Complete
 
 ### Coverage Checklist
@@ -372,14 +414,16 @@ The `tasks/` folder contains feature-specific documentation:
 - [x] System architecture documented
 - [x] Database schema documented (9 tables)
 - [x] **Async workers & concurrency (v2.0)**
-- [x] **Multi-user client management (v2.1)** ⭐ NEW
-- [x] **Workflow templates system (v2.1)** ⭐ NEW
-- [x] SOPs for common tasks (migrations, routes, components, deployment)
+- [x] **Multi-user client management (v2.1)** ⭐
+- [x] **Workflow templates system (v2.1)** ⭐
+- [x] **Automatic token refresh (v2.2.1)** ⭐
+- [x] **Security audit & fixes (v2.2.2)** ⭐ NEW
+- [x] SOPs for common tasks (migrations, routes, components, deployment, token refresh, security)
 - [x] Development workflow (CLAUDE.md)
 - [x] Quick start guide (README.md)
 - [x] Task-specific PRDs (Image Factory v1.2)
 - [ ] API documentation (Swagger - auto-generated)
-- [x] Troubleshooting guides (per workflow, workers)
+- [x] Troubleshooting guides (per workflow, workers, auth, security)
 
 ---
 

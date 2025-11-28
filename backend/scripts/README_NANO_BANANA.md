@@ -20,7 +20,7 @@ The "Image Factory" workflow has been successfully created in the database and i
   "model": "gemini-2.5-flash-image",
   "api_provider": "google_gemini",
   "max_prompts": 10000,
-  "max_reference_images": 3,
+  "max_reference_images": 14,
   "cost_per_image": 0.039,
   "supported_formats": ["png", "jpg", "webp"],
   "aspect_ratios": ["1:1", "16:9", "9:16", "4:3", "3:4"],

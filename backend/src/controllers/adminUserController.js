@@ -4,37 +4,9 @@
  */
 
 const { supabaseAdmin } = require('../config/database');
-const { logAudit } = require('../config/logger');
+const { logger, logAudit } = require('../config/logger');
 const { ApiError } = require('../middleware/errorHandler');
-
-/**
- * Helper function: Sync auth.users to public.users manually
- */
-async function syncAuthToDatabase(authUserId, email, role = 'user') {
-  const { data: userData, error: userError } = await supabaseAdmin
-    .from('users')
-    .upsert(
-      {
-        id: authUserId,
-        email: email,
-        role: role,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        onConflict: ['id']
-      }
-    )
-    .select()
-    .single();
-
-  if (userError) {
-    throw new ApiError(500, `Failed to sync user to database: ${userError.message}`, 'USER_SYNC_FAILED');
-  }
-
-  return userData;
-}
+const { syncAuthToDatabase } = require('../helpers/userSync');
 
 /**
  * POST /api/v1/admin/users
@@ -294,7 +266,7 @@ async function getClients(req, res) {
     sort = 'created_at'
   } = req.query;
 
-  console.log('📊 AdminUserController.getClients: Loading clients list', {
+  logger.debug('📊 AdminUserController.getClients: Loading clients list', {
     page, limit, status, plan, search, sort
   });
 
@@ -330,11 +302,11 @@ async function getClients(req, res) {
   const { data: clients, error, count } = await query;
 
   if (error) {
-    console.error('❌ AdminUserController.getClients: Database error', { error });
+    logger.error('❌ AdminUserController.getClients: Database error', { error });
     throw new ApiError(500, 'Failed to fetch clients', 'DATABASE_ERROR');
   }
 
-  console.log('✅ AdminUserController.getClients: Clients fetched', {
+  logger.debug('✅ AdminUserController.getClients: Clients fetched', {
     count: clients?.length || 0,
     total: count
   });
@@ -389,7 +361,7 @@ async function getClients(req, res) {
     })
   );
 
-  console.log('✅ AdminUserController.getClients: Response ready', {
+  logger.debug('✅ AdminUserController.getClients: Response ready', {
     clientsCount: clientsWithCounts.length,
     pagination: { total: count, page: pageNum, limit: limitNum }
   });
@@ -416,7 +388,7 @@ async function getClients(req, res) {
 async function getClient(req, res) {
   const { client_id } = req.params;
 
-  console.log('📊 AdminUserController.getClient: Loading client details', { client_id });
+  logger.debug('📊 AdminUserController.getClient: Loading client details', { client_id });
 
   // Fetch client
   const { data: client, error } = await supabaseAdmin
@@ -426,11 +398,11 @@ async function getClient(req, res) {
     .single();
 
   if (error || !client) {
-    console.error('❌ AdminUserController.getClient: Client not found', { client_id, error });
+    logger.error('❌ AdminUserController.getClient: Client not found', { client_id, error });
     throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
   }
 
-  console.log('✅ AdminUserController.getClient: Client found', {
+  logger.debug('✅ AdminUserController.getClient: Client found', {
     clientId: client.id,
     name: client.name
   });
@@ -441,7 +413,7 @@ async function getClient(req, res) {
     .select('*')
     .eq('client_id', client_id);
 
-  console.log('📦 AdminUserController.getClient: Workflows fetched', {
+  logger.debug('📦 AdminUserController.getClient: Workflows fetched', {
     count: workflows?.length || 0,
     error: workflowsError?.message
   });
@@ -452,7 +424,7 @@ async function getClient(req, res) {
     .select('*')
     .eq('client_id', client_id);
 
-  console.log('📦 AdminUserController.getClient: Requests fetched', {
+  logger.debug('📦 AdminUserController.getClient: Requests fetched', {
     count: requests?.length || 0,
     error: requestsError?.message
   });
@@ -463,7 +435,7 @@ async function getClient(req, res) {
     .select('*')
     .eq('client_id', client_id);
 
-  console.log('📦 AdminUserController.getClient: Tickets fetched', {
+  logger.debug('📦 AdminUserController.getClient: Tickets fetched', {
     count: tickets?.length || 0,
     error: ticketsError?.message
   });
@@ -474,7 +446,7 @@ async function getClient(req, res) {
     .select('status, created_at')
     .eq('client_id', client_id);
 
-  console.log('📦 AdminUserController.getClient: Executions fetched', {
+  logger.debug('📦 AdminUserController.getClient: Executions fetched', {
     count: executions?.length || 0,
     error: executionsError?.message
   });
@@ -502,7 +474,7 @@ async function getClient(req, res) {
     .eq('client_id', client_id)
     .eq('status', 'active');
 
-  console.log('📦 AdminUserController.getClient: Members fetched', {
+  logger.debug('📦 AdminUserController.getClient: Members fetched', {
     count: members?.length || 0,
     error: membersError?.message
   });
@@ -520,7 +492,7 @@ async function getClient(req, res) {
     collaborators_count: members?.filter(m => m.role === 'collaborator').length || 0
   };
 
-  console.log('✅ AdminUserController.getClient: Response ready', {
+  logger.debug('✅ AdminUserController.getClient: Response ready', {
     clientId: client.id,
     stats
   });

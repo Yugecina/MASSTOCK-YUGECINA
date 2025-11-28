@@ -27,6 +27,7 @@ export function Executions() {
   const [userFilter, setUserFilter] = useState('all')
   const [sortBy, setSortBy] = useState('newest')
   const [copyFeedback, setCopyFeedback] = useState(null)
+  const [inputDataViewMode, setInputDataViewMode] = useState('pretty') // 'pretty' or 'raw'
 
   // Pagination state
   const [hasMore, setHasMore] = useState(true)
@@ -125,6 +126,14 @@ export function Executions() {
         setLoadingMore(true)
       }
 
+      logger.debug('🔍 Executions.loadExecutions: Calling API with params:', {
+        limit: ITEMS_PER_PAGE,
+        offset: currentOffset,
+        status: statusFilter,
+        workflow_id: workflowFilter,
+        user_id: userFilter
+      })
+
       const response = await workflowService.getAllExecutions({
         limit: ITEMS_PER_PAGE,
         offset: currentOffset,
@@ -133,13 +142,25 @@ export function Executions() {
         user_id: userFilter
       })
 
+      logger.debug('📦 Executions.loadExecutions: Raw response:', {
+        response: response,
+        responseType: typeof response,
+        responseKeys: response ? Object.keys(response) : 'null'
+      })
+
       const data = response.data?.data || response.data
       const newExecutions = data.executions || []
 
       logger.debug('✅ Executions.loadExecutions: Received:', {
         count: newExecutions.length,
         total: data.total,
-        hasMore: data.hasMore
+        hasMore: data.hasMore,
+        dataKeys: data ? Object.keys(data) : 'null',
+        firstExecution: newExecutions[0] ? {
+          id: newExecutions[0].id,
+          status: newExecutions[0].status,
+          workflow_name: newExecutions[0].workflow_name
+        } : 'none'
       })
 
       if (isReset) {
@@ -156,8 +177,16 @@ export function Executions() {
       logger.error('❌ Executions.loadExecutions: Error:', {
         error: err,
         message: err.message,
-        response: err.response?.data
+        response: err.response?.data,
+        responseStatus: err.response?.status,
+        responseStatusText: err.response?.statusText,
+        stack: err.stack
       })
+
+      // Show error to user
+      setTotal(0)
+      setHasMore(false)
+      setExecutions([])
     } finally {
       setLoadingMore(false)
     }
@@ -199,6 +228,128 @@ export function Executions() {
       setTimeout(() => setCopyFeedback(null), 2000)
     } catch (err) {
       logger.error('❌ Executions.handleCopyInputData: Failed to copy:', err)
+    }
+  }
+
+  function isBase64Image(str) {
+    if (typeof str !== 'string') return false
+    return str.startsWith('data:image/') ||
+           (str.length > 100 && /^[A-Za-z0-9+/]+={0,2}$/.test(str.substring(0, 100)))
+  }
+
+  function renderImageValue(value) {
+    const imageSrc = value.startsWith('data:image/')
+      ? value
+      : `data:image/jpeg;base64,${value}`
+
+    return (
+      <div className="execution-data-image-container">
+        <img
+          src={imageSrc}
+          alt="Reference"
+          className="execution-data-image"
+          onClick={(e) => {
+            e.stopPropagation()
+            window.open(imageSrc, '_blank')
+          }}
+        />
+        <div className="execution-data-image-hint">
+          Click to view full size
+        </div>
+      </div>
+    )
+  }
+
+  function renderObjectValue(obj) {
+    try {
+      // Check if ALL values in object are base64 images
+      const entries = Object.entries(obj)
+      const allValuesAreImages = entries.length > 0 && entries.every(([key, val]) => {
+        return typeof val === 'string' && isBase64Image(val)
+      })
+
+      if (allValuesAreImages) {
+        return (
+          <div className="execution-data-images-grid">
+            {entries.map(([objKey, objValue]) => (
+              <div key={objKey} className="execution-data-image-item">
+                <div className="execution-data-object-key">{objKey}:</div>
+                {renderImageValue(objValue)}
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      // Fallback: render as JSON
+      return (
+        <pre className="execution-data-object-preview">
+          {JSON.stringify(obj, null, 2)}
+        </pre>
+      )
+    } catch (err) {
+      logger.error('❌ renderObjectValue: Error rendering object:', err)
+      return (
+        <pre className="execution-data-object-preview">
+          {JSON.stringify(obj, null, 2)}
+        </pre>
+      )
+    }
+  }
+
+  function renderPrettyInputData(data) {
+    if (!data || typeof data !== 'object') {
+      return <div className="execution-data-value">{String(data)}</div>
+    }
+
+    try {
+      return (
+        <div className="execution-data-pretty">
+          {Object.entries(data).map(([key, value]) => (
+            <div key={key} className="execution-data-row">
+              <div className="execution-data-key">{key}</div>
+              <div className="execution-data-value">
+                {typeof value === 'object' && value !== null ? (
+                  Array.isArray(value) ? (
+                    <div className="execution-data-array">
+                      {value.length === 0 ? (
+                        <span className="execution-data-empty">Empty array</span>
+                      ) : (
+                        value.map((item, index) => (
+                          <div key={index} className="execution-data-array-item">
+                            {typeof item === 'object' && item !== null ? (
+                              <pre className="execution-data-object-preview">
+                                {JSON.stringify(item, null, 2)}
+                              </pre>
+                            ) : isBase64Image(item) ? (
+                              renderImageValue(item)
+                            ) : (
+                              <span>{String(item)}</span>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    renderObjectValue(value)
+                  )
+                ) : isBase64Image(value) ? (
+                  renderImageValue(value)
+                ) : (
+                  <span>{String(value)}</span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    } catch (err) {
+      logger.error('❌ renderPrettyInputData: Error rendering data:', err)
+      return (
+        <div className="execution-data-value">
+          Error rendering data. Check console for details.
+        </div>
+      )
     }
   }
 
@@ -651,27 +802,47 @@ export function Executions() {
                 <div className="execution-modal-section">
                   <div className="execution-modal-section-header">
                     <h3 className="execution-modal-section-title">Input Data</h3>
-                    <button
-                      onClick={() => handleCopyInputData(selectedExecution.input_data)}
-                      className={`execution-modal-copy-btn ${copyFeedback === 'input' ? 'copied' : ''}`}
-                      title="Copy Input Data"
-                    >
-                      {copyFeedback === 'input' ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                        </svg>
-                      )}
-                      {copyFeedback === 'input' ? 'Copied!' : 'Copy'}
-                    </button>
+                    <div className="execution-modal-section-actions">
+                      <div className="execution-data-view-toggle">
+                        <button
+                          onClick={() => setInputDataViewMode('pretty')}
+                          className={`execution-data-view-btn ${inputDataViewMode === 'pretty' ? 'active' : ''}`}
+                        >
+                          Pretty
+                        </button>
+                        <button
+                          onClick={() => setInputDataViewMode('raw')}
+                          className={`execution-data-view-btn ${inputDataViewMode === 'raw' ? 'active' : ''}`}
+                        >
+                          Raw
+                        </button>
+                      </div>
+                      <button
+                        onClick={() => handleCopyInputData(selectedExecution.input_data)}
+                        className={`execution-modal-copy-btn ${copyFeedback === 'input' ? 'copied' : ''}`}
+                        title="Copy Input Data"
+                      >
+                        {copyFeedback === 'input' ? (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        ) : (
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                          </svg>
+                        )}
+                        {copyFeedback === 'input' ? 'Copied!' : 'Copy'}
+                      </button>
+                    </div>
                   </div>
-                  <pre className="execution-modal-code">
-                    {JSON.stringify(selectedExecution.input_data, null, 2)}
-                  </pre>
+                  {inputDataViewMode === 'pretty' ? (
+                    renderPrettyInputData(selectedExecution.input_data)
+                  ) : (
+                    <pre className="execution-modal-code">
+                      {JSON.stringify(selectedExecution.input_data, null, 2)}
+                    </pre>
+                  )}
                 </div>
               )}
             </div>

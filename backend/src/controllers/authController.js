@@ -163,8 +163,88 @@ async function logout(req, res) {
   }
 }
 
+async function refreshToken(req, res) {
+  try {
+    // Get refresh token from cookie
+    const refreshToken = req.cookies?.refresh_token;
+
+    if (!refreshToken) {
+      logger.warn('Refresh token missing in request');
+      return res.status(401).json({
+        message: 'No refresh token provided',
+        status: 401,
+        code: 'NO_REFRESH_TOKEN'
+      });
+    }
+
+    // Refresh session with Supabase
+    const { data, error } = await supabaseAdmin.auth.refreshSession({
+      refresh_token: refreshToken
+    });
+
+    if (error || !data.session) {
+      logger.error('Token refresh failed', {
+        error: error?.message,
+        hasSession: !!data?.session
+      });
+
+      // Clear invalid tokens
+      res.clearCookie('access_token');
+      res.clearCookie('refresh_token');
+
+      return res.status(401).json({
+        message: 'Invalid or expired refresh token',
+        status: 401,
+        code: 'INVALID_REFRESH_TOKEN'
+      });
+    }
+
+    // Set new httpOnly cookies
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000 // 15 minutes
+    };
+
+    res.cookie('access_token', data.session.access_token, cookieOptions);
+    res.cookie('refresh_token', data.session.refresh_token, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
+    logger.info('Token refreshed successfully', {
+      userId: data.user?.id,
+      expiresAt: data.session.expires_at
+    });
+
+    res.json({
+      success: true,
+      session: {
+        expires_at: data.session.expires_at
+      }
+    });
+
+  } catch (error) {
+    logger.error('Refresh token error', {
+      error: error.message,
+      stack: error.stack
+    });
+
+    // Clear potentially corrupted tokens
+    res.clearCookie('access_token');
+    res.clearCookie('refresh_token');
+
+    res.status(500).json({
+      message: 'Internal server error',
+      status: 500
+    });
+  }
+}
+
 module.exports = {
   login,
   getMe,
-  logout
+  logout,
+  refreshToken
 };

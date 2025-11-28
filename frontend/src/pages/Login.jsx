@@ -56,26 +56,44 @@ export function Login() {
   }
 
   const quickLoginAsAdmin = async () => {
-    setEmail('admin@masstock.com')
-    setPassword('Admin123123')
+    const email = import.meta.env.VITE_DEV_ADMIN_EMAIL
+    const password = import.meta.env.VITE_DEV_ADMIN_PASSWORD
+    setEmail(email)
+    setPassword(password)
     setError('')
     setDebugInfo('')
     try {
-      await login('admin@masstock.com', 'Admin123123')
+      await login(email, password)
     } catch (err) {
       setError(err.response?.data?.message || 'Admin login failed')
     }
   }
 
   const quickLoginAsEstee = async () => {
-    setEmail('estee@masstock.com')
-    setPassword('EsteePassword123!')
+    const email = import.meta.env.VITE_DEV_ESTEE_EMAIL
+    const password = import.meta.env.VITE_DEV_ESTEE_PASSWORD
+    setEmail(email)
+    setPassword(password)
     setError('')
     setDebugInfo('')
     try {
-      await login('estee@masstock.com', 'EsteePassword123!')
+      await login(email, password)
     } catch (err) {
       setError(err.response?.data?.message || 'Estee login failed')
+    }
+  }
+
+  const quickLoginAsDev = async () => {
+    const email = import.meta.env.VITE_DEV_DEV_EMAIL
+    const password = import.meta.env.VITE_DEV_DEV_PASSWORD
+    setEmail(email)
+    setPassword(password)
+    setError('')
+    setDebugInfo('')
+    try {
+      await login(email, password)
+    } catch (err) {
+      setError(err.response?.data?.message || 'Dev login failed')
     }
   }
 
@@ -107,7 +125,7 @@ export function Login() {
               </svg>
               <div className="login-error-content">
                 <span className="login-error-message">{error}</span>
-                {debugInfo && <span className="login-error-debug">{debugInfo}</span>}
+                {import.meta.env.VITE_ENV === 'development' && debugInfo && <span className="login-error-debug">{debugInfo}</span>}
               </div>
             </div>
           )}
@@ -208,6 +226,10 @@ export function Login() {
                 <button type="button" onClick={quickLoginAsEstee} disabled={loading} className="login-dev-btn">
                   <span className="login-dev-btn-icon">🎨</span>
                   Estee
+                </button>
+                <button type="button" onClick={quickLoginAsDev} disabled={loading} className="login-dev-btn">
+                  <span className="login-dev-btn-icon">👨‍💻</span>
+                  Dev
                 </button>
               </div>
             </div>

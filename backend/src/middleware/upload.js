@@ -7,7 +7,7 @@
  * Security Features:
  * - File type validation (only JPEG, PNG, WebP)
  * - File size limits (10MB per file)
- * - Maximum number of files (3 files - Gemini's recommendation)
+ * - Maximum number of files (14 files - Gemini API limit)
  * - Memory storage (files stored in memory, not disk)
  */
 
@@ -16,7 +16,7 @@ const path = require('path');
 
 // Configuration
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB in bytes
-const MAX_FILES = 3; // Gemini works best with up to 3 reference images
+const MAX_FILES = 14; // Gemini API supports up to 14 reference images (6 objects + 5 humans)
 
 // Allowed MIME types
 const ALLOWED_MIME_TYPES = [

@@ -5,7 +5,7 @@
 
 const { createClient } = require('@supabase/supabase-js');
 const { supabaseAdmin } = require('../config/database');
-const { logAuth, logError } = require('../config/logger');
+const { logger, logAuth, logError } = require('../config/logger');
 
 // Create a clean admin client to avoid RLS issues
 function getCleanAdminClient() {
@@ -209,12 +209,17 @@ async function optionalAuth(req, res, next) {
       return next();
     }
 
-    // Fetch client information
-    const { data: client } = await cleanAdmin
-      .from('clients')
-      .select('*')
-      .eq('user_id', dbUser.id)
-      .maybeSingle();
+    // Fetch client information using dbUser.client_id (same logic as authenticate)
+    let client = null;
+    if (dbUser.client_id) {
+      const { data: clientData } = await cleanAdmin
+        .from('clients')
+        .select('*')
+        .eq('id', dbUser.client_id)
+        .maybeSingle();
+
+      client = clientData;
+    }
 
     // Attach user and client to request
     req.user = dbUser;

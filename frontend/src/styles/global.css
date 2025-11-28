@@ -1,3 +1,10 @@
+@import './variables.css';
+@import './base.css';
+@import './utilities.css';
+@import './components.css';
+@import './layout.css';
+@import './pages.css';
+
 /**
  * MASSTOCK DESIGN SYSTEM - "THE TRUSTED MAGICIAN"
  * Version: 7.2 - Dark Premium Bleu Petrole
@@ -14,10 +21,3 @@
  * 5. layout.css    - Sidebar, structure de page
  * 6. pages.css     - Styles specifiques aux pages
  */
-
-@import './variables.css';
-@import './base.css';
-@import './utilities.css';
-@import './components.css';
-@import './layout.css';
-@import './pages.css';

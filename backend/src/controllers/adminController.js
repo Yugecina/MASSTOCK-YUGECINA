@@ -6,37 +6,7 @@
 const { supabaseAdmin } = require('../config/database');
 const { logAudit } = require('../config/logger');
 const { ApiError } = require('../middleware/errorHandler');
-
-/**
- * Helper function: Sync auth.users to public.users manually
- * This ensures the user exists in both auth.users and public.users
- */
-async function syncAuthToDatabase(authUserId, email, role = 'user') {
-  // Insert into public.users if not exists (upsert)
-  const { data: userData, error: userError } = await supabaseAdmin
-    .from('users')
-    .upsert(
-      {
-        id: authUserId,
-        email: email,
-        role: role,
-        status: 'active',
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      },
-      {
-        onConflict: ['id']  // Correct syntax for Supabase
-      }
-    )
-    .select()
-    .single();
-
-  if (userError) {
-    throw new ApiError(500, `Failed to sync user to database: ${userError.message}`, 'USER_SYNC_FAILED');
-  }
-
-  return userData;
-}
+const { syncAuthToDatabase } = require('../helpers/userSync');
 
 /**
  * POST /api/v1/admin/create-admin
@@ -117,6 +87,20 @@ async function createAdminUser(req, res) {
       });
     }
 
+    // Set httpOnly cookies for tokens (same as login endpoint)
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 15 * 60 * 1000 // 15 minutes
+    };
+
+    res.cookie('access_token', sessionData.session.access_token, cookieOptions);
+    res.cookie('refresh_token', sessionData.session.refresh_token, {
+      ...cookieOptions,
+      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
+    });
+
     res.status(201).json({
       success: true,
       message: 'Admin user created successfully',
@@ -124,10 +108,10 @@ async function createAdminUser(req, res) {
         id: user.id,
         email: user.email,
         role: user.role,
-        status: user.status,
-        access_token: sessionData.session.access_token,
-        refresh_token: sessionData.session.refresh_token,
-        expires_in: sessionData.session.expires_in
+        status: user.status
+      },
+      session: {
+        expires_at: sessionData.session.expires_at
       }
     });
 

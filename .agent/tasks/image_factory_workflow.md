@@ -29,7 +29,7 @@
 ### Key Features
 
 - **Batch Processing**: Generate up to 10,000 images per execution
-- **Reference Images**: Support for up to 3 reference images per generation
+- **Reference Images**: Support for up to 14 reference images per generation (6 objects + 5 humans)
 - **Multiple Models**:
   - `gemini-2.5-flash-image` (default, fast, cost-effective)
   - `gemini-3-pro-image-preview` (high quality, 4K support)
@@ -185,7 +185,7 @@ frontend/
 | Parameter | Limit | Notes |
 |-----------|-------|-------|
 | Max prompts per execution | 10,000 | Configurable in workflow config |
-| Max reference images | 3 | Per generation request |
+| Max reference images | 14 | Per generation request (6 objects + 5 humans) |
 | Prompt min length | 3 characters | Validation enforced |
 | Prompt max length | No hard limit | Longer prompts = better results |
 | Reference image max size | ~5MB | Converted to base64 |
@@ -204,7 +204,7 @@ frontend/
   "model": "gemini-2.5-flash-image",
   "api_provider": "google_gemini",
   "max_prompts": 10000,
-  "max_reference_images": 3,
+  "max_reference_images": 14,
   "cost_per_image": 0.039,
   "supported_formats": ["png", "jpg", "webp"],
   "aspect_ratios": ["1:1", "16:9", "9:16", "4:3", "3:4"],

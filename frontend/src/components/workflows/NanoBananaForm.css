@@ -606,43 +606,173 @@
 }
 
 /* ========================================
-   FILE LIST
+   IMAGE PREVIEW CARDS - "Image Vault"
+   Industrial aesthetic with real image previews
    ======================================== */
 
 .nb-file-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-2);
-  margin-top: var(--spacing-3);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--spacing-4);
+  margin-top: var(--spacing-4);
 }
 
 .nb-file-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 14px;
-  background: rgba(74, 222, 128, 0.1);
-  border: 1px solid rgba(74, 222, 128, 0.3);
-  border-radius: 20px;
-  font-size: 12px;
+  position: relative;
+  aspect-ratio: 3 / 2;
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  cursor: default;
+  transition: all 200ms ease-out;
 }
 
-.nb-file-item svg {
-  color: var(--success);
+.nb-file-item:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* Image preview */
+.nb-file-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms ease-out;
+}
+
+.nb-file-item:hover .nb-file-preview {
+  transform: scale(1.05);
+}
+
+/* Info overlay - gradient from bottom */
+.nb-file-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: var(--spacing-3);
+  background: linear-gradient(
+    to top,
+    var(--card) 0%,
+    color-mix(in srgb, var(--card) 85%, transparent) 60%,
+    transparent 100%
+  );
+  backdrop-filter: blur(8px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .nb-file-name {
   color: var(--foreground);
-  font-weight: 500;
-  max-width: 150px;
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .nb-file-size {
-  color: var(--muted-foreground);
+  color: var(--primary);
   font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Remove button - top right corner */
+.nb-file-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--card) 90%, transparent);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.9);
+  transition: all 200ms ease-out;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--background) 30%, transparent);
+}
+
+.nb-file-item:hover .nb-file-remove {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.nb-file-remove:hover {
+  background: var(--destructive);
+  border-color: var(--destructive);
+  color: var(--destructive-foreground);
+  transform: scale(1.05);
+  box-shadow: 0 2px 12px color-mix(in srgb, var(--destructive) 40%, transparent);
+}
+
+.nb-file-remove:active {
+  transform: scale(0.95);
+}
+
+.nb-file-remove svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* Success indicator - top left corner */
+.nb-file-success {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--primary);
+  border-radius: 6px;
+  color: var(--primary-foreground);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--primary) 30%, transparent);
+}
+
+.nb-file-success svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Loading state */
+.nb-file-item.loading .nb-file-preview {
+  opacity: 0.5;
+  filter: blur(2px);
+}
+
+.nb-file-item.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--primary);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: translate(-50%, -50%) rotate(360deg); }
 }
 
 /* ========================================

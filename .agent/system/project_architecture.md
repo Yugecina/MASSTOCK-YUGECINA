@@ -1,8 +1,8 @@
 # MasStock - Project Architecture
 
-**Last Updated:** 2025-11-25
+**Last Updated:** 2025-11-28
 **Status:** Production-Ready
-**Version:** 2.1.0 (Multi-User Client Management)
+**Version:** 2.2.1 (Automatic Token Refresh) ⚡
 
 ## 📋 Table of Contents
 
@@ -25,6 +25,7 @@
 ### Key Features
 
 - **Workflow Automation**: Execute AI-powered workflows with job queue management
+- **Shared Workflows**: Multiple clients access the same workflow, with per-client executions ⚡ v2.2
 - **Batch Processing**: Process multiple items (e.g., image generation) in parallel
 - **Multi-tenant**: Support for multiple clients with role-based access
 - **Multi-User Clients**: Users can belong to multiple clients with different roles (owner/collaborator) ⭐ v2.1
@@ -236,7 +237,7 @@ MASSTOCK/
 
 Handle HTTP requests and responses:
 
-- `authController.js` - Login, logout, token refresh, user profile
+- `authController.js` - Login, logout, **automatic token refresh** ⭐ v2.2.1, user profile
 - `workflowsController.js` - Workflow CRUD, execution trigger
 - `workflowRequestsController.js` - Client workflow requests
 - `supportTicketsController.js` - Support ticket management
@@ -260,7 +261,7 @@ Handle HTTP requests and responses:
 
 Define API endpoints (all prefixed with `/api/v1/`):
 
-- `authRoutes.js` - `/auth/*` (login, logout, me, refresh)
+- `authRoutes.js` - `/auth/*` (login, logout, me, **refresh** ⭐ v2.2.1)
 - `workflowRoutes.js` - `/workflows/*` (list, detail, execute)
 - `executionRoutes.js` - `/executions/*` (list, detail, results)
 - `workflowRequestRoutes.js` - `/workflow-requests/*`
@@ -381,7 +382,7 @@ Route components (one per URL):
 
 API client wrappers:
 
-- `api.js` - Axios instance with auth interceptor
+- `api.js` - Axios instance with **automatic token refresh interceptor** ⭐ v2.2.1
 - `auth.js` - Auth API calls
 - `workflows.js` - Workflow API calls
 - `requests.js` - Workflow request API calls
@@ -429,8 +430,9 @@ Zustand state management:
 - `clients` - Client organizations
 - `client_members` - User-client membership (N:N junction) ⭐ v2.1
 - `workflow_templates` - Admin-defined workflow templates ⭐ v2.1
-- `workflows` - Workflow instances (assigned to clients)
-- `workflow_executions` - Execution records
+- `workflows` - Shared workflow instances (accessible by multiple clients) ⚡ v2.2
+- `client_workflows` - Client-workflow access control (N:N junction) ⚡ v2.2
+- `workflow_executions` - Execution records (per client, even for shared workflows)
 - `workflow_batch_results` - Batch processing results
 - `workflow_requests` - Client requests
 - `support_tickets` - Support tickets
@@ -490,7 +492,7 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-im
 1. **Login** (`POST /api/v1/auth/login`)
    - User submits email + password
    - Backend validates credentials with Supabase Auth
-   - Backend generates JWT access token (15min) and refresh token (30d)
+   - Backend generates JWT access token (15min) and refresh token (7d)
    - Tokens stored in **httpOnly cookies** (NOT localStorage)
    - User data returned to frontend
 
@@ -500,12 +502,28 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-im
    - Backend verifies JWT with Supabase
    - User data attached to `req.user`
 
-3. **Token Refresh** (`POST /api/v1/auth/refresh`)
-   - When access token expires, use refresh token
-   - Backend validates refresh token
-   - New access token issued
+3. **Automatic Token Refresh** (`POST /api/v1/auth/refresh`) ⭐ v2.2.1
+   - **When access token expires (after 15min), frontend automatically attempts refresh**
+   - Frontend interceptor detects 401 error
+   - Calls `/refresh` endpoint with `refresh_token` cookie
+   - Backend validates refresh token with Supabase
+   - New access token (15min) and refresh token (7d) issued
+   - Original failed request is automatically retried
+   - **User session maintained for 7 days without manual re-login**
+   - Only logs out if refresh token also expires
 
-4. **Logout** (`POST /api/v1/auth/logout`)
+4. **Token Refresh Flow:**
+   ```
+   User makes API call → Token expired (401)
+         ↓
+   Interceptor catches 401 → Not login/refresh endpoint?
+         ↓
+   Call /refresh automatically → Get new tokens
+         ↓
+   Retry original request → Success (transparent to user)
+   ```
+
+5. **Logout** (`POST /api/v1/auth/logout`)
    - Backend clears httpOnly cookies
    - Frontend clears state
 
@@ -513,7 +531,9 @@ POST https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-im
 
 1. **Authentication**
    - JWT tokens in httpOnly cookies (XSS protection)
-   - Refresh token rotation
+   - **Automatic token refresh** - maintains session for 7 days ⭐ v2.2.1
+   - Refresh token rotation (7-day expiry)
+   - Access token short-lived (15 minutes for security)
    - Password hashing with bcrypt
    - Supabase Auth integration
 

@@ -7,7 +7,7 @@ const express = require('express');
 const { body, param, query } = require('express-validator');
 const { asyncHandler, validationErrorHandler } = require('../middleware/errorHandler');
 const { authenticate, requireAdmin } = require('../middleware/auth');
-const { adminLimiter } = require('../middleware/rateLimit');
+const { authLimiter, adminLimiter } = require('../middleware/rateLimit');
 const adminController = require('../controllers/adminController');
 const adminUserController = require('../controllers/adminUserController');
 const adminWorkflowController = require('../controllers/adminWorkflowController');
@@ -24,6 +24,7 @@ const router = express.Router();
  * NO AUTHENTICATION REQUIRED - but only works if no admin exists
  */
 router.post('/create-admin',
+  authLimiter, // Protect against brute-force and enumeration attacks
   body('email').isEmail().normalizeEmail(),
   body('password').isLength({ min: 8 }),
   body('name').optional().trim(),

@@ -20,6 +20,7 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
   const [validationState, setValidationState] = useState({
     apiKeyValid: null,
     promptCountValid: null,
+    textLengthValid: true,
     fileSizeValid: true,
     errors: {}
   });
@@ -27,6 +28,7 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showExampleModal, setShowExampleModal] = useState(false);
   const [showSecurityInfo, setShowSecurityInfo] = useState(false);
+  const [imagePreviews, setImagePreviews] = useState([]);
 
   // Load defaults from workflow config
   useEffect(() => {
@@ -40,9 +42,16 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
     }
   }, [workflow]);
 
-  // Calculate prompt count
+  // Cleanup image preview URLs on unmount
+  useEffect(() => {
+    return () => {
+      imagePreviews.forEach(preview => URL.revokeObjectURL(preview.url));
+    };
+  }, [imagePreviews]);
+
+  // Calculate prompt count (aligned with backend parser logic)
   const promptCount = formData.prompts_text
-    .split('\n\n')
+    .split(/\n\n+/)  // Split by 2 or more newlines (same as backend)
     .filter(p => p.trim())
     .length;
 
@@ -88,13 +97,39 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
     }
   }, [promptCount]);
 
+  // Real-time text length validation (500,000 characters max)
+  useEffect(() => {
+    const textLength = formData.prompts_text.length;
+    const MAX_TEXT_LENGTH = 500000;
+
+    if (textLength > MAX_TEXT_LENGTH) {
+      setValidationState(prev => ({
+        ...prev,
+        textLengthValid: false,
+        errors: {
+          ...prev.errors,
+          textLength: `Text too long: ${textLength.toLocaleString()} / ${MAX_TEXT_LENGTH.toLocaleString()} characters`
+        }
+      }));
+    } else {
+      setValidationState(prev => ({
+        ...prev,
+        textLengthValid: true,
+        errors: { ...prev.errors, textLength: null }
+      }));
+    }
+  }, [formData.prompts_text]);
+
   const handleFileChange = (e) => {
     const files = Array.from(e.target.files);
-    if (files.length > 3) {
+    const currentCount = formData.reference_images.length;
+    const totalCount = currentCount + files.length;
+
+    if (totalCount > 14) {
       setValidationState(prev => ({
         ...prev,
         fileSizeValid: false,
-        errors: { ...prev.errors, files: 'Maximum 3 reference images allowed' }
+        errors: { ...prev.errors, files: `Maximum 14 reference images allowed (currently ${currentCount})` }
       }));
       e.target.value = '';
       return;
@@ -112,12 +147,39 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
       return;
     }
 
+    // Create preview URLs for new images
+    const newPreviews = files.map(file => ({
+      file,
+      url: URL.createObjectURL(file),
+      name: file.name,
+      size: file.size
+    }));
+
     setValidationState(prev => ({
       ...prev,
       fileSizeValid: true,
       errors: { ...prev.errors, files: null }
     }));
-    setFormData({ ...formData, reference_images: files });
+
+    setFormData(prev => ({
+      ...prev,
+      reference_images: [...prev.reference_images, ...files]
+    }));
+
+    setImagePreviews(prev => [...prev, ...newPreviews]);
+    e.target.value = '';
+  };
+
+  const removeImage = (index) => {
+    // Revoke the URL to free memory
+    URL.revokeObjectURL(imagePreviews[index].url);
+
+    setFormData(prev => ({
+      ...prev,
+      reference_images: prev.reference_images.filter((_, i) => i !== index)
+    }));
+
+    setImagePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
   const loadExamplePrompts = () => {
@@ -158,6 +220,7 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
     formData.api_key.trim() &&
     validationState.apiKeyValid === true &&
     validationState.promptCountValid === true &&
+    validationState.textLengthValid === true &&
     validationState.fileSizeValid === true &&
     promptCount > 0 &&
     promptCount <= 10000;
@@ -165,6 +228,7 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
   const getSubmitDisabledReason = () => {
     if (promptCount === 0) return 'Add at least one prompt';
     if (promptCount > 10000) return 'Maximum 10,000 prompts allowed';
+    if (!validationState.textLengthValid) return 'Text too long (max 500,000 characters)';
     if (!formData.api_key.trim()) return 'API key required';
     if (validationState.apiKeyValid === false) return 'Invalid API key format';
     if (!validationState.fileSizeValid) return 'Fix file validation errors';
@@ -215,13 +279,88 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
           </div>
         </div>
 
-        {/* Step 1: Prompts */}
-        <div className="nb-step">
+        {/* Step 1: Reference Images (Optional) */}
+        <div className="nb-step nb-step-optional">
           <div className="nb-step-header">
             <div className="nb-step-badge">01</div>
             <div className="nb-step-title">
+              <h3>Reference Images</h3>
+              <p>Up to 14 images, 10MB max each</p>
+            </div>
+          </div>
+
+          <div className="nb-upload-zone">
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFileChange}
+              className="nb-upload-input"
+              id="reference-upload"
+            />
+            <label htmlFor="reference-upload" className="nb-upload-label">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+              <span>Drop images or click to browse</span>
+            </label>
+          </div>
+
+          {validationState.errors.files && (
+            <div className="nb-error-msg">{validationState.errors.files}</div>
+          )}
+
+          {imagePreviews.length > 0 && validationState.fileSizeValid && (
+            <div className="nb-file-list">
+              {imagePreviews.map((preview, i) => (
+                <div key={i} className="nb-file-item">
+                  {/* Image Preview */}
+                  <img
+                    src={preview.url}
+                    alt={preview.name}
+                    className="nb-file-preview"
+                  />
+
+                  {/* Success Indicator */}
+                  <div className="nb-file-success">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+
+                  {/* Remove Button */}
+                  <button
+                    type="button"
+                    onClick={() => removeImage(i)}
+                    className="nb-file-remove"
+                    aria-label="Remove image"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                    </svg>
+                  </button>
+
+                  {/* Info Overlay */}
+                  <div className="nb-file-info">
+                    <span className="nb-file-name">{preview.name}</span>
+                    <span className="nb-file-size">{(preview.size / 1024 / 1024).toFixed(2)} MB</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Step 2: Prompts */}
+        <div className="nb-step">
+          <div className="nb-step-header">
+            <div className="nb-step-badge">02</div>
+            <div className="nb-step-title">
               <h3>Input Queue</h3>
-              <p>Image prompts separated by double line breaks</p>
+              <p>Separate prompts with 2+ blank lines (keeps your spacing)</p>
             </div>
             <button
               type="button"
@@ -239,11 +378,14 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
             <textarea
               value={formData.prompts_text}
               onChange={(e) => setFormData({ ...formData, prompts_text: e.target.value })}
-              placeholder="a beautiful sunset over mountains, cinematic 8k
+              placeholder="First prompt goes here
+You can use multiple lines for a single prompt
 
-a futuristic city at night with neon lights
 
-a portrait of a cat wearing sunglasses, studio lighting"
+Second prompt after 2+ blank lines
+
+
+Third prompt, and so on..."
               rows={8}
               required
               className={`nb-textarea ${validationState.promptCountValid === true ? 'valid' : ''}`}
@@ -252,6 +394,17 @@ a portrait of a cat wearing sunglasses, studio lighting"
               {promptCount} <span>units</span>
             </div>
           </div>
+
+          {!validationState.textLengthValid && validationState.errors.textLength && (
+            <div className="nb-error-msg">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="8" x2="12" y2="12" />
+                <line x1="12" y1="16" x2="12.01" y2="16" />
+              </svg>
+              {validationState.errors.textLength}
+            </div>
+          )}
 
           {promptCount > 10000 && (
             <div className="nb-error-msg">
@@ -265,10 +418,10 @@ a portrait of a cat wearing sunglasses, studio lighting"
           )}
         </div>
 
-        {/* Step 2: API Key */}
+        {/* Step 3: API Key */}
         <div className="nb-step">
           <div className="nb-step-header">
-            <div className="nb-step-badge">02</div>
+            <div className="nb-step-badge">03</div>
             <div className="nb-step-title">
               <h3>Authentication</h3>
               <p>Gemini API credentials</p>
@@ -343,10 +496,10 @@ a portrait of a cat wearing sunglasses, studio lighting"
           )}
         </div>
 
-        {/* Step 3: Configuration */}
+        {/* Step 4: Configuration */}
         <div className="nb-step">
           <div className="nb-step-header">
-            <div className="nb-step-badge">03</div>
+            <div className="nb-step-badge">04</div>
             <div className="nb-step-title">
               <h3>Configuration</h3>
               <p>Model, format, and quality settings</p>
@@ -459,54 +612,6 @@ a portrait of a cat wearing sunglasses, studio lighting"
             </div>
           </div>
           */}
-        </div>
-
-        {/* Step 4: Reference Images (Optional) */}
-        <div className="nb-step nb-step-optional">
-          <div className="nb-step-header">
-            <div className="nb-step-badge nb-step-badge-optional">OPT</div>
-            <div className="nb-step-title">
-              <h3>Reference Images</h3>
-              <p>Up to 3 images, 10MB max each</p>
-            </div>
-          </div>
-
-          <div className="nb-upload-zone">
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handleFileChange}
-              className="nb-upload-input"
-              id="reference-upload"
-            />
-            <label htmlFor="reference-upload" className="nb-upload-label">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-              <span>Drop images or click to browse</span>
-            </label>
-          </div>
-
-          {validationState.errors.files && (
-            <div className="nb-error-msg">{validationState.errors.files}</div>
-          )}
-
-          {formData.reference_images.length > 0 && validationState.fileSizeValid && (
-            <div className="nb-file-list">
-              {formData.reference_images.map((file, i) => (
-                <div key={i} className="nb-file-item">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  <span className="nb-file-name">{file.name}</span>
-                  <span className="nb-file-size">{(file.size / 1024 / 1024).toFixed(2)}MB</span>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Submit Button */}

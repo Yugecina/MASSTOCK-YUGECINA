@@ -18,7 +18,7 @@ const { logger } = require('../config/logger');
 async function getClientMembers(req, res) {
   const { client_id } = req.params;
 
-  console.log('AdminClientController.getClientMembers:', { client_id });
+  logger.debug('AdminClientController.getClientMembers:', { client_id });
 
   // Verify client exists
   const { data: client, error: clientError } = await supabaseAdmin
@@ -100,7 +100,7 @@ async function addClientMember(req, res) {
   const { client_id } = req.params;
   const { user_id, role = 'collaborator' } = req.body;
 
-  console.log('AdminClientController.addClientMember:', { client_id, user_id, role });
+  logger.debug('AdminClientController.addClientMember:', { client_id, user_id, role });
 
   // Validate role
   if (!['owner', 'collaborator'].includes(role)) {
@@ -232,7 +232,7 @@ async function updateClientMemberRole(req, res) {
   const { client_id, member_id } = req.params;
   const { role } = req.body;
 
-  console.log('AdminClientController.updateClientMemberRole:', { client_id, member_id, role });
+  logger.debug('AdminClientController.updateClientMemberRole:', { client_id, member_id, role });
 
   // Validate role
   if (!['owner', 'collaborator'].includes(role)) {
@@ -324,7 +324,7 @@ async function updateClientMemberRole(req, res) {
 async function removeClientMember(req, res) {
   const { client_id, member_id } = req.params;
 
-  console.log('AdminClientController.removeClientMember:', { client_id, member_id });
+  logger.debug('AdminClientController.removeClientMember:', { client_id, member_id });
 
   // Get existing member
   const { data: member, error: fetchError } = await supabaseAdmin
@@ -399,7 +399,7 @@ async function removeClientMember(req, res) {
 async function getClientWorkflows(req, res) {
   const { client_id } = req.params;
 
-  console.log('AdminClientController.getClientWorkflows:', { client_id });
+  logger.debug('AdminClientController.getClientWorkflows:', { client_id });
 
   // Verify client exists
   const { data: client, error: clientError } = await supabaseAdmin
@@ -412,18 +412,28 @@ async function getClientWorkflows(req, res) {
     throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
   }
 
-  // Get workflows
-  const { data: workflows, error } = await supabaseAdmin
-    .from('workflows')
-    .select('*')
+  // Get workflows via client_workflows junction table
+  const { data: accessList, error } = await supabaseAdmin
+    .from('client_workflows')
+    .select(`
+      workflow_id,
+      is_active,
+      assigned_at,
+      workflow:workflows (*)
+    `)
     .eq('client_id', client_id)
-    .neq('status', 'archived')
-    .order('created_at', { ascending: false });
+    .eq('is_active', true);
 
   if (error) {
     logger.error('AdminClientController.getClientWorkflows error:', { error });
     throw new ApiError(500, 'Failed to fetch workflows', 'DATABASE_ERROR');
   }
+
+  // Extract workflows and filter out archived ones
+  const workflows = accessList
+    ?.map(a => a.workflow)
+    .filter(w => w && w.status !== 'archived')
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at)) || [];
 
   // Get execution stats for each workflow
   const workflowsWithStats = await Promise.all(
@@ -469,7 +479,7 @@ async function assignWorkflowToClient(req, res) {
   const { client_id } = req.params;
   const { template_id, name: customName } = req.body;
 
-  console.log('AdminClientController.assignWorkflowToClient:', { client_id, template_id });
+  logger.debug('AdminClientController.assignWorkflowToClient:', { client_id, template_id });
 
   // Verify client exists
   const { data: client, error: clientError } = await supabaseAdmin
@@ -494,29 +504,86 @@ async function assignWorkflowToClient(req, res) {
     throw new ApiError(404, 'Workflow template not found or inactive', 'TEMPLATE_NOT_FOUND');
   }
 
-  // Create workflow from template
-  const workflowName = customName || `${template.name} - ${client.name}`;
-
-  const { data: workflow, error: insertError } = await supabaseAdmin
+  // NEW ARCHITECTURE: Check if shared workflow exists for this template
+  let { data: sharedWorkflow } = await supabaseAdmin
     .from('workflows')
-    .insert([{
-      client_id,
-      template_id,
-      name: workflowName,
-      description: template.description,
-      status: 'deployed',
-      config: template.config,
-      cost_per_execution: template.cost_per_execution,
-      revenue_per_execution: template.revenue_per_execution,
-      created_by_user_id: req.user.id,
-      deployed_at: new Date().toISOString()
-    }])
-    .select()
-    .single();
+    .select('id, name')
+    .eq('template_id', template_id)
+    .is('client_id', null)
+    .eq('is_shared', true)
+    .eq('status', 'deployed')
+    .maybeSingle();
 
-  if (insertError) {
-    logger.error('AdminClientController.assignWorkflowToClient error:', { error: insertError });
-    throw new ApiError(500, 'Failed to create workflow', 'DATABASE_ERROR');
+  let workflowId;
+  let workflowName = customName || template.name;
+
+  if (!sharedWorkflow) {
+    // Create shared workflow (first time for this template)
+    logger.debug('Creating new shared workflow for template:', template_id);
+
+    const { data: newWorkflow, error: insertError } = await supabaseAdmin
+      .from('workflows')
+      .insert([{
+        client_id: null,  // SHARED workflow
+        template_id,
+        name: workflowName,
+        description: template.description,
+        status: 'deployed',
+        config: template.config,
+        cost_per_execution: template.cost_per_execution,
+        revenue_per_execution: template.revenue_per_execution,
+        is_shared: true,
+        created_by_user_id: req.user.id,
+        deployed_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (insertError) {
+      logger.error('AdminClientController.assignWorkflowToClient error:', { error: insertError });
+      throw new ApiError(500, 'Failed to create shared workflow', 'DATABASE_ERROR');
+    }
+
+    workflowId = newWorkflow.id;
+  } else {
+    // Use existing shared workflow
+    logger.debug('Using existing shared workflow:', sharedWorkflow.id);
+    workflowId = sharedWorkflow.id;
+  }
+
+  // Check if access already exists
+  const { data: existingAccess } = await supabaseAdmin
+    .from('client_workflows')
+    .select('id, is_active')
+    .eq('client_id', client_id)
+    .eq('workflow_id', workflowId)
+    .maybeSingle();
+
+  if (existingAccess) {
+    if (existingAccess.is_active) {
+      throw new ApiError(400, 'Client already has access to this workflow', 'ALREADY_ASSIGNED');
+    } else {
+      // Reactivate access
+      await supabaseAdmin
+        .from('client_workflows')
+        .update({ is_active: true, updated_at: new Date().toISOString() })
+        .eq('id', existingAccess.id);
+    }
+  } else {
+    // Grant access via client_workflows junction table
+    const { error: accessError } = await supabaseAdmin
+      .from('client_workflows')
+      .insert([{
+        client_id,
+        workflow_id: workflowId,
+        assigned_by: req.user.id,
+        is_active: true
+      }]);
+
+    if (accessError) {
+      logger.error('AdminClientController.assignWorkflowToClient - access error:', { error: accessError });
+      throw new ApiError(500, 'Failed to grant workflow access', 'DATABASE_ERROR');
+    }
   }
 
   // Audit log
@@ -525,10 +592,11 @@ async function assignWorkflowToClient(req, res) {
     user_id: req.user.id,
     action: 'workflow_assigned',
     resource_type: 'workflow',
-    resource_id: workflow.id,
+    resource_id: workflowId,
     changes: {
       template_name: template.name,
-      workflow_name: workflowName
+      workflow_name: workflowName,
+      shared: true
     },
     ip_address: req.ip,
     user_agent: req.get('user-agent')
@@ -536,62 +604,69 @@ async function assignWorkflowToClient(req, res) {
 
   res.status(201).json({
     success: true,
-    message: 'Workflow assigned successfully',
-    data: workflow
+    message: 'Workflow access granted successfully',
+    data: { workflow_id: workflowId, client_id }
   });
 }
 
 /**
  * DELETE /api/v1/admin/clients/:client_id/workflows/:workflow_id
- * Remove workflow from client (archive)
+ * Remove workflow access from client (NEW ARCHITECTURE: deactivate in junction table)
  */
 async function removeClientWorkflow(req, res) {
   const { client_id, workflow_id } = req.params;
 
-  console.log('AdminClientController.removeClientWorkflow:', { client_id, workflow_id });
+  logger.debug('AdminClientController.removeClientWorkflow:', { client_id, workflow_id });
 
-  // Get workflow
-  const { data: workflow, error: fetchError } = await supabaseAdmin
-    .from('workflows')
+  // Check if access exists
+  const { data: access, error: fetchError } = await supabaseAdmin
+    .from('client_workflows')
     .select('*')
-    .eq('id', workflow_id)
     .eq('client_id', client_id)
+    .eq('workflow_id', workflow_id)
     .single();
 
-  if (fetchError || !workflow) {
-    throw new ApiError(404, 'Workflow not found', 'WORKFLOW_NOT_FOUND');
+  if (fetchError || !access) {
+    throw new ApiError(404, 'Workflow access not found', 'ACCESS_NOT_FOUND');
   }
 
-  if (workflow.status === 'archived') {
-    throw new ApiError(400, 'Workflow already archived', 'ALREADY_ARCHIVED');
+  if (!access.is_active) {
+    throw new ApiError(400, 'Workflow access already removed', 'ALREADY_REMOVED');
   }
 
-  // Archive workflow
+  // Deactivate access (don't archive the shared workflow itself)
   const { error: updateError } = await supabaseAdmin
-    .from('workflows')
-    .update({ status: 'archived', updated_at: new Date().toISOString() })
-    .eq('id', workflow_id);
+    .from('client_workflows')
+    .update({ is_active: false, updated_at: new Date().toISOString() })
+    .eq('id', access.id);
 
   if (updateError) {
     logger.error('AdminClientController.removeClientWorkflow error:', { error: updateError });
-    throw new ApiError(500, 'Failed to archive workflow', 'DATABASE_ERROR');
+    throw new ApiError(500, 'Failed to remove workflow access', 'DATABASE_ERROR');
   }
+
+  // Get workflow name for audit log
+  const { data: workflow } = await supabaseAdmin
+    .from('workflows')
+    .select('name')
+    .eq('id', workflow_id)
+    .single();
 
   // Audit log
   await supabaseAdmin.from('audit_logs').insert([{
     client_id,
     user_id: req.user.id,
-    action: 'workflow_archived',
+    action: 'workflow_access_removed',
     resource_type: 'workflow',
     resource_id: workflow_id,
-    changes: { workflow_name: workflow.name },
+    changes: { workflow_name: workflow?.name || 'Unknown' },
     ip_address: req.ip,
     user_agent: req.get('user-agent')
   }]);
 
   res.json({
     success: true,
-    message: 'Workflow archived successfully'
+    message: 'Workflow access removed successfully'
   });
 }
 
@@ -615,7 +690,7 @@ async function getClientExecutions(req, res) {
     limit = 20
   } = req.query;
 
-  console.log('AdminClientController.getClientExecutions:', {
+  logger.debug('AdminClientController.getClientExecutions:', {
     client_id, workflow_id, triggered_by, status, date_from, date_to
   });
 
@@ -719,7 +794,7 @@ async function getClientActivity(req, res) {
   const { client_id } = req.params;
   const { limit = 50, offset = 0 } = req.query;
 
-  console.log('AdminClientController.getClientActivity:', { client_id, limit, offset });
+  logger.debug('AdminClientController.getClientActivity:', { client_id, limit, offset });
 
   // Verify client exists
   const { data: client, error: clientError } = await supabaseAdmin
@@ -775,7 +850,7 @@ async function getClientActivity(req, res) {
 async function searchUsersForMember(req, res) {
   const { q, exclude_client_id } = req.query;
 
-  console.log('🔍 AdminClientController.searchUsersForMember: Request received', { 
+  logger.debug('🔍 AdminClientController.searchUsersForMember: Request received', { 
     q, 
     exclude_client_id,
     qLength: q?.length,
@@ -783,7 +858,7 @@ async function searchUsersForMember(req, res) {
   });
 
   if (!q || q.length < 2) {
-    console.log('⚠️  AdminClientController.searchUsersForMember: Query too short, returning empty', { q });
+    logger.debug('⚠️  AdminClientController.searchUsersForMember: Query too short, returning empty', { q });
     return res.json({
       success: true,
       data: {
@@ -794,7 +869,7 @@ async function searchUsersForMember(req, res) {
   }
 
   // Search users by email
-  console.log('🔎 AdminClientController.searchUsersForMember: Querying database', {
+  logger.debug('🔎 AdminClientController.searchUsersForMember: Querying database', {
     searchTerm: `%${q}%`,
     filters: { status: 'active', role: 'user' }
   });
@@ -809,7 +884,7 @@ async function searchUsersForMember(req, res) {
 
   const { data: users, error } = await query;
 
-  console.log('📦 AdminClientController.searchUsersForMember: Database response', {
+  logger.debug('📦 AdminClientController.searchUsersForMember: Database response', {
     users,
     usersCount: users?.length,
     error,
@@ -824,21 +899,21 @@ async function searchUsersForMember(req, res) {
   // If exclude_client_id is provided, filter out existing members
   let filteredUsers = users || [];
   if (exclude_client_id) {
-    console.log('🔍 AdminClientController.searchUsersForMember: Filtering existing members', { exclude_client_id });
+    logger.debug('🔍 AdminClientController.searchUsersForMember: Filtering existing members', { exclude_client_id });
     const { data: existingMembers } = await supabaseAdmin
       .from('client_members')
       .select('user_id')
       .eq('client_id', exclude_client_id)
       .eq('status', 'active');
 
-    console.log('📦 AdminClientController.searchUsersForMember: Existing members', {
+    logger.debug('📦 AdminClientController.searchUsersForMember: Existing members', {
       existingMembers,
       count: existingMembers?.length
     });
 
     const existingUserIds = new Set(existingMembers?.map(m => m.user_id) || []);
     filteredUsers = filteredUsers.filter(u => !existingUserIds.has(u.id));
-    console.log('✂️  AdminClientController.searchUsersForMember: After filtering', {
+    logger.debug('✂️  AdminClientController.searchUsersForMember: After filtering', {
       filteredCount: filteredUsers.length,
       filteredUsers
     });
@@ -852,7 +927,7 @@ async function searchUsersForMember(req, res) {
     }
   };
 
-  console.log('✅ AdminClientController.searchUsersForMember: Sending response', {
+  logger.debug('✅ AdminClientController.searchUsersForMember: Sending response', {
     responseData,
     responseKeys: Object.keys(responseData),
     dataKeys: Object.keys(responseData.data),

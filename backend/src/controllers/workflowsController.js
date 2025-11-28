@@ -25,6 +25,7 @@ function getCleanAdmin() {
 /**
  * GET /api/workflows
  * Get all workflows for authenticated client
+ * Fetches workflows via client_workflows junction table (NEW ARCHITECTURE)
  */
 async function getWorkflows(req, res) {
   const clientId = req.client?.id;
@@ -44,23 +45,52 @@ async function getWorkflows(req, res) {
   // Use a fresh admin client to avoid auth context issues
   const admin = getCleanAdmin();
 
-  // Fetch workflows with execution count using raw SQL
-  const { data: workflows, error } = await admin.rpc('get_workflows_with_execution_count', {
-    p_client_id: clientId
-  });
+  // Fetch workflows via client_workflows junction table
+  const { data: accessList, error } = await admin
+    .from('client_workflows')
+    .select(`
+      workflow_id,
+      assigned_at,
+      is_active,
+      workflow:workflows (
+        id, name, description, status, config,
+        template_id, is_shared, created_at, updated_at
+      )
+    `)
+    .eq('client_id', clientId)
+    .eq('is_active', true);
 
   if (error) {
     logger.error('❌ Workflows query error:', error);
     throw new ApiError(500, `Failed to fetch workflows: ${error.message}`, 'DATABASE_ERROR');
   }
 
-  logger.debug(`✅ Found ${workflows?.length || 0} workflows for client ${clientId}`);
+  // Get execution count for each workflow
+  const workflows = await Promise.all(
+    (accessList || [])
+      .filter(a => a.workflow) // Filter out null workflows
+      .map(async (access) => {
+        const { count } = await admin
+          .from('workflow_executions')
+          .select('*', { count: 'exact', head: true })
+          .eq('workflow_id', access.workflow_id)
+          .eq('client_id', clientId);
+
+        return {
+          ...access.workflow,
+          execution_count: count || 0,
+          assigned_at: access.assigned_at
+        };
+      })
+  );
+
+  logger.debug(`✅ Found ${workflows.length} workflows for client ${clientId}`);
 
   res.json({
     success: true,
     data: {
       workflows: workflows || [],
-      total: workflows?.length || 0
+      total: workflows.length
     }
   });
 }
@@ -68,30 +98,73 @@ async function getWorkflows(req, res) {
 /**
  * GET /api/workflows/:workflow_id
  * Get workflow details with stats and recent executions
+ * Verifies access via client_workflows junction table (NEW ARCHITECTURE)
  */
 async function getWorkflow(req, res) {
   const { workflow_id } = req.params;
   const clientId = req.client.id;
 
-  // Fetch workflow
-  const { data: workflow, error } = await supabaseAdmin
+  // Use a fresh admin client to avoid auth context issues
+  const admin = getCleanAdmin();
+
+  // DEBUG: Log query parameters
+  logger.info(`🔍 getWorkflow DEBUG:`, {
+    workflow_id,
+    clientId,
+    clientIdType: typeof clientId,
+    workflow_idType: typeof workflow_id
+  });
+
+  // Check access via client_workflows junction table
+  const { data: access, error: accessError } = await admin
+    .from('client_workflows')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('workflow_id', workflow_id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  // DEBUG: Log query result
+  logger.info(`🔍 getWorkflow access query result:`, {
+    accessFound: !!access,
+    accessError: accessError,
+    accessData: access
+  });
+
+  if (accessError) {
+    logger.error('❌ Error checking workflow access:', accessError);
+    throw new ApiError(500, 'Database error', 'DATABASE_ERROR');
+  }
+
+  if (!access) {
+    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+    throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
+  }
+
+  // Fetch workflow (without client_id filter)
+  const { data: workflow, error } = await admin
     .from('workflows')
     .select('*')
     .eq('id', workflow_id)
-    .eq('client_id', clientId)
     .single();
 
   if (error || !workflow) {
+    logger.error('❌ Error fetching workflow:', error);
     throw new ApiError(404, 'Workflow not found', 'WORKFLOW_NOT_FOUND');
   }
 
-  // Fetch execution stats
-  const { data: executions } = await supabaseAdmin
+  // Fetch execution stats (filter by client_id to ensure isolation)
+  const { data: executions, error: execError } = await admin
     .from('workflow_executions')
     .select('status, duration_seconds, created_at')
     .eq('workflow_id', workflow_id)
+    .eq('client_id', clientId)
     .order('created_at', { ascending: false })
     .limit(10);
+
+  if (execError) {
+    logger.error('❌ Error fetching executions:', execError);
+  }
 
   const totalExecutions = executions?.length || 0;
   const successCount = executions?.filter(e => e.status === 'completed').length || 0;
@@ -99,6 +172,14 @@ async function getWorkflow(req, res) {
   const avgDuration = executions?.length > 0
     ? executions.reduce((sum, e) => sum + (e.duration_seconds || 0), 0) / executions.length
     : 0;
+
+  logger.info('✅ getWorkflow success:', {
+    workflow_id,
+    workflow_name: workflow.name,
+    totalExecutions,
+    successCount,
+    failedCount
+  });
 
   res.json({
     success: true,
@@ -120,17 +201,39 @@ async function getWorkflow(req, res) {
  * POST /api/workflows/:workflow_id/execute
  * Execute workflow asynchronously
  * Supports both JSON (standard workflows) and multipart/form-data (nano_banana)
+ * Verifies access via client_workflows junction table (NEW ARCHITECTURE)
  */
 async function executeWorkflow(req, res) {
   const { workflow_id } = req.params;
   const clientId = req.client.id;
 
-  // Fetch workflow
-  const { data: workflow, error } = await supabaseAdmin
+  // Use a fresh admin client to avoid auth context issues
+  const admin = getCleanAdmin();
+
+  // Check access via client_workflows junction table
+  const { data: access, error: accessError } = await admin
+    .from('client_workflows')
+    .select('*')
+    .eq('client_id', clientId)
+    .eq('workflow_id', workflow_id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (accessError) {
+    logger.error('❌ Error checking workflow access:', accessError);
+    throw new ApiError(500, 'Database error', 'DATABASE_ERROR');
+  }
+
+  if (!access) {
+    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+    throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
+  }
+
+  // Fetch workflow (without client_id filter)
+  const { data: workflow, error } = await admin
     .from('workflows')
     .select('*')
     .eq('id', workflow_id)
-    .eq('client_id', clientId)
     .single();
 
   if (error || !workflow) {
@@ -207,7 +310,8 @@ async function executeWorkflow(req, res) {
     // Parse and validate prompts
     const prompts = parsePrompts(prompts_text);
     const validation = validatePrompts(prompts, {
-      maxPrompts: workflow.config.max_prompts || 100
+      maxPrompts: workflow.config.max_prompts || 100,
+      maxLength: 10000 // Allow detailed prompts with add/negative sections (was 1000)
     });
 
     if (!validation.valid) {
@@ -217,8 +321,8 @@ async function executeWorkflow(req, res) {
     // Convert files to base64
     const referenceImages = filesToBase64(files);
 
-    if (referenceImages.length > (workflow.config.max_reference_images || 3)) {
-      throw new ApiError(400, `Maximum ${workflow.config.max_reference_images || 3} reference images allowed`, 'TOO_MANY_FILES');
+    if (referenceImages.length > (workflow.config.max_reference_images || 14)) {
+      throw new ApiError(400, `Maximum ${workflow.config.max_reference_images || 14} reference images allowed`, 'TOO_MANY_FILES');
     }
 
     // NEW: Calculate dynamic pricing based on model and resolution
@@ -265,7 +369,7 @@ async function executeWorkflow(req, res) {
     };
 
     // Update workflow with encrypted key
-    await supabaseAdmin
+    await admin
       .from('workflows')
       .update({ config: updatedConfig })
       .eq('id', workflow_id);
@@ -291,7 +395,7 @@ async function executeWorkflow(req, res) {
 
   // Create execution record
   const executionId = uuidv4();
-  const { data: execution, error: execError } = await supabaseAdmin
+  const { data: execution, error: execError } = await admin
     .from('workflow_executions')
     .insert([{
       id: executionId,
@@ -322,7 +426,7 @@ async function executeWorkflow(req, res) {
     logWorkflowExecution(executionId, workflow_id, clientId, 'queued');
   } catch (queueError) {
     // Update execution status to failed
-    await supabaseAdmin
+    await admin
       .from('workflow_executions')
       .update({
         status: 'failed',
@@ -335,7 +439,7 @@ async function executeWorkflow(req, res) {
   }
 
   // Create audit log
-  await supabaseAdmin.from('audit_logs').insert([{
+  await admin.from('audit_logs').insert([{
     client_id: clientId,
     user_id: req.user.id,
     action: 'workflow_executed',
@@ -364,7 +468,10 @@ async function getExecution(req, res) {
   const { execution_id } = req.params;
   const clientId = req.client.id;
 
-  const { data: execution, error } = await supabaseAdmin
+  // Use a fresh admin client to avoid auth context issues
+  const admin = getCleanAdmin();
+
+  const { data: execution, error } = await admin
     .from('workflow_executions')
     .select('*')
     .eq('id', execution_id)
@@ -419,16 +526,23 @@ async function getWorkflowExecutions(req, res) {
   const clientId = req.client.id;
   const { limit = 50, offset = 0, status } = req.query;
 
-  // Verify workflow belongs to client
-  const { data: workflow } = await supabaseAdmin
-    .from('workflows')
-    .select('id')
-    .eq('id', workflow_id)
+  // Check access via client_workflows junction table
+  const { data: access, error: accessError } = await supabaseAdmin
+    .from('client_workflows')
+    .select('workflow_id')
     .eq('client_id', clientId)
-    .single();
+    .eq('workflow_id', workflow_id)
+    .eq('is_active', true)
+    .maybeSingle();
 
-  if (!workflow) {
-    throw new ApiError(404, 'Workflow not found', 'WORKFLOW_NOT_FOUND');
+  if (accessError) {
+    logger.error('❌ Error checking workflow access:', accessError);
+    throw new ApiError(500, 'Database error', 'DATABASE_ERROR');
+  }
+
+  if (!access) {
+    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+    throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
   }
 
   // Build query with triggered_by user info
@@ -474,12 +588,30 @@ async function getWorkflowStats(req, res) {
   const { workflow_id } = req.params;
   const clientId = req.client.id;
 
-  // Verify workflow belongs to client
+  // Check access via client_workflows junction table
+  const { data: access, error: accessError } = await supabaseAdmin
+    .from('client_workflows')
+    .select('workflow_id')
+    .eq('client_id', clientId)
+    .eq('workflow_id', workflow_id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (accessError) {
+    logger.error('❌ Error checking workflow access:', accessError);
+    throw new ApiError(500, 'Database error', 'DATABASE_ERROR');
+  }
+
+  if (!access) {
+    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+    throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
+  }
+
+  // Fetch workflow (without client_id filter)
   const { data: workflow } = await supabaseAdmin
     .from('workflows')
     .select('*')
     .eq('id', workflow_id)
-    .eq('client_id', clientId)
     .single();
 
   if (!workflow) {
@@ -533,18 +665,64 @@ async function getWorkflowStats(req, res) {
  */
 async function getExecutionBatchResults(req, res) {
   const { execution_id } = req.params;
+
+  // Check if client exists
+  if (!req.client) {
+    logger.error('❌ getExecutionBatchResults: No client found', {
+      execution_id,
+      hasUser: !!req.user,
+      userId: req.user?.id
+    });
+    throw new ApiError(403, 'No client account', 'NO_CLIENT_ACCOUNT');
+  }
+
   const clientId = req.client.id;
 
+  logger.info('🔍 getExecutionBatchResults: Starting', {
+    execution_id,
+    clientId,
+    hasClient: !!req.client,
+    clientKeys: Object.keys(req.client || {})
+  });
+
   // Verify execution belongs to client
-  const { data: execution } = await supabaseAdmin
+  const { data: execution, error: execError } = await supabaseAdmin
     .from('workflow_executions')
-    .select('id, workflow_id')
+    .select('id, workflow_id, client_id, status')
     .eq('id', execution_id)
-    .eq('client_id', clientId)
-    .single();
+    .maybeSingle();
+
+  logger.info('🔍 getExecutionBatchResults: Execution lookup result', {
+    execution_id,
+    found: !!execution,
+    executionData: execution,
+    expectedClientId: clientId,
+    actualClientId: execution?.client_id,
+    clientIdMatch: execution?.client_id === clientId,
+    execError: execError?.message,
+    execErrorDetails: execError
+  });
+
+  if (execError) {
+    logger.error('❌ getExecutionBatchResults: Query error', {
+      execution_id,
+      error: execError
+    });
+    throw new ApiError(500, 'Failed to query execution', 'QUERY_ERROR');
+  }
 
   if (!execution) {
     throw new ApiError(404, 'Execution not found', 'EXECUTION_NOT_FOUND');
+  }
+
+  // Verify execution belongs to this client
+  if (execution.client_id !== clientId) {
+    logger.error('❌ getExecutionBatchResults: Client mismatch', {
+      execution_id,
+      executionClientId: execution.client_id,
+      requestClientId: clientId
+    });
+    throw new ApiError(403, 'Access denied to this execution', 'EXECUTION_ACCESS_DENIED');
   }
 
   // Fetch batch results
@@ -554,13 +732,40 @@ async function getExecutionBatchResults(req, res) {
     .eq('execution_id', execution_id)
     .order('batch_index', { ascending: true });
 
+  logger.info('🔍 getExecutionBatchResults: Batch results lookup', {
+    execution_id,
+    count: batchResults?.length || 0,
+    error: error?.message,
+    errorDetails: error
+  });
+
   if (error) {
+    logger.error('❌ getExecutionBatchResults: Database error fetching batch results', {
+      execution_id,
+      error: error.message,
+      errorDetails: error
+    });
     throw new ApiError(500, 'Failed to fetch batch results', 'DATABASE_ERROR');
   }
 
   // Fetch stats using the database function
-  const { data: stats } = await supabaseAdmin
+  const { data: stats, error: statsError } = await supabaseAdmin
     .rpc('get_batch_execution_stats', { p_execution_id: execution_id });
+
+  logger.info('🔍 getExecutionBatchResults: Stats RPC call result', {
+    execution_id,
+    stats,
+    statsError: statsError?.message,
+    statsErrorDetails: statsError
+  });
+
+  if (statsError) {
+    logger.error('❌ getExecutionBatchResults: RPC error fetching stats', {
+      execution_id,
+      error: statsError.message,
+      errorDetails: statsError
+    });
+  }
 
   res.json({
     success: true,
@@ -629,49 +834,97 @@ async function getAllClientExecutions(req, res) {
   const clientId = req.client.id;
   const { limit = 20, offset = 0, status, workflow_id, user_id } = req.query;
 
-  // Build query with workflow and triggered_by user info
-  let query = supabaseAdmin
+  logger.info('📡 getAllClientExecutions called:', {
+    clientId,
+    userId: req.user?.id,
+    filters: { limit, offset, status, workflow_id, user_id }
+  });
+
+  // Use a fresh admin client to avoid auth context issues
+  const admin = getCleanAdmin();
+
+  // Fetch executions first
+  let executionsQuery = admin
     .from('workflow_executions')
-    .select(`
-      *,
-      workflow:workflow_id (
-        id,
-        name,
-        config
-      ),
-      triggered_by:triggered_by_user_id (
-        id,
-        email
-      )
-    `, { count: 'exact' })
+    .select('*', { count: 'exact' })
     .eq('client_id', clientId)
     .order('created_at', { ascending: false })
     .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
 
   // Apply optional filters
   if (status && status !== 'all') {
-    query = query.eq('status', status);
+    executionsQuery = executionsQuery.eq('status', status);
   }
   if (workflow_id && workflow_id !== 'all') {
-    query = query.eq('workflow_id', workflow_id);
+    executionsQuery = executionsQuery.eq('workflow_id', workflow_id);
   }
   if (user_id && user_id !== 'all') {
-    query = query.eq('triggered_by_user_id', user_id);
+    executionsQuery = executionsQuery.eq('triggered_by_user_id', user_id);
   }
 
-  const { data: executions, error, count } = await query;
+  const { data: executions, error, count } = await executionsQuery;
+
+  logger.info('📦 getAllClientExecutions: Query result:', {
+    executionsCount: executions?.length || 0,
+    totalCount: count,
+    error: error?.message || null,
+    firstExecution: executions?.[0] ? {
+      id: executions[0].id,
+      workflow_id: executions[0].workflow_id,
+      client_id: executions[0].client_id
+    } : null
+  });
 
   if (error) {
+    logger.error('❌ getAllClientExecutions: Database error:', { error });
     throw new ApiError(500, 'Failed to fetch executions', 'DATABASE_ERROR');
   }
 
+  // Get unique workflow_ids and user_ids
+  const workflowIds = [...new Set(executions.map(e => e.workflow_id).filter(Boolean))];
+  const userIds = [...new Set(executions.map(e => e.triggered_by_user_id).filter(Boolean))];
+
+  // Fetch workflows in separate query (bypasses RLS issues)
+  const { data: workflows } = await admin
+    .from('workflows')
+    .select('id, name, config')
+    .in('id', workflowIds);
+
+  // Fetch users in separate query
+  const { data: users } = await admin
+    .from('users')
+    .select('id, email')
+    .in('id', userIds);
+
+  // Create lookup maps
+  const workflowsMap = {};
+  (workflows || []).forEach(w => {
+    workflowsMap[w.id] = w;
+  });
+
+  const usersMap = {};
+  (users || []).forEach(u => {
+    usersMap[u.id] = u;
+  });
+
   // Format executions with workflow info
-  const formattedExecutions = (executions || []).map(exec => ({
-    ...exec,
-    workflow_name: exec.workflow?.name || 'Unknown Workflow',
-    workflow_type: exec.workflow?.config?.workflow_type || 'standard',
-    triggered_by_email: exec.triggered_by?.email || null
-  }));
+  const formattedExecutions = (executions || []).map(exec => {
+    const workflow = workflowsMap[exec.workflow_id];
+    const user = usersMap[exec.triggered_by_user_id];
+
+    return {
+      ...exec,
+      workflow_name: workflow?.name || 'Unknown Workflow',
+      workflow_type: workflow?.config?.workflow_type || 'standard',
+      triggered_by_email: user?.email || null
+    };
+  });
+
+  logger.info('✅ getAllClientExecutions: Sending response:', {
+    executionsCount: formattedExecutions.length,
+    total: count,
+    hasMore: parseInt(offset) + formattedExecutions.length < count
+  });
 
   res.json({
     success: true,
@@ -685,19 +938,6 @@ async function getAllClientExecutions(req, res) {
   });
 }
 
-module.exports = {
-  getWorkflows,
-  getWorkflow,
-  executeWorkflow,
-  getExecution,
-  getWorkflowExecutions,
-  getWorkflowStats,
-  getExecutionBatchResults,
-  getDashboardStats,
-  getClientMembers,
-  getAllClientExecutions
-};
-
 /**
  * GET /api/workflows/stats/dashboard
  * Get aggregated stats for client dashboard
@@ -708,16 +948,18 @@ async function getDashboardStats(req, res) {
   // Use a fresh admin client to avoid auth context issues
   const admin = getCleanAdmin();
 
-  // 1. Get Active Workflows Count
-  const { count: activeWorkflowsCount, error: workflowError } = await admin
-    .from('workflows')
-    .select('*', { count: 'exact', head: true })
+  // 1. Get Active Workflows Count via client_workflows junction table
+  const { data: accessList, error: workflowError } = await admin
+    .from('client_workflows')
+    .select('workflow:workflows!inner(status)')
     .eq('client_id', clientId)
-    .eq('status', 'deployed'); // Assuming 'deployed' means active
+    .eq('is_active', true);
 
   if (workflowError) {
     throw new ApiError(500, `Failed to fetch workflow stats: ${workflowError.message}`, 'DATABASE_ERROR');
   }
+
+  const activeWorkflowsCount = accessList?.filter(a => a.workflow?.status === 'deployed').length || 0;
 
   // 2. Get Total Executions Count
   const { count: totalExecutionsCount, error: executionError } = await admin
@@ -756,3 +998,16 @@ async function getDashboardStats(req, res) {
     }
   });
 }
+
+module.exports = {
+  getWorkflows,
+  getWorkflow,
+  executeWorkflow,
+  getExecution,
+  getWorkflowExecutions,
+  getWorkflowStats,
+  getExecutionBatchResults,
+  getDashboardStats,
+  getClientMembers,
+  getAllClientExecutions
+};
