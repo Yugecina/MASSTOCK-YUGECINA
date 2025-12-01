@@ -97,12 +97,19 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
     throw error;
   }
 
-  // Configure concurrency for prompt processing
-  const PROMPT_CONCURRENCY = parseInt(process.env.PROMPT_CONCURRENCY || '5', 10);
+  // Configure concurrency based on model (Flash = faster, Pro = slower)
+  const model = config.model || 'gemini-2.5-flash-preview-image';
+  const isFlash = model.includes('flash');
+
+  const PROMPT_CONCURRENCY = isFlash
+    ? parseInt(process.env.PROMPT_CONCURRENCY_FLASH || '15', 10)
+    : parseInt(process.env.PROMPT_CONCURRENCY_PRO || '10', 10);
+
   const limit = pLimit(PROMPT_CONCURRENCY);
 
+  logger.debug(`🔧 Model: ${model} (${isFlash ? 'Flash' : 'Pro'})`);
   logger.debug(`🔧 Prompt concurrency set to: ${PROMPT_CONCURRENCY} parallel prompts`);
-  logger.debug(`📊 Rate limiter stats: ${JSON.stringify(apiRateLimiter.getStats())}`);
+  logger.debug(`📊 Rate limiter stats: ${JSON.stringify(apiRateLimiter.getStats(model))}`);
 
   /**
    * Process a single prompt with Gemini API
@@ -137,9 +144,10 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
           status: 'processing'
         });
 
-      // Acquire rate limiter slot before calling API
-      logger.debug(`🚦 Acquiring rate limiter slot... (Queue: ${apiRateLimiter.getStats().queuedRequests})`);
-      await apiRateLimiter.acquire();
+      // Acquire rate limiter slot before calling API (model-specific)
+      const rateLimiterStats = apiRateLimiter.getStats(model);
+      logger.debug(`🚦 Acquiring ${isFlash ? 'Flash' : 'Pro'} rate limiter slot... (Queue: ${rateLimiterStats.queuedRequests || 0})`);
+      await apiRateLimiter.acquire(model);
       logger.debug(`✅ Rate limiter slot acquired`);
 
       // Generate image with Gemini
@@ -155,7 +163,7 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
       const processingTime = Date.now() - startTime;
 
       logger.debug(`⏱️  Completed in ${(processingTime / 1000).toFixed(2)}s`);
-      logger.debug(`📊 Rate limiter stats: ${JSON.stringify(apiRateLimiter.getStats())}`);
+      logger.debug(`📊 Rate limiter stats: ${JSON.stringify(apiRateLimiter.getStats(model))}`);
 
       if (result.success) {
         logger.debug(`✅ Image generated successfully`);

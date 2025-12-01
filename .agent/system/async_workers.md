@@ -242,11 +242,16 @@ const result = await geminiService.generateImage(prompt, {...});
 
 ### Gemini API Constraints
 
-| Tier | Rate Limit | GEMINI_RATE_LIMIT | Recommended Config |
-|------|-----------|-------------------|-------------------|
-| **Free** | 15 req/min | 15 | WORKER=3, PROMPT=5 |
-| **Paid (Basic)** | 60 req/min | 60 | WORKER=5, PROMPT=10 |
-| **Paid (Pro)** | 300 req/min | 300 | WORKER=10, PROMPT=20 |
+| Tier | Model | Rate Limit | Config Variables | Recommended |
+|------|-------|-----------|------------------|-------------|
+| **Free** | Flash | 15 req/min | GEMINI_RATE_LIMIT_FLASH | WORKER=3, FLASH_CONC=5 |
+| **Free** | Pro | 5 req/min | GEMINI_RATE_LIMIT_PRO | WORKER=2, PRO_CONC=3 |
+| **Paid Tier 1** | Flash | 500 req/min | GEMINI_RATE_LIMIT_FLASH | WORKER=3, FLASH_CONC=15 |
+| **Paid Tier 1** | Pro | 100 req/min | GEMINI_RATE_LIMIT_PRO | WORKER=3, PRO_CONC=10 |
+| **Paid Tier 2** | Flash | 2000 req/min | GEMINI_RATE_LIMIT_FLASH | WORKER=5, FLASH_CONC=20 |
+| **Paid Tier 2** | Pro | 1000 req/min | GEMINI_RATE_LIMIT_PRO | WORKER=5, PRO_CONC=15 |
+
+**Note:** System automatically selects the correct rate limiter based on model used (flash vs pro).
 
 ---
 
@@ -254,23 +259,33 @@ const result = await geminiService.generateImage(prompt, {...});
 
 ### Environment Variables
 
-**File:** `backend/.env.example` (lines 38-51)
+**File:** `backend/.env.example` (lines 38-63)
 
 ```env
 # Worker Concurrency Configuration
-# Number of workflow executions to process in parallel (default: 3)
-# Set lower (1-2) for limited resources, higher (5-10) for more powerful servers
 WORKER_CONCURRENCY=3
 
-# Number of prompts to process in parallel within each execution (default: 5)
-# Must respect Gemini API rate limits: Free tier = 15 req/min, Paid = higher
-PROMPT_CONCURRENCY=5
+# Gemini API Rate Limiting (Tier 1 Paid - Dynamic per model)
+# System automatically selects the appropriate limiter based on model used
 
-# Gemini API Rate Limiting (Free tier: 15 req/min)
-# Maximum requests per minute for Gemini API (default: 15 for free tier)
-GEMINI_RATE_LIMIT=15
-# Time window in milliseconds for rate limiting (default: 60000 = 1 minute)
+# Flash models: Fast, high volume (gemini-2.5-flash-*)
+# Tier 1: 500 RPM, recommended for batch processing
+GEMINI_RATE_LIMIT_FLASH=500
+PROMPT_CONCURRENCY_FLASH=15
+
+# Pro models: High quality, slower (gemini-3-pro-*)
+# Tier 1: 100 RPM, recommended for high-quality outputs
+GEMINI_RATE_LIMIT_PRO=100
+PROMPT_CONCURRENCY_PRO=10
+
+# Rate limit time window in milliseconds (default: 60000 = 1 minute)
 GEMINI_RATE_WINDOW=60000
+
+# Free Tier Users: Uncomment and set these instead
+# GEMINI_RATE_LIMIT_FLASH=15
+# GEMINI_RATE_LIMIT_PRO=5
+# PROMPT_CONCURRENCY_FLASH=5
+# PROMPT_CONCURRENCY_PRO=3
 ```
 
 ### Tuning Guidelines

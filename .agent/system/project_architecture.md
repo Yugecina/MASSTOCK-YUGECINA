@@ -278,12 +278,14 @@ Define API endpoints (all prefixed with `/api/v1/`):
 **Async Parallel Processing Architecture:**
 
 - `workflowQueue.js` - Bull queue for background jobs (Redis-backed)
-- `workflow-worker.js` - **Async worker pool** (v2.0)
+- `workflow-worker.js` - **Async worker pool** (v2.3 - Model-aware)
   - **Worker concurrency:** 3 parallel executions (configurable via `WORKER_CONCURRENCY`)
-  - **Prompt concurrency:** 5 parallel prompts per execution (via `PROMPT_CONCURRENCY`)
+  - **Dynamic prompt concurrency:** Model-aware parallel processing
+    - Flash models: 15 parallel prompts (via `PROMPT_CONCURRENCY_FLASH`)
+    - Pro models: 10 parallel prompts (via `PROMPT_CONCURRENCY_PRO`)
   - `processNanoBananaWorkflow()` - Batch image generation with parallel processing
   - `processStandardWorkflow()` - Placeholder for future workflows
-  - **Performance:** 15x faster than sequential processing (v1.x)
+  - **Performance:** 15x faster than sequential (v1.x), 7-10x faster with Tier 1 (v2.3)
 
 **See:** [Async Workers Documentation](./async_workers.md) for complete details
 
@@ -298,11 +300,13 @@ Define API endpoints (all prefixed with `/api/v1/`):
 - `encryption.js` - Encrypt/decrypt API keys (AES-256-CBC)
 - `workflowLogger.js` - Structured workflow logging
 - `promptParser.js` - Parse workflow prompts
-- `apiRateLimiter.js` - **Global API rate limiter** (v2.0)
-  - Sliding window algorithm (15 req/min for Gemini Free tier)
-  - Automatic request queuing when limit hit
-  - Real-time statistics and monitoring
+- `apiRateLimiter.js` - **Model-aware API rate limiter** (v2.3)
+  - Separate rate limiters for Flash (500 RPM) and Pro (100 RPM) models
+  - Dynamic rate limiting based on model type (Tier 1 Paid)
+  - Sliding window algorithm with automatic request queuing
+  - Real-time statistics and monitoring per model
   - Shared singleton across all worker processes
+  - Configurable via `GEMINI_RATE_LIMIT_FLASH`, `GEMINI_RATE_LIMIT_PRO`
 
 ### Frontend Components
 

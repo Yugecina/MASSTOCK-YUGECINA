@@ -231,6 +231,14 @@ generate_backend_env() {
     local redis_port="6379"
     local log_level="info"
 
+    # Worker & Rate Limiting Configuration (Tier 1)
+    local worker_concurrency="3"
+    local gemini_rate_limit_flash="500"
+    local gemini_rate_limit_pro="100"
+    local gemini_rate_window="60000"
+    local prompt_concurrency_flash="15"
+    local prompt_concurrency_pro="10"
+
     # Write .env file
     log_step "Writing backend/.env.production..."
 
@@ -270,6 +278,21 @@ CORS_ORIGIN=$cors_origin
 
 # Logging
 LOG_LEVEL=$log_level
+
+# Worker Concurrency
+WORKER_CONCURRENCY=$worker_concurrency
+
+# Gemini API Rate Limiting (Tier 1 - Dynamic per model)
+# Flash models: Fast, high volume (gemini-2.5-flash)
+GEMINI_RATE_LIMIT_FLASH=$gemini_rate_limit_flash
+PROMPT_CONCURRENCY_FLASH=$prompt_concurrency_flash
+
+# Pro models: High quality, slower (gemini-3-pro)
+GEMINI_RATE_LIMIT_PRO=$gemini_rate_limit_pro
+PROMPT_CONCURRENCY_PRO=$prompt_concurrency_pro
+
+# Rate limit time window (milliseconds)
+GEMINI_RATE_WINDOW=$gemini_rate_window
 
 EOF
 

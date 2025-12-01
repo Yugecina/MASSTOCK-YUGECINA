@@ -99,13 +99,90 @@ class ApiRateLimiter {
   }
 }
 
-// Create global singleton instance
-// These values come from environment or use safe defaults for free tier
-const maxRequests = parseInt(process.env.GEMINI_RATE_LIMIT || '15', 10);
-const windowMs = parseInt(process.env.GEMINI_RATE_WINDOW || '60000', 10);
+/**
+ * Model-aware rate limiter manager
+ * Maintains separate rate limiters for different Gemini models
+ * to maximize throughput while respecting API tier limits
+ */
+class ModelRateLimiters {
+  constructor() {
+    // Create separate rate limiters for each model type
+    this.limiters = {
+      flash: new ApiRateLimiter(
+        parseInt(process.env.GEMINI_RATE_LIMIT_FLASH || '500', 10),
+        parseInt(process.env.GEMINI_RATE_WINDOW || '60000', 10)
+      ),
+      pro: new ApiRateLimiter(
+        parseInt(process.env.GEMINI_RATE_LIMIT_PRO || '100', 10),
+        parseInt(process.env.GEMINI_RATE_WINDOW || '60000', 10)
+      )
+    };
 
-const globalRateLimiter = new ApiRateLimiter(maxRequests, windowMs);
+    logger.info(`🚦 Model Rate Limiters initialized:`);
+    logger.info(`   Flash models: ${process.env.GEMINI_RATE_LIMIT_FLASH || 500} RPM`);
+    logger.info(`   Pro models: ${process.env.GEMINI_RATE_LIMIT_PRO || 100} RPM`);
+  }
 
-logger.info(`🚦 API Rate Limiter initialized: ${maxRequests} requests per ${windowMs}ms`);
+  /**
+   * Get the appropriate rate limiter for a given model
+   * @param {string} model - Model name (e.g., 'gemini-2.5-flash', 'gemini-3-pro')
+   * @returns {ApiRateLimiter} The appropriate rate limiter instance
+   */
+  getLimiter(model) {
+    if (!model || typeof model !== 'string') {
+      logger.warn('⚠️  No model specified, using Flash limiter as default');
+      return this.limiters.flash;
+    }
 
-module.exports = globalRateLimiter;
+    if (model.includes('flash')) {
+      logger.debug(`🔵 Using Flash rate limiter for model: ${model}`);
+      return this.limiters.flash;
+    }
+
+    if (model.includes('pro')) {
+      logger.debug(`🟣 Using Pro rate limiter for model: ${model}`);
+      return this.limiters.pro;
+    }
+
+    logger.warn(`⚠️  Unknown model type: ${model}, using Flash limiter as default`);
+    return this.limiters.flash;
+  }
+
+  /**
+   * Acquire a slot for API request
+   * @param {string} model - Model name
+   * @returns {Promise<void>} Resolves when slot is available
+   */
+  async acquire(model) {
+    return this.getLimiter(model).acquire();
+  }
+
+  /**
+   * Get statistics for a specific model's rate limiter
+   * @param {string} model - Model name
+   * @returns {Object} Rate limiter statistics
+   */
+  getStats(model) {
+    if (!model) {
+      // Return combined stats if no model specified
+      return {
+        flash: this.limiters.flash.getStats(),
+        pro: this.limiters.pro.getStats()
+      };
+    }
+    return this.getLimiter(model).getStats();
+  }
+
+  /**
+   * Reset all rate limiters (useful for testing)
+   */
+  resetAll() {
+    this.limiters.flash.reset();
+    this.limiters.pro.reset();
+  }
+}
+
+// Export singleton instance
+const modelRateLimiters = new ModelRateLimiters();
+
+module.exports = modelRateLimiters;
