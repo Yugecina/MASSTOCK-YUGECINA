@@ -5,6 +5,7 @@
  * Exemple de test pour un hook personnalisé React.
  */
 
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 

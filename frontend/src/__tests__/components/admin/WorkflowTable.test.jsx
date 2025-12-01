@@ -5,7 +5,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { WorkflowTable } from '../../components/admin/WorkflowTable';
+import { WorkflowTable } from '../../../components/admin/WorkflowTable';
 
 describe('WorkflowTable', () => {
   const mockWorkflows = [

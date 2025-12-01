@@ -11,7 +11,7 @@ jest.mock('../../config/database');
 jest.mock('../../config/logger', () => ({
   logWorkflowExecution: jest.fn(),
   logAudit: jest.fn(),
-  logger: { info: jest.fn(), error: jest.fn() }
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
 }));
 jest.mock('../../queues/workflowQueue', () => ({
   addWorkflowJob: jest.fn().mockResolvedValue({ id: 'job-123' })
@@ -122,23 +122,36 @@ describe('WorkflowsController', () => {
         { status: 'failed', duration_seconds: 10, created_at: new Date().toISOString() }
       ];
 
-      let callCount = 0;
-      supabaseAdmin.from = jest.fn((table) => {
-        if (table === 'workflows') {
-          return {
-            select: jest.fn().mockReturnThis(),
-            eq: jest.fn().mockReturnThis(),
-            single: jest.fn().mockResolvedValue({ data: mockWorkflow, error: null })
-          };
-        }
-        if (table === 'workflow_executions') {
-          return {
-            select: jest.fn().mockReturnThis(),
-            eq: jest.fn().mockReturnThis(),
-            order: jest.fn().mockReturnThis(),
-            limit: jest.fn().mockResolvedValue({ data: mockExecutions, error: null })
-          };
-        }
+      // Mock createClient to return a clean admin client
+      const { createClient } = require('@supabase/supabase-js');
+      createClient.mockReturnValue({
+        from: jest.fn((table) => {
+          if (table === 'client_workflows') {
+            return {
+              select: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              maybeSingle: jest.fn().mockResolvedValue({
+                data: { workflow_id: 'wf-1', client_id: 'client-id', is_active: true },
+                error: null
+              })
+            };
+          }
+          if (table === 'workflows') {
+            return {
+              select: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              single: jest.fn().mockResolvedValue({ data: mockWorkflow, error: null })
+            };
+          }
+          if (table === 'workflow_executions') {
+            return {
+              select: jest.fn().mockReturnThis(),
+              eq: jest.fn().mockReturnThis(),
+              order: jest.fn().mockReturnThis(),
+              limit: jest.fn().mockResolvedValue({ data: mockExecutions, error: null })
+            };
+          }
+        })
       });
 
       await workflowsController.getWorkflow(req, res);
@@ -154,11 +167,14 @@ describe('WorkflowsController', () => {
     it('should return 404 if workflow not found', async () => {
       req.params = { workflow_id: 'non-existent' };
 
-      supabaseAdmin.from = jest.fn(() => ({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({ data: null, error: { message: 'Not found' } })
-      }));
+      const { createClient } = require('@supabase/supabase-js');
+      createClient.mockReturnValue({
+        from: jest.fn(() => ({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          maybeSingle: jest.fn().mockResolvedValue({ data: null, error: null })
+        }))
+      });
 
       await expect(workflowsController.getWorkflow(req, res)).rejects.toMatchObject({
         statusCode: 404,

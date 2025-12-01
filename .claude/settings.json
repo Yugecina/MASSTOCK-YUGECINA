@@ -1,0 +1,56 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE '(className|class)=[\"\\x27].*\\b(px|py|pt|pb|pl|pr|mt|mb|ml|mr|bg|text|rounded|flex|grid|w-|h-)-'; then echo '🚫 BLOCKED: Tailwind classes detected! MasStock uses PURE CSS ONLY. Use classes from frontend/src/styles/global.css or CSS variables like var(--spacing-md).' && exit 2; fi"
+          },
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_FILE_PATHS\" =~ \\.env ]]; then echo '⚠️  WARNING: Editing .env file - ensure no secrets are committed to git' >&2; fi"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_INPUT\" == *\"rm -rf\"* ]] && [[ \"$CLAUDE_TOOL_INPUT\" != *\"node_modules\"* ]] && [[ \"$CLAUDE_TOOL_INPUT\" != *\".vite\"* ]]; then echo '🚫 BLOCKED: rm -rf is dangerous! Please confirm this operation with the user first.' && exit 2; fi"
+          },
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_INPUT\" == *\"git push --force\"* ]] && [[ \"$CLAUDE_TOOL_INPUT\" == *\"main\"* ]]; then echo '🚫 BLOCKED: Force push to main is dangerous! Please confirm with user.' && exit 2; fi"
+          },
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_INPUT\" == *\"FLUSHALL\"* ]]; then echo '🚫 BLOCKED: Redis FLUSHALL will delete all data! Please confirm with user.' && exit 2; fi"
+          },
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_TOOL_INPUT\" == *\"DROP TABLE\"* ]] || [[ \"$CLAUDE_TOOL_INPUT\" == *\"DROP DATABASE\"* ]]; then echo '⚠️  WARNING: DROP command detected - ensure this is in a migration file and not production.' >&2; fi"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [[ \"$CLAUDE_FILE_PATHS\" =~ \\.(js|jsx)$ ]] && [[ \"$CLAUDE_FILE_PATHS\" != *\"node_modules\"* ]]; then echo '✨ File saved: $CLAUDE_FILE_PATHS' >&2; fi"
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "supabase": {
+      "disabled": false
+    }
+  }
+}

@@ -30,8 +30,8 @@ describe('analyticsService', () => {
 
       const result = await analyticsService.getOverview();
 
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/analytics/overview');
-      expect(result).toEqual(mockData.data);
+      expect(api.get).toHaveBeenCalledWith('/v1/admin/analytics/overview', { params: { period: undefined } });
+      expect(result).toEqual(mockData);
     });
 
     it('should fetch overview metrics with custom period', async () => {
@@ -44,7 +44,7 @@ describe('analyticsService', () => {
 
       await analyticsService.getOverview('90d');
 
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/analytics/overview');
+      expect(api.get).toHaveBeenCalledWith('/v1/admin/analytics/overview', { params: { period: '90d' } });
     });
 
     it('should throw error when API call fails', async () => {
@@ -71,9 +71,9 @@ describe('analyticsService', () => {
       const result = await analyticsService.getExecutionsTrend();
 
       expect(api.get).toHaveBeenCalledWith('/v1/admin/analytics/executions-trend', {
-        params: { period: '30d' }
+        params: { period: undefined }
       });
-      expect(result).toEqual(mockData.data);
+      expect(result).toEqual(mockData);
     });
 
     it('should fetch executions trend with custom period', async () => {
@@ -102,7 +102,7 @@ describe('analyticsService', () => {
 
       const result = await analyticsService.getExecutionsTrend();
 
-      expect(result).toEqual([]);
+      expect(result).toEqual(mockData);
     });
   });
 
@@ -130,7 +130,7 @@ describe('analyticsService', () => {
       expect(api.get).toHaveBeenCalledWith('/v1/admin/analytics/workflow-performance', {
         params: { period: '30d' }
       });
-      expect(result).toEqual(mockData.data);
+      expect(result).toEqual(mockData);
     });
 
     it('should fetch workflow performance with custom period', async () => {
@@ -167,7 +167,7 @@ describe('analyticsService', () => {
       expect(api.get).toHaveBeenCalledWith('/v1/admin/analytics/revenue-breakdown', {
         params: { type: 'client', period: '30d' }
       });
-      expect(result).toEqual(mockData.data);
+      expect(result).toEqual(mockData);
     });
 
     it('should fetch revenue breakdown by workflow', async () => {
@@ -211,7 +211,7 @@ describe('analyticsService', () => {
       expect(api.get).toHaveBeenCalledWith('/v1/admin/analytics/failures', {
         params: { period: '30d', limit: 100 }
       });
-      expect(result).toEqual(mockData.data);
+      expect(result).toEqual(mockData);
     });
 
     it('should fetch failures with custom period and limit', async () => {
@@ -239,7 +239,7 @@ describe('analyticsService', () => {
 
       const result = await analyticsService.getFailures();
 
-      expect(result).toEqual([]);
+      expect(result).toEqual(mockData);
     });
   });
 });

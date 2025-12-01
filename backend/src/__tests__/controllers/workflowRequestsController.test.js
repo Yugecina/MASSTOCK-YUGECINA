@@ -9,7 +9,7 @@ const { ApiError } = require('../../middleware/errorHandler');
 jest.mock('../../config/database');
 jest.mock('../../config/logger', () => ({
   logAudit: jest.fn(),
-  logger: { info: jest.fn(), error: jest.fn() }
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
 }));
 
 describe('WorkflowRequestsController', () => {

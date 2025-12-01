@@ -1,0 +1,14 @@
+--- a/backend/src/routes/adminRoutes.js
++++ b/backend/src/routes/adminRoutes.js
+@@ -371,7 +371,10 @@
+  * Search users for adding to clients
+  */
+ router.get('/users/search',
+-  query('q').trim().isLength({ min: 2 }).withMessage('Search query must be at least 2 characters'),
++  query('q')
++    .notEmpty().withMessage('Search query is required')
++    .trim()
++    .isLength({ min: 2 }).withMessage('Search query must be at least 2 characters'),
+   query('exclude_client_id').optional().isUUID().withMessage('Invalid client ID'),
+   asyncHandler(async (req, res, next) => {
+     const { validationResult } = require('express-validator');

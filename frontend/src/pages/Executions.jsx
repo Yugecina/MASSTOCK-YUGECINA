@@ -1,64 +1,79 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClientLayout } from '../components/layout/ClientLayout'
 import { Spinner } from '../components/ui/Spinner'
-import { workflowService } from '../services/workflows'
-import { BatchResultsView } from '../components/workflows/BatchResultsView'
+import { useExecutionsStore } from '../store/executionsStore'
 import logger from '@/utils/logger';
-
-const ITEMS_PER_PAGE = 20
 
 /**
  * Executions Page - "The Trusted Magician" - Electric Trust
  * Premium glassmorphism, Electric Indigo + Bright Cyan, rich animations
- * Now with lazy loading / infinite scroll
+ * Now with Zustand caching and stale-while-revalidate for instant navigation
  */
 export function Executions() {
   const navigate = useNavigate()
-  const [executions, setExecutions] = useState([])
-  const [workflows, setWorkflows] = useState([])
-  const [workflowsMap, setWorkflowsMap] = useState({})
-  const [members, setMembers] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [selectedExecution, setSelectedExecution] = useState(null)
-  const [statusFilter, setStatusFilter] = useState('all')
-  const [workflowFilter, setWorkflowFilter] = useState('all')
-  const [userFilter, setUserFilter] = useState('all')
-  const [sortBy, setSortBy] = useState('newest')
-  const [copyFeedback, setCopyFeedback] = useState(null)
-  const [inputDataViewMode, setInputDataViewMode] = useState('pretty') // 'pretty' or 'raw'
 
-  // Pagination state
-  const [hasMore, setHasMore] = useState(true)
-  const [total, setTotal] = useState(0)
-  const [offset, setOffset] = useState(0)
+  // Get data from Zustand store (persists across navigations)
+  const {
+    workflows,
+    workflowsMap,
+    members,
+    executions,
+    executionsLoading,
+    executionsTotal,
+    executionsHasMore,
+    filters,
+    initialize,
+    loadMore: storeLoadMore,
+    setFilters: storeSetFilters,
+    refresh
+  } = useExecutionsStore()
+
+  // Local UI state only (not data)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [statusFilter, setStatusFilter] = useState(filters.status)
+  const [workflowFilter, setWorkflowFilter] = useState(filters.workflow_id)
+  const [userFilter, setUserFilter] = useState(filters.user_id)
+  const [sortBy, setSortBy] = useState(filters.sortBy)
 
   // Ref for infinite scroll
   const loadMoreRef = useRef(null)
 
-  // Load initial data (workflows and members for filters, then executions)
+  // Initialize store on mount (uses cache if available)
   useEffect(() => {
-    loadInitialData()
+    logger.debug('🚀 Executions: Component mounted, initializing store')
+    initialize()
   }, [])
 
-  // Reload executions when filters change
+  // Update store filters when local filters change
   useEffect(() => {
-    if (!loading) {
-      // Reset and reload when filters change
-      setExecutions([])
-      setOffset(0)
-      setHasMore(true)
-      loadExecutions(0, true)
+    const newFilters = {
+      status: statusFilter,
+      workflow_id: workflowFilter,
+      user_id: userFilter,
+      sortBy
     }
-  }, [statusFilter, workflowFilter, userFilter])
+
+    // Only update store if filters actually changed
+    const filtersChanged = (
+      filters.status !== statusFilter ||
+      filters.workflow_id !== workflowFilter ||
+      filters.user_id !== userFilter ||
+      filters.sortBy !== sortBy
+    )
+
+    if (filtersChanged && !executionsLoading) {
+      logger.debug('🔍 Executions: Filters changed, updating store', newFilters)
+      storeSetFilters(newFilters)
+    }
+  }, [statusFilter, workflowFilter, userFilter, sortBy])
 
   // Intersection Observer for infinite scroll
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
-          loadMore()
+        if (entries[0].isIntersecting && executionsHasMore && !loadingMore && !executionsLoading) {
+          handleLoadMore()
         }
       },
       { threshold: 0.1 }
@@ -69,313 +84,53 @@ export function Executions() {
     }
 
     return () => observer.disconnect()
-  }, [hasMore, loadingMore, loading, offset])
+  }, [executionsHasMore, loadingMore, executionsLoading])
 
-  async function loadInitialData() {
-    logger.debug('🔍 Executions.loadInitialData: Starting...')
-
-    try {
-      setLoading(true)
-
-      // Load workflows and members in parallel for filters
-      const [workflowsRes, membersRes] = await Promise.all([
-        workflowService.list().catch(err => {
-          logger.warn('⚠️ Executions: Could not load workflows:', err.message)
-          return { data: { workflows: [] } }
-        }),
-        workflowService.getClientMembers().catch(err => {
-          logger.warn('⚠️ Executions: Could not load members:', err.message)
-          return { data: { members: [] } }
-        })
-      ])
-
-      // Process workflows
-      const workflowsList = workflowsRes.data?.workflows || workflowsRes.workflows || []
-      setWorkflows(workflowsList)
-
-      const wfMap = {}
-      workflowsList.forEach(wf => {
-        wfMap[wf.id] = wf
-      })
-      setWorkflowsMap(wfMap)
-      logger.debug('✅ Executions: Workflows loaded:', { count: workflowsList.length })
-
-      // Process members
-      const membersList = membersRes.data?.data?.members || membersRes.data?.members || []
-      setMembers(membersList)
-      logger.debug('✅ Executions: Members loaded:', { count: membersList.length })
-
-      // Load first page of executions
-      await loadExecutions(0, true)
-
-    } catch (err) {
-      logger.error('❌ Executions.loadInitialData: Error:', {
-        error: err,
-        message: err.message
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function loadExecutions(currentOffset = 0, isReset = false) {
-    logger.debug('📡 Executions.loadExecutions:', { currentOffset, isReset, statusFilter, workflowFilter, userFilter })
-
-    try {
-      if (!isReset) {
-        setLoadingMore(true)
-      }
-
-      logger.debug('🔍 Executions.loadExecutions: Calling API with params:', {
-        limit: ITEMS_PER_PAGE,
-        offset: currentOffset,
-        status: statusFilter,
-        workflow_id: workflowFilter,
-        user_id: userFilter
-      })
-
-      const response = await workflowService.getAllExecutions({
-        limit: ITEMS_PER_PAGE,
-        offset: currentOffset,
-        status: statusFilter,
-        workflow_id: workflowFilter,
-        user_id: userFilter
-      })
-
-      logger.debug('📦 Executions.loadExecutions: Raw response:', {
-        response: response,
-        responseType: typeof response,
-        responseKeys: response ? Object.keys(response) : 'null'
-      })
-
-      const data = response.data?.data || response.data
-      const newExecutions = data.executions || []
-
-      logger.debug('✅ Executions.loadExecutions: Received:', {
-        count: newExecutions.length,
-        total: data.total,
-        hasMore: data.hasMore,
-        dataKeys: data ? Object.keys(data) : 'null',
-        firstExecution: newExecutions[0] ? {
-          id: newExecutions[0].id,
-          status: newExecutions[0].status,
-          workflow_name: newExecutions[0].workflow_name
-        } : 'none'
-      })
-
-      if (isReset) {
-        setExecutions(newExecutions)
-      } else {
-        setExecutions(prev => [...prev, ...newExecutions])
-      }
-
-      setTotal(data.total || 0)
-      setHasMore(data.hasMore || false)
-      setOffset(currentOffset + newExecutions.length)
-
-    } catch (err) {
-      logger.error('❌ Executions.loadExecutions: Error:', {
-        error: err,
-        message: err.message,
-        response: err.response?.data,
-        responseStatus: err.response?.status,
-        responseStatusText: err.response?.statusText,
-        stack: err.stack
-      })
-
-      // Show error to user
-      setTotal(0)
-      setHasMore(false)
-      setExecutions([])
-    } finally {
+  const handleLoadMore = useCallback(async () => {
+    if (!loadingMore && executionsHasMore) {
+      logger.debug('🔄 Executions.handleLoadMore: Loading more from store')
+      setLoadingMore(true)
+      await storeLoadMore()
       setLoadingMore(false)
     }
-  }
+  }, [loadingMore, executionsHasMore, storeLoadMore])
 
-  const loadMore = useCallback(() => {
-    if (!loadingMore && hasMore) {
-      logger.debug('🔄 Executions.loadMore: Loading more from offset:', offset)
-      loadExecutions(offset, false)
-    }
-  }, [loadingMore, hasMore, offset, statusFilter, workflowFilter, userFilter])
+  const handleRefresh = useCallback(async () => {
+    logger.debug('🔄 Executions.handleRefresh: Force refresh all data')
+    await refresh()
+  }, [refresh])
 
-  async function viewExecutionDetails(executionId) {
-    logger.debug('🔍 Executions.viewExecutionDetails:', { executionId })
-
-    try {
-      const data = await workflowService.getExecution(executionId)
-      const executionData = data.data.data || data.data
-
-      logger.debug('✅ Executions.viewExecutionDetails: Loaded:', {
-        id: executionData.id,
-        status: executionData.status
-      })
-
-      setSelectedExecution(executionData)
-    } catch (err) {
-      logger.error('❌ Executions.viewExecutionDetails: Error:', {
-        executionId,
-        error: err,
-        message: err.message
-      })
-    }
-  }
-
-  async function handleCopyInputData(data) {
-    try {
-      await navigator.clipboard.writeText(JSON.stringify(data, null, 2))
-      setCopyFeedback('input')
-      setTimeout(() => setCopyFeedback(null), 2000)
-    } catch (err) {
-      logger.error('❌ Executions.handleCopyInputData: Failed to copy:', err)
-    }
-  }
-
-  function isBase64Image(str) {
-    if (typeof str !== 'string') return false
-    return str.startsWith('data:image/') ||
-           (str.length > 100 && /^[A-Za-z0-9+/]+={0,2}$/.test(str.substring(0, 100)))
-  }
-
-  function renderImageValue(value) {
-    const imageSrc = value.startsWith('data:image/')
-      ? value
-      : `data:image/jpeg;base64,${value}`
-
-    return (
-      <div className="execution-data-image-container">
-        <img
-          src={imageSrc}
-          alt="Reference"
-          className="execution-data-image"
-          onClick={(e) => {
-            e.stopPropagation()
-            window.open(imageSrc, '_blank')
-          }}
-        />
-        <div className="execution-data-image-hint">
-          Click to view full size
-        </div>
-      </div>
-    )
-  }
-
-  function renderObjectValue(obj) {
-    try {
-      // Check if ALL values in object are base64 images
-      const entries = Object.entries(obj)
-      const allValuesAreImages = entries.length > 0 && entries.every(([key, val]) => {
-        return typeof val === 'string' && isBase64Image(val)
-      })
-
-      if (allValuesAreImages) {
-        return (
-          <div className="execution-data-images-grid">
-            {entries.map(([objKey, objValue]) => (
-              <div key={objKey} className="execution-data-image-item">
-                <div className="execution-data-object-key">{objKey}:</div>
-                {renderImageValue(objValue)}
-              </div>
-            ))}
-          </div>
-        )
+  // Memoize sorted executions to avoid re-sorting on every render
+  const sortedExecutions = useMemo(() => {
+    return [...executions].sort((a, b) => {
+      switch (sortBy) {
+        case 'newest':
+          return new Date(b.created_at) - new Date(a.created_at)
+        case 'oldest':
+          return new Date(a.created_at) - new Date(b.created_at)
+        case 'duration':
+          return (b.duration_seconds || 0) - (a.duration_seconds || 0)
+        default:
+          return 0
       }
+    })
+  }, [executions, sortBy])
 
-      // Fallback: render as JSON
-      return (
-        <pre className="execution-data-object-preview">
-          {JSON.stringify(obj, null, 2)}
-        </pre>
-      )
-    } catch (err) {
-      logger.error('❌ renderObjectValue: Error rendering object:', err)
-      return (
-        <pre className="execution-data-object-preview">
-          {JSON.stringify(obj, null, 2)}
-        </pre>
-      )
+  // Memoize status counts to avoid re-filtering on every render
+  const statusCounts = useMemo(() => {
+    return {
+      all: executionsTotal,
+      completed: executions.filter(e => e.status === 'completed').length,
+      pending: executions.filter(e => e.status === 'pending').length,
+      processing: executions.filter(e => e.status === 'processing').length,
+      failed: executions.filter(e => e.status === 'failed').length,
     }
-  }
+  }, [executions, executionsTotal])
 
-  function renderPrettyInputData(data) {
-    if (!data || typeof data !== 'object') {
-      return <div className="execution-data-value">{String(data)}</div>
-    }
+  // Show loading state only on initial load (not on cache hit)
+  const isInitialLoading = executionsLoading && executions.length === 0
 
-    try {
-      return (
-        <div className="execution-data-pretty">
-          {Object.entries(data).map(([key, value]) => (
-            <div key={key} className="execution-data-row">
-              <div className="execution-data-key">{key}</div>
-              <div className="execution-data-value">
-                {typeof value === 'object' && value !== null ? (
-                  Array.isArray(value) ? (
-                    <div className="execution-data-array">
-                      {value.length === 0 ? (
-                        <span className="execution-data-empty">Empty array</span>
-                      ) : (
-                        value.map((item, index) => (
-                          <div key={index} className="execution-data-array-item">
-                            {typeof item === 'object' && item !== null ? (
-                              <pre className="execution-data-object-preview">
-                                {JSON.stringify(item, null, 2)}
-                              </pre>
-                            ) : isBase64Image(item) ? (
-                              renderImageValue(item)
-                            ) : (
-                              <span>{String(item)}</span>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  ) : (
-                    renderObjectValue(value)
-                  )
-                ) : isBase64Image(value) ? (
-                  renderImageValue(value)
-                ) : (
-                  <span>{String(value)}</span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      )
-    } catch (err) {
-      logger.error('❌ renderPrettyInputData: Error rendering data:', err)
-      return (
-        <div className="execution-data-value">
-          Error rendering data. Check console for details.
-        </div>
-      )
-    }
-  }
-
-  // Apply client-side sorting
-  const sortedExecutions = [...executions].sort((a, b) => {
-    switch (sortBy) {
-      case 'newest':
-        return new Date(b.created_at) - new Date(a.created_at)
-      case 'oldest':
-        return new Date(a.created_at) - new Date(b.created_at)
-      case 'duration':
-        return (b.duration_seconds || 0) - (a.duration_seconds || 0)
-      default:
-        return 0
-    }
-  })
-
-  const statusCounts = {
-    all: total,
-    completed: executions.filter(e => e.status === 'completed').length,
-    pending: executions.filter(e => e.status === 'pending').length,
-    processing: executions.filter(e => e.status === 'processing').length,
-    failed: executions.filter(e => e.status === 'failed').length,
-  }
-
-  if (loading) {
+  if (isInitialLoading) {
     return (
       <ClientLayout>
         <div className="flex justify-center items-center" style={{ minHeight: '60vh' }}>
@@ -400,6 +155,28 @@ export function Executions() {
               Monitor and review all your workflow execution history
             </p>
           </div>
+
+          {/* Refresh button */}
+          <button
+            onClick={handleRefresh}
+            className="btn btn-secondary"
+            disabled={executionsLoading}
+            style={{ marginLeft: 'var(--spacing-md)' }}
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              style={{ marginRight: 'var(--spacing-xs)' }}
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+            </svg>
+            Refresh
+          </button>
         </div>
 
         {/* Stats Bento Grid - Glassmorphism with Glow Effects */}
@@ -407,7 +184,7 @@ export function Executions() {
           {[
             {
               label: 'Total',
-              value: total,
+              value: executionsTotal,
               icon: '📊',
               gradient: 'indigo',
               filter: 'all',
@@ -581,7 +358,7 @@ export function Executions() {
               return (
                 <div
                   key={execution.id}
-                  onClick={() => viewExecutionDetails(execution.id)}
+                  onClick={() => navigate(`/executions/${execution.id}`)}
                   className={`execution-item ${config.glow ? 'has-glow' : ''} ${config.pulse ? 'has-pulse' : ''}`}
                   data-gradient={config.gradient}
                   style={{ animationDelay: `${Math.min(index * 50, 400)}ms` }}
@@ -661,17 +438,17 @@ export function Executions() {
                   <span>Loading more...</span>
                 </div>
               )}
-              {!loadingMore && hasMore && (
+              {!loadingMore && executionsHasMore && (
                 <button
-                  onClick={loadMore}
+                  onClick={handleLoadMore}
                   className="executions-load-more-btn"
                 >
-                  Load more ({executions.length} of {total})
+                  Load more ({executions.length} of {executionsTotal})
                 </button>
               )}
-              {!hasMore && executions.length > 0 && (
+              {!executionsHasMore && executions.length > 0 && (
                 <div className="executions-load-more-end">
-                  All {total} executions loaded
+                  All {executionsTotal} executions loaded
                 </div>
               )}
             </div>
@@ -708,172 +485,6 @@ export function Executions() {
           </div>
         )}
       </div>
-
-      {/* Execution Detail Modal - Premium Glassmorphism */}
-      {selectedExecution && (
-        <div
-          className="execution-modal-overlay"
-          onClick={() => {
-            setSelectedExecution(null)
-            logger.debug('🔒 Executions: Modal closed')
-          }}
-        >
-          <div
-            className="execution-modal"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Modal Header */}
-            <div className="execution-modal-header">
-              <h2 className="execution-modal-title">
-                Execution Details
-              </h2>
-              <button
-                onClick={() => {
-                  setSelectedExecution(null)
-                  logger.debug('🔒 Executions: Modal closed via button')
-                }}
-                className="execution-modal-close"
-              >
-                <svg width={20} height={20} fill="none" strokeWidth={2} stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            {/* Modal Body */}
-            <div className="execution-modal-body">
-              {/* Quick Stats */}
-              <div className="execution-modal-stats">
-                <div className="execution-modal-stat">
-                  <div className="execution-modal-stat-label">Status</div>
-                  <div className="execution-modal-stat-value">{selectedExecution.status}</div>
-                </div>
-
-                {selectedExecution.duration_seconds && (
-                  <div className="execution-modal-stat">
-                    <div className="execution-modal-stat-label">Duration</div>
-                    <div className="execution-modal-stat-value">{selectedExecution.duration_seconds}s</div>
-                  </div>
-                )}
-
-                {selectedExecution.progress !== undefined && selectedExecution.progress !== null && (
-                  <div className="execution-modal-stat">
-                    <div className="execution-modal-stat-label">Progress</div>
-                    <div className="execution-modal-stat-value">{selectedExecution.progress}%</div>
-                  </div>
-                )}
-              </div>
-
-              {/* Error Message */}
-              {selectedExecution.error_message && (
-                <div className="execution-modal-section execution-modal-error">
-                  <h3 className="execution-modal-section-title">Error Details</h3>
-                  <pre className="execution-modal-code">
-                    {selectedExecution.error_message}
-                  </pre>
-                </div>
-              )}
-
-              {/* Batch Results for nano_banana workflows */}
-              {selectedExecution.workflow_id &&
-               workflowsMap[selectedExecution.workflow_id]?.config?.workflow_type === 'nano_banana' &&
-               selectedExecution.status === 'completed' && (
-                <div className="execution-modal-section">
-                  <h3 className="execution-modal-section-title">Batch Results</h3>
-                  <BatchResultsView executionId={selectedExecution.id} />
-                </div>
-              )}
-
-              {/* Output Data for standard workflows */}
-              {selectedExecution.output_data &&
-               Object.keys(selectedExecution.output_data).length > 0 &&
-               (!workflowsMap[selectedExecution.workflow_id] ||
-                workflowsMap[selectedExecution.workflow_id]?.config?.workflow_type !== 'nano_banana') && (
-                <div className="execution-modal-section">
-                  <h3 className="execution-modal-section-title">Output Data</h3>
-                  <pre className="execution-modal-code">
-                    {JSON.stringify(selectedExecution.output_data, null, 2)}
-                  </pre>
-                </div>
-              )}
-
-              {/* Input Data */}
-              {selectedExecution.input_data && Object.keys(selectedExecution.input_data).length > 0 && (
-                <div className="execution-modal-section">
-                  <div className="execution-modal-section-header">
-                    <h3 className="execution-modal-section-title">Input Data</h3>
-                    <div className="execution-modal-section-actions">
-                      <div className="execution-data-view-toggle">
-                        <button
-                          onClick={() => setInputDataViewMode('pretty')}
-                          className={`execution-data-view-btn ${inputDataViewMode === 'pretty' ? 'active' : ''}`}
-                        >
-                          Pretty
-                        </button>
-                        <button
-                          onClick={() => setInputDataViewMode('raw')}
-                          className={`execution-data-view-btn ${inputDataViewMode === 'raw' ? 'active' : ''}`}
-                        >
-                          Raw
-                        </button>
-                      </div>
-                      <button
-                        onClick={() => handleCopyInputData(selectedExecution.input_data)}
-                        className={`execution-modal-copy-btn ${copyFeedback === 'input' ? 'copied' : ''}`}
-                        title="Copy Input Data"
-                      >
-                        {copyFeedback === 'input' ? (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="20 6 9 17 4 12" />
-                          </svg>
-                        ) : (
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                          </svg>
-                        )}
-                        {copyFeedback === 'input' ? 'Copied!' : 'Copy'}
-                      </button>
-                    </div>
-                  </div>
-                  {inputDataViewMode === 'pretty' ? (
-                    renderPrettyInputData(selectedExecution.input_data)
-                  ) : (
-                    <pre className="execution-modal-code">
-                      {JSON.stringify(selectedExecution.input_data, null, 2)}
-                    </pre>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {/* Modal Footer */}
-            <div className="execution-modal-footer">
-              <button
-                onClick={() => {
-                  setSelectedExecution(null)
-                  logger.debug('🔒 Executions: Modal closed from footer')
-                }}
-                className="execution-modal-btn-secondary"
-              >
-                Close
-              </button>
-              {selectedExecution.workflow_id && (
-                <button
-                  onClick={() => {
-                    logger.debug('🔍 Executions: Navigating to workflow:', selectedExecution.workflow_id)
-                    setSelectedExecution(null)
-                    navigate(`/workflows/${selectedExecution.workflow_id}/execute`)
-                  }}
-                  className="execution-modal-btn-primary"
-                >
-                  View Workflow
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </ClientLayout>
   )
 }

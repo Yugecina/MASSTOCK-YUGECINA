@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import api from '../services/api'
 import logger from '@/utils/logger';
+import { useExecutionsStore } from './executionsStore';
 
 
 export const useAuthStore = create((set) => ({
@@ -61,9 +62,15 @@ export const useAuthStore = create((set) => ({
       // Continue with logout even if backend call fails
       logger.error('Logout error:', error)
     }
+
+    // Clear auth state
     set({
       user: null,
       isAuthenticated: false,
     })
+
+    // Clear executions cache on logout for security
+    logger.debug('🔄 authStore.logout: Clearing executions cache')
+    useExecutionsStore.getState().reset()
   },
 }))

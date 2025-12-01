@@ -18,23 +18,55 @@ export function BatchResultsView({ executionId }) {
   const [gridColumns, setGridColumns] = useState(2);
   const [copyFeedback, setCopyFeedback] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
+  const [previewImage, setPreviewImage] = useState(null);
+  const [hoveredImageIndex, setHoveredImageIndex] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   useEffect(() => {
     async function loadResults() {
       try {
-        logger.debug('BatchResultsView: Loading results for execution:', executionId);
+        logger.debug('🔍 BatchResultsView: Loading results for execution:', {
+          executionId,
+          executionIdType: typeof executionId
+        });
+        
         const response = await workflowService.getBatchResults(executionId);
+        
+        logger.debug('📦 BatchResultsView: Raw response:', {
+          status: response.status,
+          hasData: !!response.data,
+          dataKeys: Object.keys(response.data || {}),
+          dataStructure: response.data
+        });
 
         let resultsData = response.data?.data || response.data;
 
         if (!resultsData || !resultsData.results) {
-          setError('Invalid response format');
+          logger.error('❌ BatchResultsView: Invalid response format:', {
+            hasResultsData: !!resultsData,
+            resultsDataKeys: Object.keys(resultsData || {}),
+            hasResults: !!resultsData?.results
+          });
+          setError('Invalid response format - no results found');
           return;
         }
 
+        logger.debug('✅ BatchResultsView: Results loaded successfully:', {
+          resultsCount: resultsData.results.length,
+          stats: resultsData.stats
+        });
+        
         setData(resultsData);
       } catch (err) {
-        logger.error('BatchResultsView: Error:', err);
+        logger.error('❌ BatchResultsView: Error loading results:', {
+          error: err,
+          message: err.message,
+          response: err.response,
+          status: err.response?.status,
+          data: err.response?.data,
+          executionId
+        });
         setError(err.response?.data?.message || err.message || 'Failed to load results');
       } finally {
         setLoading(false);
@@ -105,6 +137,138 @@ export function BatchResultsView({ executionId }) {
     }
   };
 
+  const toggleSelection = (resultId) => {
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(resultId)) {
+        newSet.delete(resultId);
+      } else {
+        newSet.add(resultId);
+      }
+      return newSet;
+    });
+  };
+
+  const selectAll = () => {
+    const completedIds = results
+      .filter(r => r.status === 'completed' && r.result_url)
+      .map(r => r.id);
+    setSelectedIds(new Set(completedIds));
+  };
+
+  const deselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleDownloadSelectedIndividual = async () => {
+    const selectedResults = results.filter(r => selectedIds.has(r.id) && r.result_url);
+    if (selectedResults.length === 0) return;
+
+    logger.debug('🔽 BatchResultsView.handleDownloadSelectedIndividual: Starting downloads', {
+      count: selectedResults.length
+    });
+
+    setIsDownloading(true);
+    setDownloadProgress({ current: 0, total: selectedResults.length });
+
+    let successCount = 0;
+    let failCount = 0;
+
+    // Download each image with delay to avoid browser blocking
+    for (let i = 0; i < selectedResults.length; i++) {
+      const result = selectedResults[i];
+
+      try {
+        logger.debug('🔽 BatchResultsView: Downloading image', {
+          index: i + 1,
+          total: selectedResults.length,
+          batch_index: result.batch_index
+        });
+
+        const response = await fetch(result.result_url);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.download = `image_${result.batch_index}.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+
+        successCount++;
+
+        logger.debug('✅ BatchResultsView: Image downloaded', {
+          batch_index: result.batch_index,
+          progress: `${i + 1}/${selectedResults.length}`
+        });
+
+      } catch (err) {
+        failCount++;
+        logger.error('❌ BatchResultsView: Failed to download image', {
+          error: err,
+          message: err.message,
+          batch_index: result.batch_index,
+          progress: `${i + 1}/${selectedResults.length}`
+        });
+      }
+
+      // Update progress
+      setDownloadProgress({ current: i + 1, total: selectedResults.length });
+
+      // Add delay between downloads to avoid browser blocking (except for the last one)
+      if (i < selectedResults.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    }
+
+    logger.debug('✅ BatchResultsView.handleDownloadSelectedIndividual: All downloads completed', {
+      success: successCount,
+      failed: failCount,
+      total: selectedResults.length
+    });
+
+    // Reset state after a short delay to show completion
+    setTimeout(() => {
+      setIsDownloading(false);
+      setDownloadProgress({ current: 0, total: 0 });
+    }, 1000);
+  };
+
+  const handleDownloadSelected = async () => {
+    const selectedResults = results.filter(r => selectedIds.has(r.id) && r.result_url);
+    if (selectedResults.length === 0) return;
+
+    setIsDownloading(true);
+    try {
+      const zip = new JSZip();
+
+      for (const result of selectedResults) {
+        try {
+          const response = await fetch(result.result_url);
+          const blob = await response.blob();
+          zip.file(`image_${result.batch_index}.png`, blob);
+        } catch (err) {
+          logger.error(`Failed to download image ${result.batch_index}:`, err);
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+      const zipUrl = window.URL.createObjectURL(zipBlob);
+      const link = document.createElement('a');
+      link.href = zipUrl;
+      link.download = `batch_selection_${executionId}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(zipUrl);
+    } catch (err) {
+      logger.error('BatchResultsView: Failed to create selection ZIP:', err);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="br-loading">
@@ -164,6 +328,15 @@ export function BatchResultsView({ executionId }) {
 
   return (
     <div className="br-container">
+      {/* Quick Look Preview Overlay */}
+      {previewImage && (
+        <div className="br-preview-overlay" onClick={() => setPreviewImage(null)}>
+          <div className="br-preview-content" onClick={(e) => e.stopPropagation()}>
+            <img src={previewImage} alt="Preview" />
+          </div>
+        </div>
+      )}
+
       {/* Stats Panel */}
       {stats && (
         <div className="br-stats-panel">
@@ -209,7 +382,7 @@ export function BatchResultsView({ executionId }) {
 
       {/* Control Panel */}
       <div className="br-controls">
-        {/* Row 1: Filter + Counter */}
+        {/* Single Row: Filter + Grid + Counter + Download */}
         <div className="br-controls-row">
           <div className="br-controls-group">
             <span className="br-controls-label">Filter:</span>
@@ -240,13 +413,6 @@ export function BatchResultsView({ executionId }) {
             </button>
           </div>
 
-          <div className="br-results-counter">
-            {sortedResults.length} / {results.length} UNITS
-          </div>
-        </div>
-
-        {/* Row 2: Grid + Sort + Download */}
-        <div className="br-controls-row">
           <div className="br-controls-group">
             <span className="br-controls-label">Grid:</span>
             {[1, 2, 3, 4, 5].map(cols => (
@@ -269,25 +435,91 @@ export function BatchResultsView({ executionId }) {
             </select>
           </div>
 
-          <button
-            onClick={handleDownloadAll}
-            disabled={successCount === 0 || isDownloading}
-            className="br-download-btn"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            {isDownloading ? 'CREATING...' : 'DOWNLOAD ALL'}
-          </button>
+          <div className="br-controls-group">
+            <div className="br-results-counter">
+              {sortedResults.length} / {results.length} UNITS
+            </div>
+            <button
+              onClick={handleDownloadAll}
+              disabled={successCount === 0 || isDownloading}
+              className="br-download-btn"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              {isDownloading ? 'CREATING...' : 'DOWNLOAD ALL'}
+            </button>
+          </div>
+        </div>
+
+        {/* Selection Bar */}
+        <div className="br-selection-bar">
+          <div className="br-controls-group">
+            <button onClick={selectAll} className="br-select-btn">
+              Select All
+            </button>
+            <button onClick={deselectAll} className="br-select-btn">
+              Deselect All
+            </button>
+          </div>
+
+          {selectedIds.size > 0 && (
+            <div className="br-controls-group">
+              <span className="br-selection-count">{selectedIds.size} selected</span>
+
+              {/* Download individuel */}
+              <button
+                onClick={handleDownloadSelectedIndividual}
+                disabled={isDownloading}
+                className="br-download-btn"
+                title="Download selected images individually"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {isDownloading && downloadProgress.total > 0
+                  ? `DOWNLOADING ${downloadProgress.current}/${downloadProgress.total}...`
+                  : 'DOWNLOAD'}
+              </button>
+
+              {/* Download ZIP */}
+              <button
+                onClick={handleDownloadSelected}
+                disabled={isDownloading}
+                className="br-download-btn br-download-btn--selection"
+                title="Download selected images as ZIP archive"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {isDownloading ? 'CREATING...' : 'DOWNLOAD ZIP'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Results Grid */}
       <div className={`br-grid br-grid--${gridColumns}`}>
         {sortedResults.map((result, index) => (
-          <div key={result.id || index} className="br-card">
+          <div key={result.id || index} className={`br-card ${selectedIds.has(result.id) ? 'br-card--selected' : ''}`}>
+            {/* Checkbox - uniquement pour les images completed */}
+            {result.status === 'completed' && result.result_url && (
+              <label className="br-card-checkbox" onClick={(e) => e.stopPropagation()}>
+                <input
+                  type="checkbox"
+                  checked={selectedIds.has(result.id)}
+                  onChange={() => toggleSelection(result.id)}
+                />
+              </label>
+            )}
+
             {/* Index Badge */}
             <div className="br-card-index">#{result.batch_index}</div>
 
@@ -298,13 +530,30 @@ export function BatchResultsView({ executionId }) {
 
             {/* Image or Placeholder */}
             {result.status === 'completed' && result.result_url ? (
-              <div className="br-card-image">
+              <div
+                className="br-card-image"
+                onMouseEnter={() => setHoveredImageIndex(result.batch_index)}
+                onMouseLeave={() => setHoveredImageIndex(null)}
+                onClick={() => setPreviewImage(result.result_url)}
+              >
                 <img
                   src={result.result_url}
                   alt={`Unit ${result.batch_index}`}
                 />
+                {/* Eye Icon on Hover */}
+                {hoveredImageIndex === result.batch_index && (
+                  <div className="br-card-eye-overlay">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  </div>
+                )}
                 <button
-                  onClick={() => handleCopyUrl(result.result_url, result.batch_index)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleCopyUrl(result.result_url, result.batch_index);
+                  }}
                   className={`br-copy-btn ${copyFeedback === result.batch_index ? 'copied' : ''}`}
                   title="Copy URL"
                 >

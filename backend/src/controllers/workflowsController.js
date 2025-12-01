@@ -471,9 +471,16 @@ async function getExecution(req, res) {
   // Use a fresh admin client to avoid auth context issues
   const admin = getCleanAdmin();
 
+  // Fetch execution with workflow name
   const { data: execution, error } = await admin
     .from('workflow_executions')
-    .select('*')
+    .select(`
+      *,
+      workflow:workflows (
+        name,
+        config
+      )
+    `)
     .eq('id', execution_id)
     .eq('client_id', clientId)
     .single();
@@ -504,6 +511,8 @@ async function getExecution(req, res) {
     data: {
       id: execution.id,
       workflow_id: execution.workflow_id,
+      workflow_name: execution.workflow?.name || 'Unknown Workflow',
+      workflow_type: execution.workflow?.config?.workflow_type || 'standard',
       status: execution.status,
       progress,
       input_data: execution.input_data,
@@ -685,8 +694,11 @@ async function getExecutionBatchResults(req, res) {
     clientKeys: Object.keys(req.client || {})
   });
 
+  // Use a fresh admin client to avoid auth context issues
+  const admin = getCleanAdmin();
+
   // Verify execution belongs to client
-  const { data: execution, error: execError } = await supabaseAdmin
+  const { data: execution, error: execError } = await admin
     .from('workflow_executions')
     .select('id, workflow_id, client_id, status')
     .eq('id', execution_id)
@@ -726,7 +738,7 @@ async function getExecutionBatchResults(req, res) {
   }
 
   // Fetch batch results
-  const { data: batchResults, error } = await supabaseAdmin
+  const { data: batchResults, error } = await admin
     .from('workflow_batch_results')
     .select('*')
     .eq('execution_id', execution_id)
@@ -749,7 +761,7 @@ async function getExecutionBatchResults(req, res) {
   }
 
   // Fetch stats using the database function
-  const { data: stats, error: statsError } = await supabaseAdmin
+  const { data: stats, error: statsError } = await admin
     .rpc('get_batch_execution_stats', { p_execution_id: execution_id });
 
   logger.info('🔍 getExecutionBatchResults: Stats RPC call result', {

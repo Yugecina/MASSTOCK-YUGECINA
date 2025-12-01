@@ -11,6 +11,8 @@ vi.mock('../../services/workflows', () => ({
     list: vi.fn(),
     getExecutions: vi.fn(),
     getExecution: vi.fn(),
+    getClientMembers: vi.fn(),
+    getAllExecutions: vi.fn(),
   }
 }))
 
@@ -71,12 +73,22 @@ describe('Executions', () => {
   beforeEach(() => {
     vi.clearAllMocks()
 
-    // Default mock implementations
-    workflowService.list.mockResolvedValue({ workflows: mockWorkflows })
+    // Default mock implementations - wrap in data.data structure
+    workflowService.list.mockResolvedValue({ data: { workflows: mockWorkflows } })
     workflowService.getExecutions.mockImplementation((workflowId) => {
       const execs = mockExecutions.filter(e => e.workflow_id === workflowId)
-      return Promise.resolve({ executions: execs })
+      return Promise.resolve({ data: { executions: execs } })
     })
+    workflowService.getAllExecutions.mockResolvedValue({
+      data: {
+        data: {
+          executions: mockExecutions,
+          total: mockExecutions.length,
+          hasMore: false
+        }
+      }
+    })
+    workflowService.getClientMembers.mockResolvedValue({ data: { members: [] } })
   })
 
   function renderComponent() {

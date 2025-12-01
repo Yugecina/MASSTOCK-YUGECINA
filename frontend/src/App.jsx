@@ -8,6 +8,7 @@ import { WorkflowsList } from './pages/WorkflowsList'
 import { WorkflowDetail } from './pages/WorkflowDetail'
 import { WorkflowExecute } from './pages/WorkflowExecute'
 import { Executions } from './pages/Executions'
+import { ExecutionDetail } from './pages/ExecutionDetail'
 import { Requests } from './pages/Requests'
 import { Settings } from './pages/Settings'
 import { AdminDashboard } from './pages/admin/AdminDashboard'
@@ -94,6 +95,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Executions />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/executions/:id"
+            element={
+              <ProtectedRoute>
+                <ExecutionDetail />
               </ProtectedRoute>
             }
           />

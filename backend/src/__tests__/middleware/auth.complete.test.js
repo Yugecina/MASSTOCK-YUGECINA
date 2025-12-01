@@ -23,7 +23,7 @@ jest.mock('@supabase/supabase-js', () => ({
 jest.mock('../../config/logger', () => ({
   logAuth: jest.fn(),
   logError: jest.fn(),
-  logger: { info: jest.fn(), error: jest.fn() }
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
 }));
 
 describe('Auth Middleware - Complete', () => {
@@ -55,7 +55,8 @@ describe('Auth Middleware - Complete', () => {
         id: 'user-id',
         email: 'user@test.com',
         role: 'user',
-        status: 'active'
+        status: 'active',
+        client_id: 'client-id'
       };
 
       const mockClient = {

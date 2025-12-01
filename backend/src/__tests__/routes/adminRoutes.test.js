@@ -29,7 +29,7 @@ jest.mock('../../config/logger', () => ({
   logError: jest.fn(),
   logAudit: jest.fn(),
   logAudit: jest.fn(),
-  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn() }
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
 }));
 jest.mock('../../queues/workflowQueue', () => ({
   addWorkflowJob: jest.fn(),
@@ -51,6 +51,11 @@ describe('Admin Routes', () => {
     app = express();
     app.use(express.json());
     app.use('/api/v1/admin', adminRoutes);
+
+    // Add error handler to prevent hanging
+    app.use((err, req, res, next) => {
+      res.status(err.status || 500).json({ error: err.message });
+    });
 
     // Setup default middleware mocks
     authenticate.mockImplementation((req, res, next) => {

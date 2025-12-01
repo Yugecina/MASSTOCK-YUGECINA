@@ -16,13 +16,18 @@ const IntersectionObserverMock = vi.fn(() => ({
 }))
 vi.stubGlobal('IntersectionObserver', IntersectionObserverMock)
 
-// Mock ResizeObserver
-const ResizeObserverMock = vi.fn(() => ({
-  disconnect: vi.fn(),
-  observe: vi.fn(),
-  unobserve: vi.fn(),
-}))
+// Mock ResizeObserver as a class constructor
+class ResizeObserverMock {
+  constructor() {
+    this.disconnect = vi.fn()
+    this.observe = vi.fn()
+    this.unobserve = vi.fn()
+  }
+}
 vi.stubGlobal('ResizeObserver', ResizeObserverMock)
 
 // Augmenter le timeout pour les tests asynchrones
 vi.setConfig({ testTimeout: 10000 });
+
+// Mock CSS imports
+vi.mock('*.css', () => ({}));

@@ -48,7 +48,7 @@ describe('App - Authentication Initialization', () => {
 
     // Wait for initAuth to complete
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/auth/me')
+      expect(api.get).toHaveBeenCalledWith('/v1/auth/me')
     })
 
     // After successful init, loading should be false
@@ -70,7 +70,7 @@ describe('App - Authentication Initialization', () => {
 
     // Wait for initAuth to complete
     await waitFor(() => {
-      expect(api.get).toHaveBeenCalledWith('/auth/me')
+      expect(api.get).toHaveBeenCalledWith('/v1/auth/me')
     })
 
     // After failed init, user should not be authenticated

@@ -24,7 +24,7 @@ vi.mock('react-router-dom', async () => {
 
 // Mock useAuth hook
 const mockLogin = vi.fn();
-let mockAuthState = {
+const mockAuthState = {
   login: mockLogin,
   loading: false,
   isAuthenticated: false,
@@ -32,18 +32,17 @@ let mockAuthState = {
 };
 
 vi.mock('../../hooks/useAuth', () => ({
-  useAuth: () => mockAuthState,
+  useAuth: vi.fn(() => mockAuthState),
 }));
 
 describe('Login - Role-based Redirection', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockAuthState = {
-      login: mockLogin,
-      loading: false,
-      isAuthenticated: false,
-      user: null,
-    };
+    // Reset auth state
+    mockAuthState.loading = false;
+    mockAuthState.isAuthenticated = false;
+    mockAuthState.user = null;
+    mockAuthState.login = mockLogin;
   });
 
   afterEach(() => {
@@ -59,7 +58,10 @@ describe('Login - Role-based Redirection', () => {
       name: 'Admin User',
     };
 
-    mockLogin.mockImplementation((email, password) => {
+    mockLogin.mockImplementation(async (email, password) => {
+      // Simulate successful login by updating auth state
+      mockAuthState.isAuthenticated = true;
+      mockAuthState.user = adminUser;
       return Promise.resolve({
         data: { user: adminUser, access_token: 'token123' },
       });
@@ -73,8 +75,8 @@ describe('Login - Role-based Redirection', () => {
     );
 
     // Act - Fill in the form and submit
-    const emailInputs = screen.getAllByPlaceholderText('your@email.com');
-    const passwordInputs = screen.getAllByPlaceholderText('Your password');
+    const emailInputs = screen.getAllByPlaceholderText('you@example.com');
+    const passwordInputs = screen.getAllByPlaceholderText('Enter your password');
 
     const emailInput = emailInputs[0];
     const passwordInput = passwordInputs[0];
@@ -84,8 +86,8 @@ describe('Login - Role-based Redirection', () => {
     await user.clear(passwordInput);
     await user.type(passwordInput, 'password123');
 
-    // Get the button and click it
-    const submitButton = screen.getByRole('button');
+    // Get the submit button by type (not the password toggle or dev buttons)
+    const submitButton = screen.getByRole('button', { name: /sign in/i });
     await user.click(submitButton);
 
     // Assert
@@ -104,7 +106,10 @@ describe('Login - Role-based Redirection', () => {
       name: 'Client User',
     };
 
-    mockLogin.mockImplementation((email, password) => {
+    mockLogin.mockImplementation(async (email, password) => {
+      // Simulate successful login by updating auth state
+      mockAuthState.isAuthenticated = true;
+      mockAuthState.user = clientUser;
       return Promise.resolve({
         data: { user: clientUser, access_token: 'token123' },
       });
@@ -118,8 +123,8 @@ describe('Login - Role-based Redirection', () => {
     );
 
     // Act - Fill in the form and submit
-    const emailInputs = screen.getAllByPlaceholderText('your@email.com');
-    const passwordInputs = screen.getAllByPlaceholderText('Your password');
+    const emailInputs = screen.getAllByPlaceholderText('you@example.com');
+    const passwordInputs = screen.getAllByPlaceholderText('Enter your password');
 
     const emailInput = emailInputs[0];
     const passwordInput = passwordInputs[0];
@@ -129,8 +134,8 @@ describe('Login - Role-based Redirection', () => {
     await user.clear(passwordInput);
     await user.type(passwordInput, 'password123');
 
-    // Get the button and click it
-    const submitButton = screen.getByRole('button');
+    // Get the submit button by type (not the password toggle or dev buttons)
+    const submitButton = screen.getByRole('button', { name: /sign in/i });
     await user.click(submitButton);
 
     // Assert
@@ -152,8 +157,8 @@ describe('Login - Role-based Redirection', () => {
     );
 
     // Act
-    const emailInputs = screen.getAllByPlaceholderText('your@email.com');
-    const passwordInputs = screen.getAllByPlaceholderText('Your password');
+    const emailInputs = screen.getAllByPlaceholderText('you@example.com');
+    const passwordInputs = screen.getAllByPlaceholderText('Enter your password');
 
     const emailInput = emailInputs[0];
     const passwordInput = passwordInputs[0];
@@ -163,8 +168,8 @@ describe('Login - Role-based Redirection', () => {
     await user.clear(passwordInput);
     await user.type(passwordInput, 'wrongpassword');
 
-    // Get the button and click it
-    const submitButton = screen.getByRole('button');
+    // Get the submit button by type (not the password toggle button)
+    const submitButton = screen.getByRole('button', { name: /sign in/i });
     await user.click(submitButton);
 
     // Assert - Navigation should not be called on error
@@ -185,8 +190,8 @@ describe('Login - Role-based Redirection', () => {
     );
 
     // Act
-    const emailInputs = screen.getAllByPlaceholderText('your@email.com');
-    const passwordInputs = screen.getAllByPlaceholderText('Your password');
+    const emailInputs = screen.getAllByPlaceholderText('you@example.com');
+    const passwordInputs = screen.getAllByPlaceholderText('Enter your password');
 
     const emailInput = emailInputs[0];
     const passwordInput = passwordInputs[0];
@@ -196,8 +201,8 @@ describe('Login - Role-based Redirection', () => {
     await user.clear(passwordInput);
     await user.type(passwordInput, 'password123');
 
-    // Get the button and click it
-    const submitButton = screen.getByRole('button');
+    // Get the submit button by type (not the password toggle or dev buttons)
+    const submitButton = screen.getByRole('button', { name: /sign in/i });
     await user.click(submitButton);
 
     // Assert

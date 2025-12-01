@@ -19,7 +19,7 @@ jest.mock('../../middleware/rateLimit', () => ({
   authLimiter: (req, res, next) => next()
 }));
 jest.mock('../../config/logger', () => ({
-  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn() }
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
 }));
 
 describe('Workflow Routes', () => {
@@ -32,6 +32,11 @@ describe('Workflow Routes', () => {
     app = express();
     app.use(express.json());
     app.use('/api/workflows', workflowRoutes);
+
+    // Add error handler to prevent hanging
+    app.use((err, req, res, next) => {
+      res.status(err.status || 500).json({ error: err.message });
+    });
 
     // Setup default middleware mocks
     authenticate.mockImplementation((req, res, next) => {

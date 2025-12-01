@@ -13,7 +13,7 @@ const { authenticate, requireClient } = require('../../middleware/auth');
 jest.mock('../../controllers/supportTicketsController');
 jest.mock('../../middleware/auth');
 jest.mock('../../config/logger', () => ({
-  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn() }
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
 }));
 
 describe('Support Ticket Routes', () => {
@@ -26,6 +26,11 @@ describe('Support Ticket Routes', () => {
     app = express();
     app.use(express.json());
     app.use('/api/support-tickets', supportTicketRoutes);
+
+    // Add error handler to prevent hanging
+    app.use((err, req, res, next) => {
+      res.status(err.status || 500).json({ error: err.message });
+    });
 
     // Setup default middleware mocks
     authenticate.mockImplementation((req, res, next) => {

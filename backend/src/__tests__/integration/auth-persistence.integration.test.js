@@ -32,6 +32,11 @@ app.use(express.json());
 app.use(cookieParser());
 app.use('/api/v1/auth', authRoutes);
 
+// Add error handler to prevent hanging
+app.use((err, req, res, next) => {
+  res.status(err.status || 500).json({ error: err.message });
+});
+
 describe('Authentication Persistence Integration Test', () => {
   let accessTokenCookie;
   let refreshTokenCookie;

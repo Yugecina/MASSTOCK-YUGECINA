@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import AdminAnalytics from '../../../src/pages/AdminAnalytics.jsx';
-import { analyticsService } from '../../../services/analyticsService';
+import AdminAnalytics from '../../pages/AdminAnalytics.jsx';
+import { analyticsService } from '../../services/analyticsService';
 
-vi.mock('../../../services/analyticsService');
+vi.mock('../../services/analyticsService');
 
 const renderWithRouter = (component) => {
   return render(<MemoryRouter>{component}</MemoryRouter>);

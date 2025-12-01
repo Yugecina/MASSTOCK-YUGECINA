@@ -12,7 +12,9 @@ jest.mock('../../config/logger', () => ({
   logAudit: jest.fn(),
   logger: {
     info: jest.fn(),
-    error: jest.fn()
+    error: jest.fn(),
+    warn: jest.fn(),
+    debug: jest.fn()
   }
 }));
 
@@ -133,7 +135,7 @@ describe('SupportTicketsController', () => {
   describe('GET /api/support-tickets - getTickets', () => {
     it('should fetch client tickets for regular user', async () => {
       const mockTickets = [
-        { id: 'ticket-1', title: 'Issue 1', status: 'open' }
+        { id: 'ticket-1', title: 'Issue 1', status: 'open', clients: null }
       ];
 
       supabaseAdmin.from = jest.fn(() => ({
@@ -144,15 +146,10 @@ describe('SupportTicketsController', () => {
 
       await supportTicketsController.getTickets(req, res);
 
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          data: expect.objectContaining({
-            tickets: mockTickets,
-            total: 1
-          })
-        })
-      );
+      const response = res.json.mock.calls[0][0];
+      expect(response.success).toBe(true);
+      expect(response.data.total).toBe(1);
+      expect(response.data.tickets[0]).toHaveProperty('client_name');
     });
 
     it('should fetch all tickets for admin', async () => {
@@ -160,8 +157,8 @@ describe('SupportTicketsController', () => {
       req.client = null;
 
       const mockTickets = [
-        { id: 'ticket-1', title: 'Issue 1' },
-        { id: 'ticket-2', title: 'Issue 2' }
+        { id: 'ticket-1', title: 'Issue 1', clients: null },
+        { id: 'ticket-2', title: 'Issue 2', clients: null }
       ];
 
       supabaseAdmin.from = jest.fn(() => ({
@@ -171,15 +168,10 @@ describe('SupportTicketsController', () => {
 
       await supportTicketsController.getTickets(req, res);
 
-      expect(res.json).toHaveBeenCalledWith(
-        expect.objectContaining({
-          success: true,
-          data: expect.objectContaining({
-            tickets: mockTickets,
-            total: 2
-          })
-        })
-      );
+      const response = res.json.mock.calls[0][0];
+      expect(response.success).toBe(true);
+      expect(response.data.total).toBe(2);
+      expect(response.data.tickets).toHaveLength(2);
     });
   });
 

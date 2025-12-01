@@ -29,8 +29,8 @@ describe('adminUserService', () => {
       await adminUserService.getUsers();
 
       // Assert
-      expect(api.get).toHaveBeenCalledWith('/admin/clients', {
-        params: { page: 1, limit: 10 }
+      expect(api.get).toHaveBeenCalledWith('/v1/admin/users', {
+        params: { page: 1, limit: 50 }
       });
     });
 
@@ -45,7 +45,7 @@ describe('adminUserService', () => {
       await adminUserService.getUsers(2, { limit: 20 });
 
       // Assert
-      expect(api.get).toHaveBeenCalledWith('/admin/clients', {
+      expect(api.get).toHaveBeenCalledWith('/v1/admin/users', {
         params: { page: 2, limit: 20 }
       });
     });
@@ -56,14 +56,14 @@ describe('adminUserService', () => {
         data: { clients: [], pagination: { page: 1, limit: 10, total: 0 } }
       };
       api.get.mockResolvedValue(mockResponse);
-      const filters = { status: 'active', plan: 'pro', search: 'test@example.com' };
+      const filters = { status: 'active', search: 'test@example.com' };
 
       // Act
       await adminUserService.getUsers(1, filters);
 
       // Assert
-      expect(api.get).toHaveBeenCalledWith('/admin/clients', {
-        params: { page: 1, limit: 10, status: 'active', plan: 'pro', search: 'test@example.com' }
+      expect(api.get).toHaveBeenCalledWith('/v1/admin/users', {
+        params: { page: 1, limit: 50, status: 'active', search: 'test@example.com' }
       });
     });
 
@@ -80,8 +80,8 @@ describe('adminUserService', () => {
       // Act
       const result = await adminUserService.getUsers();
 
-      // Assert
-      expect(result).toEqual(mockData);
+      // Assert - adminUserService returns the full response
+      expect(result).toEqual({ data: mockData });
     });
 
     it('devrait gérer les erreurs', async () => {
@@ -106,7 +106,7 @@ describe('adminUserService', () => {
       await adminUserService.getUserDetails('123');
 
       // Assert
-      expect(api.get).toHaveBeenCalledWith('/admin/clients/123');
+      expect(api.get).toHaveBeenCalledWith('/v1/admin/clients/123');
     });
 
     it('devrait retourner les détails de l\'utilisateur', async () => {
@@ -119,8 +119,8 @@ describe('adminUserService', () => {
       // Act
       const result = await adminUserService.getUserDetails('123');
 
-      // Assert
-      expect(result).toEqual(mockData);
+      // Assert - Returns full response
+      expect(result).toEqual({ data: mockData });
     });
   });
 
@@ -143,7 +143,7 @@ describe('adminUserService', () => {
       await adminUserService.createUser(userData);
 
       // Assert
-      expect(api.post).toHaveBeenCalledWith('/admin/users', userData);
+      expect(api.post).toHaveBeenCalledWith('/v1/admin/users', userData);
     });
 
     it('devrait retourner l\'utilisateur créé', async () => {
@@ -162,8 +162,8 @@ describe('adminUserService', () => {
       // Act
       const result = await adminUserService.createUser(userData);
 
-      // Assert
-      expect(result).toEqual(mockData);
+      // Assert - Returns full response
+      expect(result).toEqual({ data: mockData });
     });
 
     it('devrait gérer les erreurs de validation', async () => {
@@ -193,7 +193,7 @@ describe('adminUserService', () => {
       await adminUserService.updateUser(userId, updateData);
 
       // Assert
-      expect(api.put).toHaveBeenCalledWith(`/admin/clients/${userId}`, updateData);
+      expect(api.put).toHaveBeenCalledWith(`/v1/admin/clients/${userId}`, updateData);
     });
 
     it('devrait retourner l\'utilisateur mis à jour', async () => {
@@ -207,8 +207,8 @@ describe('adminUserService', () => {
       // Act
       const result = await adminUserService.updateUser(userId, {});
 
-      // Assert
-      expect(result).toEqual(mockData);
+      // Assert - Returns full response
+      expect(result).toEqual({ data: mockData });
     });
   });
 
@@ -225,7 +225,7 @@ describe('adminUserService', () => {
       await adminUserService.deleteUser(userId);
 
       // Assert
-      expect(api.delete).toHaveBeenCalledWith(`/admin/clients/${userId}`);
+      expect(api.delete).toHaveBeenCalledWith(`/v1/admin/clients/${userId}`);
     });
 
     it('devrait retourner la réponse de suppression', async () => {
@@ -237,8 +237,8 @@ describe('adminUserService', () => {
       // Act
       const result = await adminUserService.deleteUser(userId);
 
-      // Assert
-      expect(result).toEqual(mockData);
+      // Assert - Returns full response
+      expect(result).toEqual({ data: mockData });
     });
   });
 
@@ -255,7 +255,7 @@ describe('adminUserService', () => {
       await adminUserService.blockUser(userId);
 
       // Assert
-      expect(api.put).toHaveBeenCalledWith(`/admin/clients/${userId}`, {
+      expect(api.put).toHaveBeenCalledWith(`/v1/admin/clients/${userId}`, {
         status: 'suspended'
       });
     });
@@ -274,7 +274,7 @@ describe('adminUserService', () => {
       await adminUserService.unblockUser(userId);
 
       // Assert
-      expect(api.put).toHaveBeenCalledWith(`/admin/clients/${userId}`, {
+      expect(api.put).toHaveBeenCalledWith(`/v1/admin/clients/${userId}`, {
         status: 'active'
       });
     });

@@ -21,7 +21,7 @@ jest.mock('../../config/logger', () => ({
   logAuth: jest.fn(),
   logError: jest.fn(),
   logAudit: jest.fn(),
-  logger: { info: jest.fn(), error: jest.fn() }
+  logger: { info: jest.fn(), error: jest.fn(), warn: jest.fn(), debug: jest.fn() }
 }));
 
 describe('Auth Routes', () => {
@@ -34,6 +34,11 @@ describe('Auth Routes', () => {
     app = express();
     app.use(express.json());
     app.use('/api/auth', authRoutes);
+
+    // Add error handler to prevent hanging
+    app.use((err, req, res, next) => {
+      res.status(err.status || 500).json({ error: err.message });
+    });
 
     // Setup middleware mocks
     authenticate.mockImplementation((req, res, next) => {
