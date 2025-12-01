@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { workflowService } from '../../services/workflows';
 import JSZip from 'jszip';
 import logger from '@/utils/logger';
+import { OptimizedImage } from '../common/OptimizedImage';
 import './BatchResultsView.css';
 
 /**
@@ -20,6 +21,7 @@ export function BatchResultsView({ executionId }) {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadProgress, setDownloadProgress] = useState({ current: 0, total: 0 });
   const [previewImage, setPreviewImage] = useState(null);
+  const [previewData, setPreviewData] = useState(null);
   const [hoveredImageIndex, setHoveredImageIndex] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -330,9 +332,71 @@ export function BatchResultsView({ executionId }) {
     <div className="br-container">
       {/* Quick Look Preview Overlay */}
       {previewImage && (
-        <div className="br-preview-overlay" onClick={() => setPreviewImage(null)}>
+        <div className="br-preview-overlay" onClick={() => {
+          setPreviewImage(null);
+          setPreviewData(null);
+        }}>
           <div className="br-preview-content" onClick={(e) => e.stopPropagation()}>
-            <img src={previewImage} alt="Preview" />
+            {/* Close Button */}
+            <button
+              className="br-preview-close"
+              onClick={() => {
+                setPreviewImage(null);
+                setPreviewData(null);
+              }}
+              aria-label="Close preview"
+            >
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18" />
+                <line x1="6" y1="6" x2="18" y2="18" />
+              </svg>
+            </button>
+
+            {/* Image Container */}
+            <div className="br-preview-image-wrapper">
+              <img src={previewImage} alt="Preview" />
+            </div>
+
+            {/* Info Footer */}
+            {previewData && (
+              <div className="br-preview-info">
+                <div className="br-preview-info-row">
+                  <span className="br-preview-index">#{previewData.batch_index}</span>
+                  <span className="br-preview-status">{previewData.status}</span>
+                </div>
+                {previewData.prompt_text && (
+                  <div className="br-preview-prompt">{previewData.prompt_text}</div>
+                )}
+                <div className="br-preview-meta">
+                  {previewData.processing_time_ms && (
+                    <span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      {(previewData.processing_time_ms / 1000).toFixed(2)}s
+                    </span>
+                  )}
+                  {previewData.created_at && (
+                    <span>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                        <line x1="16" y1="2" x2="16" y2="6" />
+                        <line x1="8" y1="2" x2="8" y2="6" />
+                        <line x1="3" y1="10" x2="21" y2="10" />
+                      </svg>
+                      {new Date(previewData.created_at).toLocaleDateString('fr-FR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -534,11 +598,16 @@ export function BatchResultsView({ executionId }) {
                 className="br-card-image"
                 onMouseEnter={() => setHoveredImageIndex(result.batch_index)}
                 onMouseLeave={() => setHoveredImageIndex(null)}
-                onClick={() => setPreviewImage(result.result_url)}
+                onClick={() => {
+                  setPreviewImage(result.result_url);
+                  setPreviewData(result);
+                }}
               >
-                <img
+                <OptimizedImage
                   src={result.result_url}
                   alt={`Unit ${result.batch_index}`}
+                  thumbnailSize={400}
+                  aspectRatio="auto"
                 />
                 {/* Eye Icon on Hover */}
                 {hoveredImageIndex === result.batch_index && (

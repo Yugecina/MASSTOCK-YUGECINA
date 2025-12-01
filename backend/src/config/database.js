@@ -64,6 +64,24 @@ function getSupabaseClient(accessToken) {
 }
 
 /**
+ * Create a fresh admin client for each query to avoid auth context contamination
+ * Used in controllers that need a clean Supabase client without any session state
+ * @returns {object} Fresh Supabase admin client
+ */
+function getCleanAdmin() {
+  return createClient(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    }
+  );
+}
+
+/**
  * Test database connection
  */
 async function testConnection() {
@@ -85,5 +103,6 @@ module.exports = {
   supabase,
   supabaseAdmin,
   getSupabaseClient,
+  getCleanAdmin,
   testConnection
 };

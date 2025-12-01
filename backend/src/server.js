@@ -10,6 +10,7 @@ const workflowRequestRoutes = require('./routes/workflowRequestRoutes');
 const supportTicketRoutes = require('./routes/supportTicketRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const assetsRoutes = require('./routes/assetsRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -37,6 +38,7 @@ app.use('/api/v1/executions', executionRoutes);
 app.use('/api/v1/workflow-requests', workflowRequestRoutes);
 app.use('/api/v1/support-tickets', supportTicketRoutes);
 app.use('/api/v1/settings', settingsRoutes);
+app.use('/api/v1/assets', assetsRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
 app.use((err, req, res, next) => {

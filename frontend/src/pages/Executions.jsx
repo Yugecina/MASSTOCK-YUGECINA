@@ -4,6 +4,8 @@ import { ClientLayout } from '../components/layout/ClientLayout'
 import { Spinner } from '../components/ui/Spinner'
 import { useExecutionsStore } from '../store/executionsStore'
 import logger from '@/utils/logger';
+import './Executions.css';
+import '../components/executions/ExecutionModal.css';
 
 /**
  * Executions Page - "The Trusted Magician" - Electric Trust

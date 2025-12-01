@@ -5,6 +5,7 @@ import { settingsService } from '../services/settings'
 import { Spinner } from '../components/ui/Spinner'
 import toast from 'react-hot-toast'
 import logger from '@/utils/logger'
+import './Settings.css'
 
 /**
  * Settings Page - Dark Premium Style

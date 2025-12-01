@@ -224,6 +224,13 @@ export function WorkflowTable({ workflows, onViewDetails }) {  // Add defaults!
 
 ### Styling (PURE CSS ONLY - ZERO Tailwind)
 
+**CSS File Size Rule (≤3,000 tokens):**
+- **MUST** keep CSS files under 3,000 tokens (~12,000 characters)
+- **MUST** co-locate page CSS with page components (import './PageName.css' in .jsx file)
+- **MUST** use BEM-like naming with page prefixes (.dashboard-, .login-, .executions-, etc.)
+- If a CSS file exceeds 3,000 tokens, split it into multiple files by logical sections
+- Example: pages/Executions.css + components/executions/ExecutionModal.css
+
 **✅ DO: Use CSS Classes from global.css**
 
 **CSS Variable Pattern:**
@@ -459,6 +466,9 @@ api.interceptors.response.use(
 
 export default api;
 ```
+
+**⚠️ IMPORTANT: Response Unwrapping**
+The Axios interceptor at `api.js:35` does `(response) => response.data`, which automatically unwraps responses once. Services return `response.data`, stores receive the unwrapped data directly. Never access `response.data.data` or store won't find nested properties.
 
 **Service Pattern:** `src/services/workflowService.js`
 ```javascript

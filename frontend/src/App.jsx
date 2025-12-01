@@ -9,6 +9,7 @@ import { WorkflowDetail } from './pages/WorkflowDetail'
 import { WorkflowExecute } from './pages/WorkflowExecute'
 import { Executions } from './pages/Executions'
 import { ExecutionDetail } from './pages/ExecutionDetail'
+import Assets from './pages/Assets'
 import { Requests } from './pages/Requests'
 import { Settings } from './pages/Settings'
 import { AdminDashboard } from './pages/admin/AdminDashboard'
@@ -103,6 +104,14 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <ExecutionDetail />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/assets"
+            element={
+              <ProtectedRoute>
+                <Assets />
               </ProtectedRoute>
             }
           />

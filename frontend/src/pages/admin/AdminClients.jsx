@@ -6,6 +6,7 @@ import { AddClientModal } from '../../components/admin/AddClientModal'
 import { EditClientModal } from '../../components/admin/EditClientModal'
 import { ConfirmDialog } from '../../components/admin/ConfirmDialog'
 import { adminUserService } from '../../services/adminUserService'
+import '../AdminClients.css'
 
 // SVG Icons
 const Icons = {

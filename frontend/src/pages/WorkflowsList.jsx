@@ -4,6 +4,7 @@ import { ClientLayout } from '../components/layout/ClientLayout'
 import { Spinner } from '../components/ui/Spinner'
 import { workflowService } from '../services/workflows'
 import logger from '@/utils/logger';
+import './WorkflowsList.css'
 
 /**
  * WorkflowsList Page - Dark Premium Style

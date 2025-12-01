@@ -6,6 +6,7 @@ import { workflowService } from '../services/workflows';
 import { NanoBananaForm } from '../components/workflows/NanoBananaForm';
 import { BatchResultsView } from '../components/workflows/BatchResultsView';
 import logger from '@/utils/logger';
+import './WorkflowExecute.css'
 
 /**
  * WorkflowExecute Page - Dark Premium Style

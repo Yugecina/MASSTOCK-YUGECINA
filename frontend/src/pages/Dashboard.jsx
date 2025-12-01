@@ -5,6 +5,7 @@ import { Spinner } from '../components/ui/Spinner'
 import { useAuth } from '../hooks/useAuth'
 import { workflowService } from '../services/workflows'
 import logger from '@/utils/logger'
+import './Dashboard.css'
 
 /**
  * Dashboard Page - Electric Trust Design System
