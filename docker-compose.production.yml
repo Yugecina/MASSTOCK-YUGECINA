@@ -75,18 +75,18 @@ services:
     networks:
       - masstock_network
 
-  # Nginx - Reverse Proxy + Static Files
+  # Application - React SPA (app.masstock.fr)
   # Note: VPS nginx handles ports 80/443 and SSL, this container serves on 8080
-  nginx:
+  app:
     build:
       context: ./nginx
       dockerfile: Dockerfile
-    container_name: masstock_nginx
+    container_name: masstock_app
     restart: unless-stopped
     depends_on:
       - api
     ports:
-      - "8080:80"  # VPS nginx proxies :80/:443 → :8080
+      - "8080:80"  # VPS nginx proxies app.masstock.fr → :8080
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
@@ -100,10 +100,58 @@ services:
       timeout: 10s
       retries: 3
 
+  # Site Vitrine - Landing Page (masstock.fr)
+  vitrine:
+    build:
+      context: ./frontend-vitrine
+      dockerfile: Dockerfile
+    container_name: masstock_vitrine
+    restart: unless-stopped
+    ports:
+      - "8081:80"  # VPS nginx proxies masstock.fr → :8081
+    networks:
+      - masstock_network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # n8n - Workflow Automation (n8n.masstock.fr)
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: masstock_n8n
+    restart: unless-stopped
+    environment:
+      - N8N_HOST=n8n.masstock.fr
+      - N8N_PROTOCOL=https
+      - N8N_PORT=5678
+      - WEBHOOK_URL=https://n8n.masstock.fr/
+      - GENERIC_TIMEZONE=Europe/Paris
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=${N8N_USER}
+      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+    ports:
+      - "5678:5678"  # VPS nginx proxies n8n.masstock.fr → :5678
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - masstock_network
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5678/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 networks:
   masstock_network:
     driver: bridge
 
 volumes:
   redis_data:
+    driver: local
+  n8n_data:
     driver: local

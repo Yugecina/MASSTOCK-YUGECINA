@@ -31,6 +31,7 @@ export const workflowService = {
    * @param {string} params.status - Filter by status (optional)
    * @param {string} params.workflow_id - Filter by workflow (optional)
    * @param {string} params.user_id - Filter by user (optional)
+   * @param {string} params.fields - Comma-separated list of fields to return (optional)
    */
   getAllExecutions: (params = {}) => {
     const queryParams = new URLSearchParams()
@@ -39,6 +40,7 @@ export const workflowService = {
     if (params.status && params.status !== 'all') queryParams.append('status', params.status)
     if (params.workflow_id && params.workflow_id !== 'all') queryParams.append('workflow_id', params.workflow_id)
     if (params.user_id && params.user_id !== 'all') queryParams.append('user_id', params.user_id)
+    if (params.fields) queryParams.append('fields', params.fields)
     return api.get(`/v1/workflows/executions/all?${queryParams.toString()}`)
   },
 

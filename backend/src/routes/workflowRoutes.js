@@ -55,6 +55,7 @@ router.get('/executions/all',
   query('status').optional().isString(),
   query('workflow_id').optional(),
   query('user_id').optional(),
+  query('fields').optional().isString(),
   validate,
   asyncHandler(workflowsController.getAllClientExecutions)
 );

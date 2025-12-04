@@ -844,21 +844,52 @@ async function getClientMembers(req, res) {
  */
 async function getAllClientExecutions(req, res) {
   const clientId = req.client.id;
-  const { limit = 20, offset = 0, status, workflow_id, user_id } = req.query;
+  const { limit = 20, offset = 0, status, workflow_id, user_id, fields } = req.query;
 
   logger.info('📡 getAllClientExecutions called:', {
     clientId,
     userId: req.user?.id,
-    filters: { limit, offset, status, workflow_id, user_id }
+    filters: { limit, offset, status, workflow_id, user_id, fields }
   });
 
   // Use a fresh admin client to avoid auth context issues
   const admin = getCleanAdmin();
 
+  // Define allowed fields (whitelist for security)
+  const ALLOWED_FIELDS = [
+    'id', 'workflow_id', 'client_id', 'status', 'input_data', 'output_data',
+    'error_message', 'started_at', 'completed_at', 'duration_seconds',
+    'triggered_by_user_id', 'created_at', 'updated_at', 'retry_count'
+  ];
+
+  // Default lightweight fields for list view (excludes heavy input_data/output_data)
+  const DEFAULT_LIST_FIELDS = [
+    'id', 'status', 'workflow_id', 'created_at', 'duration_seconds',
+    'triggered_by_user_id', 'error_message', 'started_at', 'completed_at', 'retry_count'
+  ];
+
+  // Parse requested fields or use defaults
+  let selectFields = DEFAULT_LIST_FIELDS;
+  if (fields) {
+    const requestedFields = fields.split(',').map(f => f.trim());
+    selectFields = requestedFields.filter(f => ALLOWED_FIELDS.includes(f));
+    if (selectFields.length === 0) {
+      selectFields = DEFAULT_LIST_FIELDS;
+    }
+  }
+
+  const selectString = selectFields.join(', ');
+
+  logger.debug('Field selection:', {
+    requested: fields,
+    selected: selectString,
+    fieldCount: selectFields.length
+  });
+
   // Fetch executions first
   let executionsQuery = admin
     .from('workflow_executions')
-    .select('*', { count: 'exact' })
+    .select(selectString, { count: 'exact' })
     .eq('client_id', clientId)
     .order('created_at', { ascending: false })
     .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);

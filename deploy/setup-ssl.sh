@@ -34,8 +34,10 @@ OPTIONS:
 WHAT THIS DOES:
     1. Installs certbot if not present
     2. Obtains SSL certificates for:
-       - dorian-gonzalez.fr
-       - api.dorian-gonzalez.fr
+       - masstock.fr (site vitrine)
+       - app.masstock.fr (application)
+       - api.masstock.fr (API)
+       - n8n.masstock.fr (n8n)
     3. Updates nginx configuration with SSL
     4. Configures automatic renewal
     5. Sets up HTTPS redirects and security headers
@@ -58,7 +60,7 @@ EOF
 LETSENCRYPT_EMAIL=""
 
 # Domains to certify
-DOMAINS=("dorian-gonzalez.fr" "www.dorian-gonzalez.fr" "api.dorian-gonzalez.fr")
+DOMAINS=("masstock.fr" "www.masstock.fr" "app.masstock.fr" "api.masstock.fr" "n8n.masstock.fr")
 
 # Staging mode for testing
 STAGING_MODE=0
@@ -251,7 +253,7 @@ obtain_certificates() {
 
     # Show certificate info
     log_info "Certificate details:"
-    certbot certificates | grep -A 5 "dorian-gonzalez.fr" || true
+    certbot certificates | grep -A 5 "masstock.fr" || true
 }
 
 #####################################################################
@@ -274,7 +276,7 @@ update_nginx_with_ssl() {
     backup_file "$config_file"
 
     # Certificate paths
-    local cert_path="/etc/letsencrypt/live/dorian-gonzalez.fr"
+    local cert_path="/etc/letsencrypt/live/masstock.fr"
 
     log_info "Writing SSL configuration..."
 
@@ -292,7 +294,12 @@ update_nginx_with_ssl() {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # Upstream definitions
-upstream masstock_frontend {
+upstream masstock_vitrine {
+    server 127.0.0.1:8081;
+    keepalive 32;
+}
+
+upstream masstock_app {
     server 127.0.0.1:8080;
     keepalive 32;
 }
@@ -302,14 +309,19 @@ upstream masstock_api {
     keepalive 32;
 }
 
+upstream masstock_n8n {
+    server 127.0.0.1:5678;
+    keepalive 32;
+}
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# FRONTEND - dorian-gonzalez.fr (HTTP → HTTPS redirect)
+# SITE VITRINE - masstock.fr (HTTP → HTTPS redirect)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 server {
     listen 80;
     listen [::]:80;
-    server_name dorian-gonzalez.fr www.dorian-gonzalez.fr;
+    server_name masstock.fr www.masstock.fr;
 
     # ACME challenge for certificate renewal
     location /.well-known/acme-challenge/ {
@@ -325,7 +337,7 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name dorian-gonzalez.fr www.dorian-gonzalez.fr;
+    server_name masstock.fr www.masstock.fr;
 
     # SSL Configuration
     ssl_certificate ${cert_path}/fullchain.pem;
@@ -350,18 +362,102 @@ server {
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
-    add_header Content-Security-Policy "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https://api.dorian-gonzalez.fr https://*.supabase.co;" always;
+    add_header Content-Security-Policy "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https://api.masstock.fr https://app.masstock.fr https://*.supabase.co;" always;
 
     # Access logs
-    access_log /var/log/nginx/masstock-frontend-access.log;
-    error_log /var/log/nginx/masstock-frontend-error.log;
+    access_log /var/log/nginx/masstock-vitrine-access.log;
+    error_log /var/log/nginx/masstock-vitrine-error.log;
+
+    # Client limits
+    client_max_body_size 5M;
+
+    # Proxy to MasStock vitrine container
+    location / {
+        proxy_pass http://masstock_vitrine;
+
+        # Standard proxy headers
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # Connection settings
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        # Buffering
+        proxy_buffering on;
+        proxy_buffer_size 4k;
+        proxy_buffers 8 4k;
+    }
+
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# APPLICATION - app.masstock.fr (HTTP → HTTPS redirect)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name app.masstock.fr;
+
+    # ACME challenge for certificate renewal
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Redirect all HTTP to HTTPS
+    location / {
+        return 301 https://\$server_name\$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name app.masstock.fr;
+
+    # SSL Configuration
+    ssl_certificate ${cert_path}/fullchain.pem;
+    ssl_certificate_key ${cert_path}/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:10m;
+    ssl_session_tickets off;
+
+    # Modern SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # OCSP stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    ssl_trusted_certificate ${cert_path}/chain.pem;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Content-Security-Policy "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https://api.masstock.fr https://*.supabase.co;" always;
+
+    # Access logs
+    access_log /var/log/nginx/masstock-app-access.log;
+    error_log /var/log/nginx/masstock-app-error.log;
 
     # Client limits
     client_max_body_size 10M;
 
-    # Proxy to MasStock nginx container
+    # Proxy to MasStock app container
     location / {
-        proxy_pass http://masstock_frontend;
+        proxy_pass http://masstock_app;
 
         # Standard proxy headers
         proxy_set_header Host \$host;
@@ -387,18 +483,18 @@ server {
     # Health check endpoint
     location /health {
         access_log off;
-        proxy_pass http://masstock_frontend/health;
+        proxy_pass http://masstock_app/health;
     }
 }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# API - api.dorian-gonzalez.fr (HTTP → HTTPS redirect)
+# API - api.masstock.fr (HTTP → HTTPS redirect)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 server {
     listen 80;
     listen [::]:80;
-    server_name api.dorian-gonzalez.fr;
+    server_name api.masstock.fr;
 
     # ACME challenge for certificate renewal
     location /.well-known/acme-challenge/ {
@@ -414,7 +510,7 @@ server {
 server {
     listen 443 ssl http2;
     listen [::]:443 ssl http2;
-    server_name api.dorian-gonzalez.fr;
+    server_name api.masstock.fr;
 
     # SSL Configuration
     ssl_certificate ${cert_path}/fullchain.pem;
@@ -475,6 +571,100 @@ server {
     location /health {
         access_log off;
         proxy_pass http://masstock_api/health;
+    }
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# N8N - n8n.masstock.fr (HTTP → HTTPS redirect)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name n8n.masstock.fr;
+
+    # ACME challenge for certificate renewal
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Redirect all HTTP to HTTPS
+    location / {
+        return 301 https://\$server_name\$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name n8n.masstock.fr;
+
+    # SSL Configuration
+    ssl_certificate ${cert_path}/fullchain.pem;
+    ssl_certificate_key ${cert_path}/privkey.pem;
+    ssl_session_timeout 1d;
+    ssl_session_cache shared:MozSSL:10m;
+    ssl_session_tickets off;
+
+    # Modern SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384;
+    ssl_prefer_server_ciphers off;
+
+    # OCSP stapling
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    ssl_trusted_certificate ${cert_path}/chain.pem;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Access logs
+    access_log /var/log/nginx/masstock-n8n-access.log;
+    error_log /var/log/nginx/masstock-n8n-error.log;
+
+    # Client limits (for workflow data)
+    client_max_body_size 50M;
+
+    # Proxy to n8n container
+    location / {
+        proxy_pass http://masstock_n8n;
+
+        # Standard proxy headers
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # Connection settings (important for n8n websockets)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade \$http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Timeouts (longer for workflow executions)
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
+        # Buffering
+        proxy_buffering off;  # Disable for websockets
+    }
+
+    # Webhooks endpoint (no auth required)
+    location ~* ^/webhook/ {
+        proxy_pass http://masstock_n8n;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+
+        # Timeouts for webhooks
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
     }
 }
 EOF
@@ -554,7 +744,7 @@ verify_ssl() {
     local errors=0
 
     # Check certificate files exist
-    local cert_path="/etc/letsencrypt/live/dorian-gonzalez.fr"
+    local cert_path="/etc/letsencrypt/live/masstock.fr"
 
     if [[ ! -f "${cert_path}/fullchain.pem" ]]; then
         log_error "Certificate not found: ${cert_path}/fullchain.pem"
@@ -595,7 +785,7 @@ test_https_access() {
     log_info "To fully test SSL, run build-and-start.sh first"
 
     # Test certificate only (not the backend)
-    for domain in "dorian-gonzalez.fr" "api.dorian-gonzalez.fr"; do
+    for domain in "masstock.fr" "app.masstock.fr" "api.masstock.fr" "n8n.masstock.fr"; do
         log_debug "Testing SSL for: $domain"
 
         if timeout 5 openssl s_client -connect "$domain:443" -servername "$domain" </dev/null 2>/dev/null | grep -q "Verify return code: 0"; then
@@ -614,8 +804,10 @@ print_next_steps() {
     echo ""
 
     log_success "HTTPS enabled for:"
-    echo "  • https://dorian-gonzalez.fr (frontend)"
-    echo "  • https://api.dorian-gonzalez.fr (API)"
+    echo "  • https://masstock.fr (site vitrine)"
+    echo "  • https://app.masstock.fr (application)"
+    echo "  • https://api.masstock.fr (API)"
+    echo "  • https://n8n.masstock.fr (n8n)"
     echo ""
 
     log_info "🔒 Security features:"

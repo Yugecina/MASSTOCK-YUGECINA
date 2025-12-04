@@ -105,20 +105,18 @@ export function AdminSidebar() {
 
   return (
     <aside className="sidebar">
-      {/* Logo */}
-      <div className="sidebar-logo">
-        <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
-          <rect width="40" height="40" rx="10" fill="var(--primary)" />
-          <path d="M12 28V12h4.5l3.5 10.5L23.5 12H28v16h-3v-11l-3.5 11h-3L15 17v11h-3z" fill="white" />
-        </svg>
-        <span style={{
-          fontSize: '18px',
-          fontWeight: 600,
-          color: 'var(--foreground)',
-          marginLeft: '10px'
-        }}>
-          Admin
-        </span>
+      {/* Header: Logo + Dark Mode */}
+      <div className="sidebar-header">
+        <div className="sidebar-logo">
+          <svg width="32" height="32" viewBox="0 0 40 40" fill="none">
+            <rect width="40" height="40" rx="10" fill="var(--primary)" />
+            <path d="M12 28V12h4.5l3.5 10.5L23.5 12H28v16h-3v-11l-3.5 11h-3L15 17v11h-3z" fill="white" />
+          </svg>
+          <span className="sidebar-logo-text" style={{ letterSpacing: 'normal', fontFamily: 'var(--font-sans)' }}>
+            Admin
+          </span>
+        </div>
+        <DarkModeToggle />
       </div>
 
       {/* Navigation */}
@@ -139,25 +137,20 @@ export function AdminSidebar() {
       <div className="sidebar-footer">
         {/* User Card */}
         <div className="sidebar-user-card">
-          {/* Avatar */}
+          {/* Avatar with gradient */}
           <div className="sidebar-user-avatar">
-            {(user?.name || 'A').charAt(0).toUpperCase()}
+            {(user?.name || 'Admin').charAt(0).toUpperCase()}
           </div>
 
           {/* User Info */}
           <div className="sidebar-user-info">
             <div className="sidebar-user-name">
-              {user?.name || 'Admin'}
+              Admin {user?.name || 'MasStock'}
             </div>
             <div className="sidebar-user-email">
               {user?.email || 'admin@masstock.com'}
             </div>
           </div>
-        </div>
-
-        {/* Dark Mode Toggle */}
-        <div className="sidebar-toggle-wrapper">
-          <DarkModeToggle />
         </div>
 
         {/* Logout Button */}

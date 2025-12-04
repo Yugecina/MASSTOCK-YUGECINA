@@ -23,6 +23,7 @@ export const useExecutionsStore = create((set, get) => ({
   // Dynamic data (cached with 30s TTL)
   executions: [],
   executionsLoading: false,
+  executionsRefreshing: false,
   executionsLastFetch: null,
   executionsTotal: 0,
   executionsHasMore: false,
@@ -131,7 +132,13 @@ export const useExecutionsStore = create((set, get) => ({
     }
 
     logger.debug('🔍 executionsStore.fetchExecutions: Fetching from API', { params: queryParams })
-    set({ executionsLoading: true })
+
+    // Use executionsRefreshing for updates, executionsLoading for initial load
+    if (isInitialLoad) {
+      set({ executionsLoading: true })
+    } else {
+      set({ executionsRefreshing: true })
+    }
 
     try {
       const response = await workflowService.getAllExecutions({
@@ -139,7 +146,8 @@ export const useExecutionsStore = create((set, get) => ({
         offset: options.append ? get().executionsOffset : 0,
         status: queryParams.status !== 'all' ? queryParams.status : undefined,
         workflow_id: queryParams.workflow_id !== 'all' ? queryParams.workflow_id : undefined,
-        user_id: queryParams.user_id !== 'all' ? queryParams.user_id : undefined
+        user_id: queryParams.user_id !== 'all' ? queryParams.user_id : undefined,
+        fields: 'id,status,workflow_id,created_at,duration_seconds,triggered_by_user_id,error_message,started_at,completed_at,retry_count'
       })
 
       const executionsData = response.data?.data || response.data
@@ -151,6 +159,7 @@ export const useExecutionsStore = create((set, get) => ({
         executionsHasMore: executionsData.hasMore || false,
         executionsOffset: options.append ? get().executionsOffset + newExecutions.length : newExecutions.length,
         executionsLoading: false,
+        executionsRefreshing: false,
         executionsLastFetch: Date.now()
       })
 
@@ -162,6 +171,7 @@ export const useExecutionsStore = create((set, get) => ({
       logger.error('❌ executionsStore.fetchExecutions: Error', { error })
       set({
         executionsLoading: false,
+        executionsRefreshing: false,
         executions: [],
         executionsTotal: 0,
         executionsHasMore: false
@@ -172,6 +182,7 @@ export const useExecutionsStore = create((set, get) => ({
   // Background refresh (stale-while-revalidate)
   refreshExecutionsInBackground: async (params = {}) => {
     logger.debug('🔄 executionsStore.refreshExecutionsInBackground: Starting silent update')
+    set({ executionsRefreshing: true })
 
     try {
       const response = await workflowService.getAllExecutions({
@@ -179,7 +190,8 @@ export const useExecutionsStore = create((set, get) => ({
         offset: 0,
         status: params.status !== 'all' ? params.status : undefined,
         workflow_id: params.workflow_id !== 'all' ? params.workflow_id : undefined,
-        user_id: params.user_id !== 'all' ? params.user_id : undefined
+        user_id: params.user_id !== 'all' ? params.user_id : undefined,
+        fields: 'id,status,workflow_id,created_at,duration_seconds,triggered_by_user_id,error_message,started_at,completed_at,retry_count'
       })
 
       const executionsData = response.data?.data || response.data
@@ -190,6 +202,7 @@ export const useExecutionsStore = create((set, get) => ({
         executionsTotal: executionsData.total || 0,
         executionsHasMore: executionsData.hasMore || false,
         executionsOffset: newExecutions.length,
+        executionsRefreshing: false,
         executionsLastFetch: Date.now()
       })
 
@@ -198,6 +211,7 @@ export const useExecutionsStore = create((set, get) => ({
       })
     } catch (error) {
       logger.error('❌ executionsStore.refreshExecutionsInBackground: Error (silent)', { error })
+      set({ executionsRefreshing: false })
     }
   },
 
@@ -279,6 +293,7 @@ export const useExecutionsStore = create((set, get) => ({
       membersLastFetch: null,
       executions: [],
       executionsLoading: false,
+      executionsRefreshing: false,
       executionsLastFetch: null,
       executionsTotal: 0,
       executionsHasMore: false,

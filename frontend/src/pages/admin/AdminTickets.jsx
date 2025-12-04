@@ -1,16 +1,20 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import toast from 'react-hot-toast'
 import { Spinner } from '../../components/ui/Spinner'
 import { AdminLayout } from '../../components/layout/AdminLayout'
 import { adminService } from '../../services/admin'
 import logger from '@/utils/logger'
+import './AdminTickets.css'
 
 /**
- * AdminTickets - Dark Premium Style
+ * AdminTickets - Dark Premium Editorial Design
+ * Refined ticket management with visual hierarchy and filtering
  */
 export function AdminTickets() {
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [priorityFilter, setPriorityFilter] = useState('all')
 
   useEffect(() => {
     async function loadTickets() {
@@ -29,24 +33,39 @@ export function AdminTickets() {
     loadTickets()
   }, [])
 
-  const getPriorityClass = (priority) => {
-    switch (priority?.toLowerCase()) {
-      case 'urgent': return 'admin-badge--danger'
-      case 'high': return 'admin-badge--danger'
-      case 'medium': return 'admin-badge--warning'
-      case 'low': return 'admin-badge--success'
-      default: return ''
+  // Calculate stats
+  const stats = useMemo(() => {
+    return {
+      total: tickets.length,
+      open: tickets.filter(t => t.status === 'open').length,
+      inProgress: tickets.filter(t => t.status === 'in_progress').length,
+      urgent: tickets.filter(t => t.priority === 'urgent').length
     }
+  }, [tickets])
+
+  // Filter tickets
+  const filteredTickets = useMemo(() => {
+    return tickets.filter(ticket => {
+      const statusMatch = statusFilter === 'all' || ticket.status === statusFilter
+      const priorityMatch = priorityFilter === 'all' || ticket.priority === priorityFilter
+      return statusMatch && priorityMatch
+    })
+  }, [tickets, statusFilter, priorityFilter])
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffInHours = Math.floor((now - date) / (1000 * 60 * 60))
+
+    if (diffInHours < 1) return 'Just now'
+    if (diffInHours < 24) return `${diffInHours}h ago`
+    if (diffInHours < 48) return 'Yesterday'
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
-  const getStatusClass = (status) => {
-    switch (status?.toLowerCase()) {
-      case 'open': return 'admin-badge--primary'
-      case 'in_progress': return 'admin-badge--warning'
-      case 'resolved': return 'admin-badge--success'
-      case 'closed': return ''
-      default: return ''
-    }
+  const handleStatusChange = (ticketId, newStatus) => {
+    toast.success(`Ticket #${ticketId.substring(0, 8)} marked as ${newStatus}`)
+    // TODO: Implement API call
   }
 
   return (
@@ -58,8 +77,11 @@ export function AdminTickets() {
             <h1 className="admin-title">Support Tickets</h1>
             <p className="admin-subtitle">Manage customer support requests and issues</p>
           </div>
-          <button className="btn btn-primary" onClick={() => toast.info('Add Ticket feature coming soon')}>
-            + Add Ticket
+          <button
+            className="btn btn-primary"
+            onClick={() => toast.info('Add Ticket feature coming soon')}
+          >
+            + New Ticket
           </button>
         </header>
 
@@ -67,49 +89,182 @@ export function AdminTickets() {
           <div className="admin-loading">
             <Spinner size="lg" />
           </div>
-        ) : tickets.length === 0 ? (
-          <div className="admin-card">
-            <div className="admin-empty">
-              <div className="admin-empty-icon">💬</div>
-              <h3 className="admin-empty-title">No support tickets</h3>
-              <p className="admin-empty-text">All tickets have been resolved. Great job!</p>
-            </div>
-          </div>
         ) : (
-          <div className="admin-tickets-list">
-            {tickets.map((ticket) => (
-              <article key={ticket.id} className="admin-ticket-card">
-                <div className="admin-ticket-header">
-                  <div className="admin-ticket-info">
-                    <div className="admin-ticket-title-row">
-                      <span className="admin-ticket-id">#{ticket.id.substring(0, 8)}</span>
-                      <h3 className="admin-ticket-title">{ticket.title}</h3>
+          <div className="admin-tickets-container">
+            {/* Stats Overview */}
+            <div className="tickets-stats-bar">
+              <div className="tickets-stat-card">
+                <span className="tickets-stat-label">Total Tickets</span>
+                <span className="tickets-stat-value">{stats.total}</span>
+                <span className="tickets-stat-trend">All time</span>
+              </div>
+              <div className="tickets-stat-card">
+                <span className="tickets-stat-label">Open</span>
+                <span className="tickets-stat-value">{stats.open}</span>
+                <span className="tickets-stat-trend">Awaiting response</span>
+              </div>
+              <div className="tickets-stat-card">
+                <span className="tickets-stat-label">In Progress</span>
+                <span className="tickets-stat-value">{stats.inProgress}</span>
+                <span className="tickets-stat-trend">Being worked on</span>
+              </div>
+              <div className="tickets-stat-card">
+                <span className="tickets-stat-label">Urgent</span>
+                <span className="tickets-stat-value">{stats.urgent}</span>
+                <span className="tickets-stat-trend">High priority</span>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            <div className="tickets-filter-bar">
+              <div className="tickets-filter-group">
+                <button
+                  className={`filter-chip ${statusFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('all')}
+                >
+                  All Status
+                </button>
+                <button
+                  className={`filter-chip ${statusFilter === 'open' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('open')}
+                >
+                  Open
+                </button>
+                <button
+                  className={`filter-chip ${statusFilter === 'in_progress' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('in_progress')}
+                >
+                  In Progress
+                </button>
+                <button
+                  className={`filter-chip ${statusFilter === 'resolved' ? 'active' : ''}`}
+                  onClick={() => setStatusFilter('resolved')}
+                >
+                  Resolved
+                </button>
+              </div>
+
+              <div className="filter-divider" />
+
+              <div className="tickets-filter-group">
+                <button
+                  className={`filter-chip ${priorityFilter === 'all' ? 'active' : ''}`}
+                  onClick={() => setPriorityFilter('all')}
+                >
+                  All Priority
+                </button>
+                <button
+                  className={`filter-chip ${priorityFilter === 'urgent' ? 'active' : ''}`}
+                  onClick={() => setPriorityFilter('urgent')}
+                >
+                  Urgent
+                </button>
+                <button
+                  className={`filter-chip ${priorityFilter === 'high' ? 'active' : ''}`}
+                  onClick={() => setPriorityFilter('high')}
+                >
+                  High
+                </button>
+                <button
+                  className={`filter-chip ${priorityFilter === 'medium' ? 'active' : ''}`}
+                  onClick={() => setPriorityFilter('medium')}
+                >
+                  Medium
+                </button>
+                <button
+                  className={`filter-chip ${priorityFilter === 'low' ? 'active' : ''}`}
+                  onClick={() => setPriorityFilter('low')}
+                >
+                  Low
+                </button>
+              </div>
+            </div>
+
+            {/* Tickets Grid */}
+            {filteredTickets.length === 0 ? (
+              <div className="tickets-empty-state">
+                <div className="tickets-empty-icon">💬</div>
+                <h3 className="tickets-empty-title">
+                  {tickets.length === 0
+                    ? 'No support tickets'
+                    : 'No tickets match your filters'}
+                </h3>
+                <p className="tickets-empty-text">
+                  {tickets.length === 0
+                    ? 'All tickets have been resolved. Great job!'
+                    : 'Try adjusting your filters to see more results.'}
+                </p>
+              </div>
+            ) : (
+              <div className="admin-tickets-grid">
+                {filteredTickets.map((ticket) => (
+                  <article
+                    key={ticket.id}
+                    className={`admin-ticket-card priority-${ticket.priority?.toLowerCase() || 'medium'}`}
+                  >
+                    {/* Card Header */}
+                    <div className="ticket-card-header">
+                      <span className="ticket-id-badge">
+                        #{ticket.id.substring(0, 8)}
+                      </span>
+                      <div className="ticket-badges">
+                        <span className={`ticket-status-badge status-${ticket.status}`}>
+                          {ticket.status.replace('_', ' ')}
+                        </span>
+                        <span className={`ticket-priority-badge priority-${ticket.priority?.toLowerCase() || 'medium'}`}>
+                          {ticket.priority}
+                        </span>
+                      </div>
                     </div>
-                    <p className="admin-ticket-description">{ticket.description}</p>
-                    <div className="admin-ticket-meta">
-                      <span>From: <strong>{ticket.client_name}</strong></span>
-                      <span className="admin-ticket-date">
-                        {new Date(ticket.created_at).toLocaleDateString()}
+
+                    {/* Ticket Content */}
+                    <div className="ticket-content">
+                      <h3 className="ticket-title">{ticket.title}</h3>
+                      <p className="ticket-description">{ticket.description}</p>
+                    </div>
+
+                    {/* Ticket Meta */}
+                    <div className="ticket-meta">
+                      <div className="ticket-meta-left">
+                        <span className="ticket-client-label">Client</span>
+                        <span className="ticket-client">{ticket.client_name}</span>
+                      </div>
+                      <span className="ticket-timestamp">
+                        {formatDate(ticket.created_at)}
                       </span>
                     </div>
-                  </div>
 
-                  <div className="admin-ticket-actions">
-                    <span className={`admin-badge ${getStatusClass(ticket.status)}`}>
-                      {ticket.status.replace('_', ' ')}
-                    </span>
-                    <span className={`admin-badge ${getPriorityClass(ticket.priority)}`}>
-                      {ticket.priority}
-                    </span>
+                    {/* Action Buttons */}
                     {(ticket.status === 'open' || ticket.status === 'in_progress') && (
-                      <button className="btn btn-primary btn-sm" onClick={() => toast.success('Resolve feature coming soon')}>
-                        {ticket.status === 'open' ? 'Start' : 'Resolve'}
-                      </button>
+                      <div className="ticket-actions">
+                        {ticket.status === 'open' && (
+                          <button
+                            className="ticket-action-btn primary"
+                            onClick={() => handleStatusChange(ticket.id, 'in_progress')}
+                          >
+                            Start Working
+                          </button>
+                        )}
+                        {ticket.status === 'in_progress' && (
+                          <button
+                            className="ticket-action-btn primary"
+                            onClick={() => handleStatusChange(ticket.id, 'resolved')}
+                          >
+                            Mark Resolved
+                          </button>
+                        )}
+                        <button
+                          className="ticket-action-btn"
+                          onClick={() => toast.info('View details coming soon')}
+                        >
+                          View Details
+                        </button>
+                      </div>
                     )}
-                  </div>
-                </div>
-              </article>
-            ))}
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

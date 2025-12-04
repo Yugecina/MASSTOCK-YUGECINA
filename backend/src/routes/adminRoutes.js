@@ -382,10 +382,8 @@ router.get('/users/search',
     const { validationResult } = require('express-validator');
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      console.log('❌ /users/search: Validation failed', { errors: errors.array(), query: req.query });
       throw validationErrorHandler(errors.array());
     }
-    console.log('✅ /users/search: Validation passed', { query: req.query });
     await adminClientController.searchUsersForMember(req, res);
   })
 );

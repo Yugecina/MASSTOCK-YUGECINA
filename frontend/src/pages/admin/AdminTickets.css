@@ -1,0 +1,413 @@
+/* ========================================
+   ADMIN TICKETS PAGE - Dark Premium
+   Refined editorial design with visual hierarchy
+   ======================================== */
+
+.admin-tickets-container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+
+/* Stats Overview Bar */
+.tickets-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-4);
+}
+
+.tickets-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: var(--spacing-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  transition: all var(--transition-fast) var(--ease-out);
+}
+
+.tickets-stat-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary);
+}
+
+.tickets-stat-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+}
+
+.tickets-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  font-family: var(--font-sans);
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+
+.tickets-stat-trend {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--muted-foreground);
+}
+
+/* Filter Bar */
+.tickets-filter-bar {
+  display: flex;
+  gap: var(--spacing-3);
+  align-items: center;
+  padding: var(--spacing-4);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: var(--spacing-6);
+}
+
+.tickets-filter-group {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.filter-chip {
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all var(--transition-fast) var(--ease-out);
+}
+
+.filter-chip:hover {
+  background: var(--muted);
+  border-color: var(--primary);
+  color: var(--foreground);
+}
+
+.filter-chip.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.filter-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--border);
+  margin: 0 var(--spacing-2);
+}
+
+/* Tickets Grid - Editorial Layout */
+.admin-tickets-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  gap: var(--spacing-6);
+  margin-top: var(--spacing-4);
+}
+
+/* Ticket Card - Refined Premium */
+.admin-ticket-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: var(--spacing-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  transition: all var(--transition-fast) var(--ease-out);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Priority accent bar */
+.admin-ticket-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 4px;
+  height: 100%;
+  background: var(--border);
+  transition: all var(--transition-fast) var(--ease-out);
+}
+
+.admin-ticket-card.priority-urgent::before {
+  background: var(--destructive);
+  width: 6px;
+}
+
+.admin-ticket-card.priority-high::before {
+  background: var(--warning);
+  width: 5px;
+}
+
+.admin-ticket-card.priority-medium::before {
+  background: var(--primary);
+}
+
+.admin-ticket-card.priority-low::before {
+  background: var(--success);
+}
+
+.admin-ticket-card:hover {
+  transform: translateY(-4px);
+  border-color: var(--primary);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
+}
+
+/* Card Header */
+.ticket-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+}
+
+.ticket-id-badge {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 8px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  border-radius: 6px;
+  letter-spacing: 0.03em;
+}
+
+.ticket-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* Ticket Content */
+.ticket-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.ticket-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--foreground);
+  line-height: 1.3;
+  margin: 0;
+}
+
+.ticket-description {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted-foreground);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Ticket Meta */
+.ticket-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: var(--spacing-3);
+  border-top: 1px solid var(--border);
+  gap: var(--spacing-4);
+}
+
+.ticket-meta-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.ticket-client {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.ticket-client-label {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ticket-timestamp {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ticket-timestamp::before {
+  content: '•';
+  color: var(--border);
+}
+
+/* Action Buttons */
+.ticket-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: var(--spacing-2);
+}
+
+.ticket-action-btn {
+  flex: 1;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--foreground);
+  cursor: pointer;
+  transition: all var(--transition-fast) var(--ease-out);
+}
+
+.ticket-action-btn:hover {
+  background: var(--muted);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.ticket-action-btn.primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+.ticket-action-btn.primary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(46, 107, 123, 0.25);
+}
+
+/* Status & Priority Badges - Enhanced */
+.ticket-status-badge {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.ticket-status-badge.status-open {
+  background: rgba(46, 107, 123, 0.15);
+  color: var(--primary);
+}
+
+.ticket-status-badge.status-in_progress {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
+.ticket-status-badge.status-resolved {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--success);
+}
+
+.ticket-status-badge.status-closed {
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.ticket-priority-badge {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+
+.ticket-priority-badge.priority-urgent {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--destructive);
+}
+
+.ticket-priority-badge.priority-high {
+  background: rgba(245, 158, 11, 0.15);
+  color: var(--warning);
+}
+
+.ticket-priority-badge.priority-medium {
+  background: rgba(46, 107, 123, 0.15);
+  color: var(--primary);
+}
+
+.ticket-priority-badge.priority-low {
+  background: rgba(74, 222, 128, 0.15);
+  color: var(--success);
+}
+
+/* Empty State - Enhanced */
+.tickets-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-16);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.tickets-empty-icon {
+  font-size: 64px;
+  margin-bottom: var(--spacing-4);
+  opacity: 0.5;
+}
+
+.tickets-empty-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0 0 var(--spacing-2) 0;
+}
+
+.tickets-empty-text {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .admin-tickets-grid {
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .admin-tickets-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tickets-stats-bar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .tickets-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .tickets-filter-group {
+    flex-wrap: wrap;
+  }
+}

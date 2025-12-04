@@ -109,12 +109,20 @@ check_existing_configs() {
     # Check if our domains are already configured
     local conflicts=()
 
-    if grep -r "server_name.*dorian-gonzalez\.fr" /etc/nginx 2>/dev/null | grep -v "n8n\|api\." > /dev/null; then
-        conflicts+=("dorian-gonzalez.fr")
+    if grep -r "server_name.*masstock\.fr" /etc/nginx 2>/dev/null | grep -v "app\|api\|n8n" > /dev/null; then
+        conflicts+=("masstock.fr")
     fi
 
-    if grep -r "server_name.*api\.dorian-gonzalez\.fr" /etc/nginx 2>/dev/null > /dev/null; then
-        conflicts+=("api.dorian-gonzalez.fr")
+    if grep -r "server_name.*app\.masstock\.fr" /etc/nginx 2>/dev/null > /dev/null; then
+        conflicts+=("app.masstock.fr")
+    fi
+
+    if grep -r "server_name.*api\.masstock\.fr" /etc/nginx 2>/dev/null > /dev/null; then
+        conflicts+=("api.masstock.fr")
+    fi
+
+    if grep -r "server_name.*n8n\.masstock\.fr" /etc/nginx 2>/dev/null > /dev/null; then
+        conflicts+=("n8n.masstock.fr")
     fi
 
     if [[ ${#conflicts[@]} -gt 0 ]]; then
@@ -148,16 +156,21 @@ create_masstock_config() {
         return 0
     fi
 
-    # Note: MasStock nginx container will be exposed on port 8080 (after docker-compose update)
-    # API container on port 3000
+    # Note: MasStock containers exposed on different ports
+    # Site vitrine: 8081, App: 8080, API: 3000, n8n: 5678
     cat > "$config_file" << 'EOF'
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # MASSTOCK - NGINX REVERSE PROXY CONFIGURATION
-# VPS nginx → Docker containers
+# VPS nginx → Docker containers (masstock.fr)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # Upstream definitions
-upstream masstock_frontend {
+upstream masstock_vitrine {
+    server 127.0.0.1:8081;
+    keepalive 32;
+}
+
+upstream masstock_app {
     server 127.0.0.1:8080;
     keepalive 32;
 }
@@ -167,25 +180,72 @@ upstream masstock_api {
     keepalive 32;
 }
 
+upstream masstock_n8n {
+    server 127.0.0.1:5678;
+    keepalive 32;
+}
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# FRONTEND - dorian-gonzalez.fr
+# SITE VITRINE - masstock.fr (Landing Page)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 server {
     listen 80;
     listen [::]:80;
-    server_name dorian-gonzalez.fr www.dorian-gonzalez.fr;
+    server_name masstock.fr www.masstock.fr;
 
     # Access logs
-    access_log /var/log/nginx/masstock-frontend-access.log;
-    error_log /var/log/nginx/masstock-frontend-error.log;
+    access_log /var/log/nginx/masstock-vitrine-access.log;
+    error_log /var/log/nginx/masstock-vitrine-error.log;
+
+    # Client limits
+    client_max_body_size 5M;
+
+    # Proxy to MasStock vitrine container
+    location / {
+        proxy_pass http://masstock_vitrine;
+
+        # Standard proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Connection settings
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+
+        # Timeouts
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+
+        # Buffering
+        proxy_buffering on;
+        proxy_buffer_size 4k;
+        proxy_buffers 8 4k;
+    }
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# APPLICATION - app.masstock.fr (React SPA)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name app.masstock.fr;
+
+    # Access logs
+    access_log /var/log/nginx/masstock-app-access.log;
+    error_log /var/log/nginx/masstock-app-error.log;
 
     # Client limits
     client_max_body_size 10M;
 
-    # Proxy to MasStock nginx container
+    # Proxy to MasStock app container
     location / {
-        proxy_pass http://masstock_frontend;
+        proxy_pass http://masstock_app;
 
         # Standard proxy headers
         proxy_set_header Host $host;
@@ -211,18 +271,18 @@ server {
     # Health check endpoint
     location /health {
         access_log off;
-        proxy_pass http://masstock_frontend/health;
+        proxy_pass http://masstock_app/health;
     }
 }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# API - api.dorian-gonzalez.fr
+# API - api.masstock.fr (Express Backend)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 server {
     listen 80;
     listen [::]:80;
-    server_name api.dorian-gonzalez.fr;
+    server_name api.masstock.fr;
 
     # Access logs
     access_log /var/log/nginx/masstock-api-access.log;
@@ -254,17 +314,62 @@ server {
         proxy_buffering on;
         proxy_buffer_size 8k;
         proxy_buffers 16 8k;
-
-        # CORS headers (if needed, usually handled by backend)
-        # add_header 'Access-Control-Allow-Origin' '$http_origin' always;
-        # add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS' always;
-        # add_header 'Access-Control-Allow-Headers' 'Authorization, Content-Type' always;
     }
 
     # Health check endpoint
     location /health {
         access_log off;
         proxy_pass http://masstock_api/health;
+    }
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# N8N - n8n.masstock.fr (Workflow Automation)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name n8n.masstock.fr;
+
+    # Access logs
+    access_log /var/log/nginx/masstock-n8n-access.log;
+    error_log /var/log/nginx/masstock-n8n-error.log;
+
+    # Client limits (for workflow data)
+    client_max_body_size 50M;
+
+    # Proxy to n8n container
+    location / {
+        proxy_pass http://masstock_n8n;
+
+        # Standard proxy headers
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Connection settings (important for n8n websockets)
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # Timeouts (longer for workflow executions)
+        proxy_connect_timeout 300s;
+        proxy_send_timeout 300s;
+        proxy_read_timeout 300s;
+
+        # Buffering
+        proxy_buffering off;  # Disable for websockets
+    }
+
+    # Webhooks endpoint (no auth required)
+    location ~* ^/webhook/ {
+        proxy_pass http://masstock_n8n;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 
@@ -409,21 +514,37 @@ verify_nginx_config() {
     fi
 
     # Check upstreams are defined
-    if ! grep -q "upstream masstock_frontend" "$config_file"; then
-        error_exit 38 "Missing upstream definition: masstock_frontend"
+    if ! grep -q "upstream masstock_vitrine" "$config_file"; then
+        error_exit 38 "Missing upstream definition: masstock_vitrine"
+    fi
+
+    if ! grep -q "upstream masstock_app" "$config_file"; then
+        error_exit 39 "Missing upstream definition: masstock_app"
     fi
 
     if ! grep -q "upstream masstock_api" "$config_file"; then
-        error_exit 39 "Missing upstream definition: masstock_api"
+        error_exit 40 "Missing upstream definition: masstock_api"
+    fi
+
+    if ! grep -q "upstream masstock_n8n" "$config_file"; then
+        error_exit 41 "Missing upstream definition: masstock_n8n"
     fi
 
     # Check server blocks
-    if ! grep -q "server_name dorian-gonzalez.fr" "$config_file"; then
-        error_exit 40 "Missing server block for: dorian-gonzalez.fr"
+    if ! grep -q "server_name masstock.fr" "$config_file"; then
+        error_exit 42 "Missing server block for: masstock.fr"
     fi
 
-    if ! grep -q "server_name api.dorian-gonzalez.fr" "$config_file"; then
-        error_exit 41 "Missing server block for: api.dorian-gonzalez.fr"
+    if ! grep -q "server_name app.masstock.fr" "$config_file"; then
+        error_exit 43 "Missing server block for: app.masstock.fr"
+    fi
+
+    if ! grep -q "server_name api.masstock.fr" "$config_file"; then
+        error_exit 44 "Missing server block for: api.masstock.fr"
+    fi
+
+    if ! grep -q "server_name n8n.masstock.fr" "$config_file"; then
+        error_exit 45 "Missing server block for: n8n.masstock.fr"
     fi
 
     log_success "Configuration verification passed"
@@ -437,8 +558,10 @@ print_next_steps() {
     echo ""
 
     log_success "VPS nginx is configured to proxy:"
-    echo "  • http://dorian-gonzalez.fr → container port 8080 (frontend)"
-    echo "  • http://api.dorian-gonzalez.fr → container port 3000 (API)"
+    echo "  • http://masstock.fr → container port 8081 (site vitrine)"
+    echo "  • http://app.masstock.fr → container port 8080 (application)"
+    echo "  • http://api.masstock.fr → container port 3000 (API)"
+    echo "  • http://n8n.masstock.fr → container port 5678 (n8n)"
     echo ""
 
     log_info "📝 Configuration file: ${NGINX_SITES_AVAILABLE}/masstock.conf"
@@ -447,9 +570,10 @@ print_next_steps() {
     echo ""
 
     log_warning "⚠️  IMPORTANT:"
-    log_info "   1. Update docker-compose.production.yml nginx ports to 8080:80"
+    log_info "   1. Configure DNS (masstock.fr, app, api, n8n) → VPS IP"
     log_info "   2. Run setup-ssl.sh to add HTTPS support"
-    log_info "   3. Start Docker containers with build-and-start.sh"
+    log_info "   3. Update docker-compose.production.yml (add n8n and vitrine)"
+    log_info "   4. Start Docker containers with build-and-start.sh"
     echo ""
 
     log_info "Next steps:"

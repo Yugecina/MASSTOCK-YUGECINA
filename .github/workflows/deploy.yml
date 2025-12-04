@@ -62,16 +62,24 @@ jobs:
             set -e
 
             echo "Checking API health..."
-            curl -f http://api.dorian-gonzalez.fr/health || exit 1
+            curl -f https://api.masstock.fr/health || exit 1
 
-            echo "Checking frontend..."
-            curl -f http://dorian-gonzalez.fr/health || exit 1
+            echo "Checking application..."
+            curl -f https://app.masstock.fr/ || exit 1
+
+            echo "Checking site vitrine..."
+            curl -f https://masstock.fr/ || exit 1
+
+            echo "Checking n8n..."
+            curl -f https://n8n.masstock.fr/healthz || exit 1
 
             echo "Checking Docker containers..."
             docker ps | grep masstock_api || exit 1
             docker ps | grep masstock_worker || exit 1
             docker ps | grep masstock_redis || exit 1
-            docker ps | grep masstock_nginx || exit 1
+            docker ps | grep masstock_app || exit 1
+            docker ps | grep masstock_vitrine || exit 1
+            docker ps | grep masstock_n8n || exit 1
 
             echo "✅ All health checks passed!"
           ENDSSH
@@ -93,8 +101,10 @@ jobs:
         if: success()
         run: |
           echo "🎉 Deployment successful!"
-          echo "Frontend: http://dorian-gonzalez.fr"
-          echo "Backend API: http://api.dorian-gonzalez.fr"
+          echo "Site Vitrine: https://masstock.fr"
+          echo "Application: https://app.masstock.fr"
+          echo "Backend API: https://api.masstock.fr"
+          echo "n8n: https://n8n.masstock.fr"
 
       - name: Notify failure
         if: failure()
