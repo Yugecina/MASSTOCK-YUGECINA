@@ -350,7 +350,7 @@ wait_for_containers() {
         fi
 
         # Check each critical container (excluding worker - it has no health check)
-        for container in masstock_redis masstock_api masstock_app masstock_vitrine masstock_n8n; do
+        for container in masstock_redis masstock_api masstock_app masstock_vitrine; do
             if docker ps --filter "name=$container" --filter "status=running" | grep -q "$container"; then
                 # Check health status
                 local health=$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "none")
@@ -399,7 +399,7 @@ verify_containers() {
     local errors=0
 
     # Expected containers
-    local containers=("masstock_redis" "masstock_api" "masstock_worker" "masstock_app" "masstock_vitrine" "masstock_n8n")
+    local containers=("masstock_redis" "masstock_api" "masstock_worker" "masstock_app" "masstock_vitrine")
 
     for container in "${containers[@]}"; do
         if docker ps --filter "name=$container" --filter "status=running" | grep -q "$container"; then

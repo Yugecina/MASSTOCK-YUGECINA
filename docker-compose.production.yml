@@ -123,41 +123,10 @@ services:
       timeout: 10s
       retries: 3
 
-  # n8n - Workflow Automation (n8n.masstock.fr)
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: masstock_n8n
-    restart: unless-stopped
-    environment:
-      - N8N_HOST=n8n.masstock.fr
-      - N8N_PROTOCOL=https
-      - N8N_PORT=5678
-      - WEBHOOK_URL=https://n8n.masstock.fr/
-      - GENERIC_TIMEZONE=Europe/Paris
-      - N8N_BASIC_AUTH_ACTIVE=true
-      - N8N_BASIC_AUTH_USER=${N8N_USER}
-      - N8N_BASIC_AUTH_PASSWORD=${N8N_PASSWORD}
-      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
-    ports:
-      - "5678:5678"  # VPS nginx proxies n8n.masstock.fr → :5678
-    volumes:
-      - n8n_data:/home/node/.n8n
-    networks:
-      - masstock_network
-    depends_on:
-      - api
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5678/healthz"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
 networks:
   masstock_network:
     driver: bridge
 
 volumes:
   redis_data:
-    driver: local
-  n8n_data:
     driver: local

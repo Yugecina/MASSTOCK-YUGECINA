@@ -24,9 +24,6 @@ echo "📝 STEP 2/7: Creating .env file at project root..."
 cat > .env << 'ENVEOF'
 # Docker Compose Environment Variables
 REDIS_PASSWORD=3a00YQekOSZ4BR6WT2UYwCU8JxB13QX6
-N8N_USER=admin
-N8N_PASSWORD=46RLgikr60WJNfJjtenTKLatyJCIP0ob
-N8N_ENCRYPTION_KEY=e84a572af21138e0c301b4f079b1af8a1c0154c8e210813f38b75576cab42737
 ENVEOF
 
 echo "✅ .env created"
@@ -107,12 +104,7 @@ else
     echo "❌ Vitrine (masstock.fr) - not responding"
 fi
 
-# n8n
-if curl -s -f -I https://n8n.masstock.fr | head -1 | grep -q "200"; then
-    echo "✅ n8n (n8n.masstock.fr) - healthy"
-else
-    echo "❌ n8n (n8n.masstock.fr) - not responding"
-fi
+# n8n removed from deployment
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -128,16 +120,10 @@ echo ""
 echo "🧪 Test the deployment:"
 echo "   Frontend:  https://app.masstock.fr"
 echo "   API:       https://api.masstock.fr/health"
-echo "   n8n:       https://n8n.masstock.fr"
 echo "   Landing:   https://masstock.fr"
 echo ""
-echo "📋 n8n Login:"
-echo "   URL:      https://n8n.masstock.fr"
-echo "   User:     admin"
-echo "   Password: 46RLgikr60WJNfJjtenTKLatyJCIP0ob"
-echo ""
 echo "🔍 If any service is not healthy, check logs:"
-echo "   docker logs masstock_n8n"
 echo "   docker logs masstock_app"
 echo "   docker logs masstock_worker"
+echo "   docker logs masstock_api"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

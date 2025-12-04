@@ -141,7 +141,7 @@ EOF
 check_docker_containers() {
     log_step "Checking Docker containers..."
 
-    local containers=("masstock_redis" "masstock_api" "masstock_worker" "masstock_app" "masstock_vitrine" "masstock_n8n")
+    local containers=("masstock_redis" "masstock_api" "masstock_worker" "masstock_app" "masstock_vitrine")
 
     for container in "${containers[@]}"; do
         if docker ps --filter "name=$container" --filter "status=running" --format "{{.Names}}" | grep -q "^${container}$"; then
@@ -169,7 +169,7 @@ check_docker_containers() {
 check_container_resources() {
     log_step "Checking container resource usage..."
 
-    local containers=("masstock_api" "masstock_worker" "masstock_redis" "masstock_app" "masstock_vitrine" "masstock_n8n")
+    local containers=("masstock_api" "masstock_worker" "masstock_redis" "masstock_app" "masstock_vitrine")
 
     for container in "${containers[@]}"; do
         if docker ps --filter "name=$container" --format "{{.Names}}" | grep -q "^${container}$"; then
