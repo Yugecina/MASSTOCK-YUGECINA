@@ -350,7 +350,7 @@ wait_for_containers() {
         fi
 
         # Check each critical container (excluding worker - it has no health check)
-        for container in masstock_redis masstock_api masstock_nginx; do
+        for container in masstock_redis masstock_api masstock_app masstock_vitrine masstock_n8n; do
             if docker ps --filter "name=$container" --filter "status=running" | grep -q "$container"; then
                 # Check health status
                 local health=$(docker inspect --format='{{.State.Health.Status}}' "$container" 2>/dev/null || echo "none")
@@ -399,7 +399,7 @@ verify_containers() {
     local errors=0
 
     # Expected containers
-    local containers=("masstock_redis" "masstock_api" "masstock_worker" "masstock_nginx")
+    local containers=("masstock_redis" "masstock_api" "masstock_worker" "masstock_app" "masstock_vitrine" "masstock_n8n")
 
     for container in "${containers[@]}"; do
         if docker ps --filter "name=$container" --filter "status=running" | grep -q "$container"; then
@@ -457,7 +457,7 @@ test_services() {
 
     # Test nginx
     log_debug "Testing nginx..."
-    if docker exec masstock_nginx wget --spider -q http://localhost:80/health 2>/dev/null; then
+    if docker exec masstock_app wget --spider -q http://localhost:80/health 2>/dev/null; then
         log_success "✓ nginx is responding"
     else
         log_warning "⚠ nginx health check failed"

@@ -141,7 +141,7 @@ EOF
 check_docker_containers() {
     log_step "Checking Docker containers..."
 
-    local containers=("masstock_redis" "masstock_api" "masstock_worker" "masstock_nginx")
+    local containers=("masstock_redis" "masstock_api" "masstock_worker" "masstock_app" "masstock_vitrine" "masstock_n8n")
 
     for container in "${containers[@]}"; do
         if docker ps --filter "name=$container" --filter "status=running" --format "{{.Names}}" | grep -q "^${container}$"; then
@@ -169,7 +169,7 @@ check_docker_containers() {
 check_container_resources() {
     log_step "Checking container resource usage..."
 
-    local containers=("masstock_api" "masstock_worker" "masstock_redis" "masstock_nginx")
+    local containers=("masstock_api" "masstock_worker" "masstock_redis" "masstock_app" "masstock_vitrine" "masstock_n8n")
 
     for container in "${containers[@]}"; do
         if docker ps --filter "name=$container" --format "{{.Names}}" | grep -q "^${container}$"; then
@@ -297,7 +297,7 @@ check_frontend() {
     log_step "Checking Frontend..."
 
     # Check nginx container serving frontend
-    if docker exec masstock_nginx test -f /usr/share/nginx/html/index.html 2>/dev/null; then
+    if docker exec masstock_app test -f /usr/share/nginx/html/index.html 2>/dev/null; then
         record_check "frontend_files" "pass" "Frontend files deployed"
     else
         record_check "frontend_files" "fail" "Frontend files not found in nginx container"
