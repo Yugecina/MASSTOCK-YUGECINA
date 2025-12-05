@@ -250,8 +250,26 @@ free_required_ports() {
     for port in "${ports[@]}"; do
         log_debug "Checking port $port..."
 
-        # Check if port is in use
+        # Method 1: Try lsof (works on host)
         local pid=$(lsof -ti :$port 2>/dev/null)
+
+        # Method 2: Try netstat/ss (fallback)
+        if [[ -z "$pid" ]]; then
+            pid=$(ss -tlnp 2>/dev/null | grep ":$port " | grep -oP 'pid=\K[0-9]+' | head -1)
+        fi
+
+        # Method 3: Check Docker containers using the port
+        if [[ -z "$pid" ]]; then
+            local container=$(docker ps --format '{{.Names}}' --filter "publish=$port" 2>/dev/null | head -1)
+            if [[ -n "$container" ]]; then
+                log_warning "Port $port is in use by Docker container: $container"
+                log_info "Stopping container $container..."
+                docker stop "$container" 2>/dev/null && docker rm "$container" 2>/dev/null
+                log_success "Container $container removed, port $port freed"
+                sleep 2
+                continue
+            fi
+        fi
 
         if [[ -n "$pid" ]]; then
             local process_info=$(ps -p $pid -o comm= 2>/dev/null || echo "unknown")
@@ -286,14 +304,24 @@ stop_existing_containers() {
         log_info "Stopping running containers..."
 
         if docker compose version &> /dev/null; then
-            docker compose --env-file backend/.env.production -f docker-compose.production.yml down
+            docker compose --env-file backend/.env.production -f docker-compose.production.yml down --remove-orphans
         else
-            docker-compose --env-file backend/.env.production -f docker-compose.production.yml down
+            docker-compose --env-file backend/.env.production -f docker-compose.production.yml down --remove-orphans
         fi
 
         log_success "Containers stopped"
     else
         log_debug "No running containers to stop"
+    fi
+
+    # Also clean up any orphaned containers (n8n, nginx, etc.)
+    log_info "Cleaning up orphaned containers..."
+    local orphans=$(docker ps -a --filter "name=masstock_" --format "{{.Names}}" | grep -E "masstock_(n8n|nginx)" || true)
+    if [[ -n "$orphans" ]]; then
+        echo "$orphans" | xargs -r docker rm -f 2>/dev/null || true
+        log_success "Orphaned containers removed"
+    else
+        log_debug "No orphaned containers found"
     fi
 }
 
@@ -307,11 +335,11 @@ start_containers() {
         return 0
     fi
 
-    # Start containers with env file
+    # Start containers with env file and remove orphans
     if docker compose version &> /dev/null; then
-        local cmd="docker compose --env-file backend/.env.production -f docker-compose.production.yml up -d"
+        local cmd="docker compose --env-file backend/.env.production -f docker-compose.production.yml up -d --remove-orphans"
     else
-        local cmd="docker-compose --env-file backend/.env.production -f docker-compose.production.yml up -d"
+        local cmd="docker-compose --env-file backend/.env.production -f docker-compose.production.yml up -d --remove-orphans"
     fi
 
     if run_command "Starting containers" $cmd; then
