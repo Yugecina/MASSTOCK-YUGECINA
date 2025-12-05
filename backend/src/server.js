@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
+const helmet = require('helmet');
 const { logger } = require('./config/logger');
 const authRoutes = require('./routes/authRoutes');
 const workflowRoutes = require('./routes/workflowRoutes');
@@ -17,6 +18,20 @@ const PORT = process.env.PORT || 3000;
 
 // Trust proxy for correct IP detection behind nginx
 app.set('trust proxy', 1);
+
+// Security headers with Helmet
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", "https:"],
+      connectSrc: ["'self'", process.env.CORS_ORIGIN || 'http://localhost:5173'],
+    }
+  },
+  crossOriginEmbedderPolicy: false, // Allow cross-origin images
+}));
 
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',

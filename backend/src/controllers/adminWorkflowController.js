@@ -5,6 +5,8 @@
 
 const { supabaseAdmin } = require('../config/database');
 const { ApiError } = require('../middleware/errorHandler');
+const { z } = require('zod');
+const { updateWorkflowStageSchema } = require('../validation/schemas');
 
 /**
  * Valid workflow request stages/statuses
@@ -274,61 +276,75 @@ async function getWorkflowRequest(req, res) {
  * Update workflow request stage/status
  */
 async function updateWorkflowRequestStage(req, res) {
-  const { id } = req.params;
-  const { stage } = req.body;
+  try {
+    const { id } = req.params;
 
-  // Validate stage
-  if (!stage || !VALID_STAGES.includes(stage)) {
-    throw new ApiError(
-      400,
-      `Invalid stage. Must be one of: ${VALID_STAGES.join(', ')}`,
-      'INVALID_STAGE'
-    );
+    // Validate input with Zod
+    const validatedData = updateWorkflowStageSchema.parse(req.body);
+    const { stage } = validatedData;
+
+    // Fetch existing request
+    const { data: request, error: fetchError } = await supabaseAdmin
+      .from('workflow_requests')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !request) {
+      throw new ApiError(404, 'Workflow request not found', 'REQUEST_NOT_FOUND');
+    }
+
+    // Update stage
+    const { data: updatedRequest, error: updateError } = await supabaseAdmin
+      .from('workflow_requests')
+      .update({ status: stage })
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new ApiError(500, 'Failed to update workflow request stage', 'UPDATE_FAILED');
+    }
+
+    // Create audit log
+    await supabaseAdmin.from('audit_logs').insert([{
+      client_id: request.client_id,
+      user_id: req.user.id,
+      action: 'workflow_request_stage_updated',
+      resource_type: 'workflow_request',
+      resource_id: id,
+      changes: {
+        before: { status: request.status },
+        after: { status: stage }
+      },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    res.json({
+      success: true,
+      message: 'Workflow request stage updated successfully',
+      data: updatedRequest
+    });
+
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation error',
+        details: error.errors
+      });
+    }
+
+    // Re-throw ApiError to be handled by global error handler
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    // Handle unexpected errors
+    throw new ApiError(500, 'Internal server error', 'INTERNAL_ERROR');
   }
-
-  // Fetch existing request
-  const { data: request, error: fetchError } = await supabaseAdmin
-    .from('workflow_requests')
-    .select('*')
-    .eq('id', id)
-    .single();
-
-  if (fetchError || !request) {
-    throw new ApiError(404, 'Workflow request not found', 'REQUEST_NOT_FOUND');
-  }
-
-  // Update stage
-  const { data: updatedRequest, error: updateError } = await supabaseAdmin
-    .from('workflow_requests')
-    .update({ status: stage })
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (updateError) {
-    throw new ApiError(500, 'Failed to update workflow request stage', 'UPDATE_FAILED');
-  }
-
-  // Create audit log
-  await supabaseAdmin.from('audit_logs').insert([{
-    client_id: request.client_id,
-    user_id: req.user.id,
-    action: 'workflow_request_stage_updated',
-    resource_type: 'workflow_request',
-    resource_id: id,
-    changes: {
-      before: { status: request.status },
-      after: { status: stage }
-    },
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.json({
-    success: true,
-    message: 'Workflow request stage updated successfully',
-    data: updatedRequest
-  });
 }
 
 /**

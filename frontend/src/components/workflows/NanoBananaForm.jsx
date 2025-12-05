@@ -7,7 +7,7 @@ import './NanoBananaForm.css';
  * Dark Premium design with Bleu Pétrole accent
  * Production pipeline aesthetic for AI image generation
  */
-export function NanoBananaForm({ onSubmit, loading, workflow }) {
+export function NanoBananaForm({ onSubmit, loading, workflow, initialData = null }) {
   const [formData, setFormData] = useState({
     prompts_text: '',
     api_key: 'AIzaSyC1I4JWJ9H7Pld6NJZfdux13s1xlZc8u8w',
@@ -30,9 +30,70 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
   const [showSecurityInfo, setShowSecurityInfo] = useState(false);
   const [imagePreviews, setImagePreviews] = useState([]);
 
-  // Load defaults from workflow config
+  // Helper: Convert base64 object to File object
+  const base64ToFile = (imageObj, filename) => {
+    try {
+      // Handle two formats:
+      // 1. Object with { data, mimeType } (stored in DB)
+      // 2. String with data:image/...;base64,... (legacy)
+      let base64Data, mimeType;
+
+      if (typeof imageObj === 'object' && imageObj.data) {
+        // Format from DB: { data: 'base64', mimeType: 'image/png' }
+        base64Data = imageObj.data;
+        mimeType = imageObj.mimeType;
+        filename = imageObj.originalName || filename;
+      } else if (typeof imageObj === 'string') {
+        // Legacy format: 'data:image/png;base64,iVBORw0...'
+        const arr = imageObj.split(',');
+        const mime = arr[0].match(/:(.*?);/);
+        if (!mime) {
+          throw new Error('Invalid base64 string format');
+        }
+        mimeType = mime[1];
+        base64Data = arr[1];
+      } else {
+        throw new Error('Unsupported image format');
+      }
+
+      // Decode base64
+      const bstr = atob(base64Data);
+
+      // Convert to Uint8Array
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+
+      // Create and return File object
+      return new File([u8arr], filename, { type: mimeType });
+    } catch (error) {
+      logger.error('❌ NanoBananaForm.base64ToFile: Conversion failed', {
+        error,
+        message: error.message,
+        filename,
+        imageObj: typeof imageObj
+      });
+      return null;
+    }
+  };
+
+  // Load defaults from workflow config (only if no prefill data)
   useEffect(() => {
+    // Skip defaults if we have prefill data (for "Run Again" feature)
+    if (initialData) {
+      logger.debug('⚠️ NanoBananaForm: Skipping workflow defaults (prefill data exists)');
+      return;
+    }
+
     if (workflow?.config) {
+      logger.debug('🔄 NanoBananaForm: Loading workflow defaults', {
+        default_model: workflow.config.default_model,
+        default_aspect_ratio: workflow.config.default_aspect_ratio,
+        default_resolution: workflow.config.default_resolution?.pro
+      });
+
       setFormData(prev => ({
         ...prev,
         model: workflow.config.default_model === 'gemini-3-pro-image-preview' ? 'pro' : 'flash',
@@ -40,7 +101,79 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
         resolution: workflow.config.default_resolution?.pro || '1K'
       }));
     }
-  }, [workflow]);
+  }, [workflow, initialData]);
+
+  // Initialize form with prefill data (for "Run Again" feature)
+  useEffect(() => {
+    if (!initialData) return;
+
+    logger.debug('🔄 NanoBananaForm: Initializing with prefill data', {
+      prompts_text_length: initialData.prompts_text?.length,
+      model: initialData.model,
+      aspect_ratio: initialData.aspect_ratio,
+      resolution: initialData.resolution,
+      has_images: !!initialData.reference_images_base64
+    });
+
+    // Convert base64 images to File objects
+    let convertedImages = [];
+    let newPreviews = [];
+
+    if (initialData.reference_images_base64) {
+      const imagesData = initialData.reference_images_base64;
+
+      // Handle both array and object formats
+      if (Array.isArray(imagesData)) {
+        // Array format: [{ data, mimeType, originalName }, ...]
+        imagesData.forEach((imageObj, index) => {
+          const file = base64ToFile(imageObj, `reference_${index}.png`);
+          if (file) {
+            convertedImages.push(file);
+            newPreviews.push({
+              file,
+              url: URL.createObjectURL(file),
+              name: file.name,
+              size: file.size
+            });
+          }
+        });
+      } else if (typeof imagesData === 'object') {
+        // Object format: { img_0: '...', img_1: '...' }
+        Object.entries(imagesData).forEach(([key, imageData], index) => {
+          const file = base64ToFile(imageData, `reference_${index}.png`);
+          if (file) {
+            convertedImages.push(file);
+            newPreviews.push({
+              file,
+              url: URL.createObjectURL(file),
+              name: file.name,
+              size: file.size
+            });
+          }
+        });
+      }
+
+      logger.debug('✅ NanoBananaForm: Converted images', {
+        original_count: Array.isArray(imagesData) ? imagesData.length : Object.keys(imagesData).length,
+        converted_count: convertedImages.length
+      });
+    }
+
+    // Update form data
+    setFormData({
+      prompts_text: initialData.prompts_text || '',
+      api_key: 'AIzaSyC1I4JWJ9H7Pld6NJZfdux13s1xlZc8u8w', // Keep default API key (security)
+      reference_images: convertedImages,
+      model: initialData.model || 'flash',
+      aspect_ratio: initialData.aspect_ratio || '1:1',
+      resolution: initialData.resolution || '1K'
+    });
+
+    // Update image previews
+    setImagePreviews(newPreviews);
+
+    logger.debug('✅ NanoBananaForm: Form initialized with prefill data');
+  }, [initialData]);
 
   // Cleanup image preview URLs on unmount
   useEffect(() => {
@@ -212,6 +345,33 @@ export function NanoBananaForm({ onSubmit, loading, workflow }) {
     formData.reference_images.forEach((file) => {
       formDataToSend.append('reference_images', file);
     });
+
+    // DEBUG: Log FormData contents (only in development)
+    logger.debug('🔍 NanoBananaForm: FormData before sending', {
+      prompts_text_length: formData.prompts_text.length,
+      api_key_present: !!formData.api_key,
+      model: modelValue,
+      aspect_ratio: formData.aspect_ratio,
+      resolution: formData.resolution,
+      reference_images_count: formData.reference_images.length,
+      reference_images_files: formData.reference_images.map(f => ({
+        name: f.name,
+        size: f.size,
+        type: f.type
+      }))
+    });
+
+    // DEBUG: Log actual FormData entries (only in development)
+    if (logger.isEnabled()) {
+      for (let [key, value] of formDataToSend.entries()) {
+        if (value instanceof File) {
+          logger.debug(`  📎 FormData entry: ${key} = File(${value.name}, ${value.size} bytes, ${value.type})`);
+        } else {
+          logger.debug(`  📝 FormData entry: ${key} = ${value}`);
+        }
+      }
+    }
+
     onSubmit(formDataToSend);
   };
 

@@ -3,10 +3,15 @@
  * Enhanced user and client management with search and pagination
  */
 
+const { z } = require('zod');
 const { supabaseAdmin } = require('../config/database');
 const { logger, logAudit } = require('../config/logger');
 const { ApiError } = require('../middleware/errorHandler');
 const { syncAuthToDatabase } = require('../helpers/userSync');
+const {
+  createUserSchema,
+  updateClientSchema
+} = require('../validation/schemas');
 
 /**
  * POST /api/v1/admin/users
@@ -15,37 +20,21 @@ const { syncAuthToDatabase } = require('../helpers/userSync');
  * - For role='admin': no client association needed
  */
 async function createUser(req, res) {
-  const {
-    email,
-    password,
-    name,
-    role = 'user',
-    client_id,
-    member_role = 'collaborator'
-  } = req.body;
+  try {
+    // Validate input with Zod
+    const {
+      email,
+      password,
+      name,
+      role = 'user',
+      client_id,
+      member_role = 'collaborator'
+    } = createUserSchema.parse(req.body);
 
-  // Validate input
-  if (!email || !password) {
-    throw new ApiError(400, 'Email and password are required', 'MISSING_REQUIRED_FIELDS');
-  }
-
-  if (password.length < 8) {
-    throw new ApiError(400, 'Password must be at least 8 characters', 'WEAK_PASSWORD');
-  }
-
-  if (!['user', 'admin'].includes(role)) {
-    throw new ApiError(400, 'Role must be either "user" or "admin"', 'INVALID_ROLE');
-  }
-
-  // For regular users, client_id is required
-  if (role === 'user' && !client_id) {
-    throw new ApiError(400, 'client_id is required for regular users', 'CLIENT_ID_REQUIRED');
-  }
-
-  // Validate member_role
-  if (role === 'user' && !['owner', 'collaborator'].includes(member_role)) {
-    throw new ApiError(400, 'member_role must be "owner" or "collaborator"', 'INVALID_MEMBER_ROLE');
-  }
+    // For regular users, client_id is required
+    if (role === 'user' && !client_id) {
+      throw new ApiError(400, 'client_id is required for regular users', 'CLIENT_ID_REQUIRED');
+    }
 
   // Check if user already exists
   const { data: existingUser } = await supabaseAdmin
@@ -58,22 +47,21 @@ async function createUser(req, res) {
     throw new ApiError(400, 'User with this email already exists', 'USER_EXISTS');
   }
 
-  // If client_id provided, verify the client exists
-  let client = null;
-  if (client_id) {
-    const { data: clientData, error: clientError } = await supabaseAdmin
-      .from('clients')
-      .select('id, name')
-      .eq('id', client_id)
-      .single();
+    // If client_id provided, verify the client exists
+    let client = null;
+    if (client_id) {
+      const { data: clientData, error: clientError } = await supabaseAdmin
+        .from('clients')
+        .select('id, name')
+        .eq('id', client_id)
+        .single();
 
-    if (clientError || !clientData) {
-      throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+      if (clientError || !clientData) {
+        throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+      }
+      client = clientData;
     }
-    client = clientData;
-  }
 
-  try {
     // Step 1: Create user in Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
@@ -163,9 +151,24 @@ async function createUser(req, res) {
     });
 
   } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+
+    // If error is already ApiError, rethrow it
     if (error instanceof ApiError) {
       throw error;
     }
+
     throw new ApiError(500, `Failed to create user: ${error.message}`, 'USER_CREATION_FAILED');
   }
 }
@@ -514,86 +517,111 @@ async function getClient(req, res) {
  * Update client details
  */
 async function updateClient(req, res) {
-  const { client_id } = req.params;
-  const { status, subscription_amount, metadata, plan, name, company_name } = req.body;
+  try {
+    const { client_id } = req.params;
 
-  // Fetch existing client
-  const { data: client, error: fetchError } = await supabaseAdmin
-    .from('clients')
-    .select('*')
-    .eq('id', client_id)
-    .single();
+    // Validate input with Zod
+    const { status, subscription_amount, metadata, plan, name, company_name } = updateClientSchema.parse(req.body);
 
-  if (fetchError || !client) {
-    throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+    // Fetch existing client
+    const { data: client, error: fetchError } = await supabaseAdmin
+      .from('clients')
+      .select('*')
+      .eq('id', client_id)
+      .single();
+
+    if (fetchError || !client) {
+      throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+    }
+
+    // Build update object
+    const updates = {};
+    const changes = { before: {}, after: {} };
+
+    if (status) {
+      updates.status = status;
+      changes.before.status = client.status;
+      changes.after.status = status;
+    }
+
+    if (subscription_amount !== undefined) {
+      updates.subscription_amount = subscription_amount;
+      changes.before.subscription_amount = client.subscription_amount;
+      changes.after.subscription_amount = subscription_amount;
+    }
+
+    if (plan) {
+      updates.plan = plan;
+      changes.before.plan = client.plan;
+      changes.after.plan = plan;
+    }
+
+    if (name) {
+      updates.name = name;
+      changes.before.name = client.name;
+      changes.after.name = name;
+    }
+
+    if (company_name) {
+      updates.company_name = company_name;
+      changes.before.company_name = client.company_name;
+      changes.after.company_name = company_name;
+    }
+
+    if (metadata) {
+      updates.metadata = { ...client.metadata, ...metadata };
+    }
+
+    // Perform update
+    const { data: updatedClient, error: updateError } = await supabaseAdmin
+      .from('clients')
+      .update(updates)
+      .eq('id', client_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new ApiError(500, 'Failed to update client', 'UPDATE_FAILED');
+    }
+
+    // Create audit log
+    await supabaseAdmin.from('audit_logs').insert([{
+      client_id: client_id,
+      user_id: req.user.id,
+      action: 'client_updated',
+      resource_type: 'client',
+      resource_id: client_id,
+      changes,
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    res.json({
+      success: true,
+      data: updatedClient
+    });
+
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+
+    // If error is already ApiError, rethrow it
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    throw new ApiError(500, `Failed to update client: ${error.message}`, 'CLIENT_UPDATE_FAILED');
   }
-
-  // Build update object
-  const updates = {};
-  const changes = { before: {}, after: {} };
-
-  if (status) {
-    updates.status = status;
-    changes.before.status = client.status;
-    changes.after.status = status;
-  }
-
-  if (subscription_amount !== undefined) {
-    updates.subscription_amount = subscription_amount;
-    changes.before.subscription_amount = client.subscription_amount;
-    changes.after.subscription_amount = subscription_amount;
-  }
-
-  if (plan) {
-    updates.plan = plan;
-    changes.before.plan = client.plan;
-    changes.after.plan = plan;
-  }
-
-  if (name) {
-    updates.name = name;
-    changes.before.name = client.name;
-    changes.after.name = name;
-  }
-
-  if (company_name) {
-    updates.company_name = company_name;
-    changes.before.company_name = client.company_name;
-    changes.after.company_name = company_name;
-  }
-
-  if (metadata) {
-    updates.metadata = { ...client.metadata, ...metadata };
-  }
-
-  // Perform update
-  const { data: updatedClient, error: updateError } = await supabaseAdmin
-    .from('clients')
-    .update(updates)
-    .eq('id', client_id)
-    .select()
-    .single();
-
-  if (updateError) {
-    throw new ApiError(500, 'Failed to update client', 'UPDATE_FAILED');
-  }
-
-  // Create audit log
-  await supabaseAdmin.from('audit_logs').insert([{
-    client_id: client_id,
-    user_id: req.user.id,
-    action: 'client_updated',
-    resource_type: 'client',
-    resource_id: client_id,
-    changes,
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.json({
-    success: true,
-    data: updatedClient
-  });
 }
 
 /**

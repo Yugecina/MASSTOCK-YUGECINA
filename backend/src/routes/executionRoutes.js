@@ -7,6 +7,7 @@ const express = require('express');
 const { param } = require('express-validator');
 const { asyncHandler, validate } = require('../middleware/errorHandler');
 const { authenticate, requireClient } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimit');
 const workflowsController = require('../controllers/workflowsController');
 
 const router = express.Router();
@@ -18,6 +19,7 @@ const router = express.Router();
 router.get('/:execution_id',
   authenticate,
   requireClient,
+  apiLimiter,
   param('execution_id').isUUID(),
   validate,
   asyncHandler(workflowsController.getExecution)
@@ -30,6 +32,7 @@ router.get('/:execution_id',
 router.get('/:execution_id/batch-results',
   authenticate,
   requireClient,
+  apiLimiter,
   param('execution_id').isUUID(),
   validate,
   asyncHandler(workflowsController.getExecutionBatchResults)

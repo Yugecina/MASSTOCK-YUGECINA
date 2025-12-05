@@ -6,9 +6,13 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const { asyncHandler, validate } = require('../middleware/errorHandler');
 const { authenticate, requireClient } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimit');
 const supportTicketsController = require('../controllers/supportTicketsController');
 
 const router = express.Router();
+
+// Apply rate limiting to all support ticket routes
+router.use(apiLimiter);
 
 /**
  * POST /api/support-tickets

@@ -3,10 +3,16 @@
  * Handles admin-only operations: client management, analytics, monitoring
  */
 
+const { z } = require('zod');
 const { supabaseAdmin } = require('../config/database');
 const { logAudit } = require('../config/logger');
 const { ApiError } = require('../middleware/errorHandler');
 const { syncAuthToDatabase } = require('../helpers/userSync');
+const {
+  createAdminSchema,
+  createClientSchema,
+  updateClientSchema
+} = require('../validation/schemas');
 
 /**
  * POST /api/v1/admin/create-admin
@@ -14,16 +20,9 @@ const { syncAuthToDatabase } = require('../helpers/userSync');
  * Protection: Only works if no admin exists
  */
 async function createAdminUser(req, res) {
-  const { email, password, name } = req.body;
-
-  // Validate input
-  if (!email || !password) {
-    throw new ApiError(400, 'Email and password are required', 'MISSING_REQUIRED_FIELDS');
-  }
-
-  if (password.length < 8) {
-    throw new ApiError(400, 'Password must be at least 8 characters', 'WEAK_PASSWORD');
-  }
+  // Validate input with Zod
+  const validatedData = createAdminSchema.parse(req.body);
+  const { email, password, name } = validatedData;
 
   // Check if any admin already exists (security measure)
   const { data: existingAdmins } = await supabaseAdmin
@@ -116,6 +115,19 @@ async function createAdminUser(req, res) {
     });
 
   } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+
     // If error is already ApiError, rethrow it
     if (error instanceof ApiError) {
       throw error;
@@ -244,57 +256,77 @@ async function getClient(req, res) {
  * Client = company with name, plan, subscription - members added separately
  */
 async function createClient(req, res) {
-  const { name, plan = 'premium_custom', subscription_amount = 0 } = req.body;
+  try {
+    // Validate input with Zod
+    const { name, plan, subscription_amount } = createClientSchema.parse(req.body);
 
-  if (!name) {
-    throw new ApiError(400, 'Company name is required', 'MISSING_REQUIRED_FIELDS');
+    // Check if client with same name already exists
+    const { data: existing } = await supabaseAdmin
+      .from('clients')
+      .select('id')
+      .eq('name', name)
+      .single();
+
+    if (existing) {
+      throw new ApiError(400, 'Client with this name already exists', 'CLIENT_EXISTS');
+    }
+
+    // Create client (company)
+    const { data: client, error } = await supabaseAdmin
+      .from('clients')
+      .insert([{
+        name,
+        plan,
+        status: 'active',
+        subscription_amount: parseFloat(subscription_amount) || 0,
+        subscription_start_date: new Date().toISOString().split('T')[0]
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      throw new ApiError(500, `Failed to create client: ${error.message}`, 'DATABASE_ERROR');
+    }
+
+    // Create audit log
+    await supabaseAdmin.from('audit_logs').insert([{
+      client_id: client.id,
+      user_id: req.user.id,
+      action: 'client_created',
+      resource_type: 'client',
+      resource_id: client.id,
+      changes: { name, plan, subscription_amount },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Client created successfully',
+      data: client
+    });
+
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+
+    // If error is already ApiError, rethrow it
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    throw new ApiError(500, `Failed to create client: ${error.message}`, 'CLIENT_CREATION_FAILED');
   }
-
-  // Check if client with same name already exists
-  const { data: existing } = await supabaseAdmin
-    .from('clients')
-    .select('id')
-    .eq('name', name)
-    .single();
-
-  if (existing) {
-    throw new ApiError(400, 'Client with this name already exists', 'CLIENT_EXISTS');
-  }
-
-  // Create client (company)
-  const { data: client, error } = await supabaseAdmin
-    .from('clients')
-    .insert([{
-      name,
-      plan,
-      status: 'active',
-      subscription_amount: parseFloat(subscription_amount) || 0,
-      subscription_start_date: new Date().toISOString().split('T')[0]
-    }])
-    .select()
-    .single();
-
-  if (error) {
-    throw new ApiError(500, `Failed to create client: ${error.message}`, 'DATABASE_ERROR');
-  }
-
-  // Create audit log
-  await supabaseAdmin.from('audit_logs').insert([{
-    client_id: client.id,
-    user_id: req.user.id,
-    action: 'client_created',
-    resource_type: 'client',
-    resource_id: client.id,
-    changes: { name, plan, subscription_amount },
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.status(201).json({
-    success: true,
-    message: 'Client created successfully',
-    data: client
-  });
 }
 
 /**
@@ -302,80 +334,105 @@ async function createClient(req, res) {
  * Update client
  */
 async function updateClient(req, res) {
-  const { client_id } = req.params;
-  const { name, status, subscription_amount, metadata, plan } = req.body;
+  try {
+    const { client_id } = req.params;
 
-  // Fetch existing client
-  const { data: client, error: fetchError } = await supabaseAdmin
-    .from('clients')
-    .select('*')
-    .eq('id', client_id)
-    .single();
+    // Validate input with Zod
+    const { name, status, subscription_amount, metadata, plan } = updateClientSchema.parse(req.body);
 
-  if (fetchError || !client) {
-    throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+    // Fetch existing client
+    const { data: client, error: fetchError } = await supabaseAdmin
+      .from('clients')
+      .select('*')
+      .eq('id', client_id)
+      .single();
+
+    if (fetchError || !client) {
+      throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+    }
+
+    // Build update object
+    const updates = { updated_at: new Date().toISOString() };
+    const changes = { before: {}, after: {} };
+
+    if (name && name !== client.name) {
+      updates.name = name;
+      changes.before.name = client.name;
+      changes.after.name = name;
+    }
+
+    if (status) {
+      updates.status = status;
+      changes.before.status = client.status;
+      changes.after.status = status;
+    }
+
+    if (subscription_amount !== undefined) {
+      updates.subscription_amount = parseFloat(subscription_amount);
+      changes.before.subscription_amount = client.subscription_amount;
+      changes.after.subscription_amount = parseFloat(subscription_amount);
+    }
+
+    if (plan) {
+      updates.plan = plan;
+      changes.before.plan = client.plan;
+      changes.after.plan = plan;
+    }
+
+    if (metadata) {
+      updates.metadata = { ...client.metadata, ...metadata };
+    }
+
+    // Perform update
+    const { data: updatedClient, error: updateError } = await supabaseAdmin
+      .from('clients')
+      .update(updates)
+      .eq('id', client_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      throw new ApiError(500, 'Failed to update client', 'UPDATE_FAILED');
+    }
+
+    // Create audit log
+    await supabaseAdmin.from('audit_logs').insert([{
+      client_id: client_id,
+      user_id: req.user.id,
+      action: 'client_updated',
+      resource_type: 'client',
+      resource_id: client_id,
+      changes,
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    res.json({
+      success: true,
+      data: updatedClient
+    });
+
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+
+    // If error is already ApiError, rethrow it
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    throw new ApiError(500, `Failed to update client: ${error.message}`, 'CLIENT_UPDATE_FAILED');
   }
-
-  // Build update object
-  const updates = { updated_at: new Date().toISOString() };
-  const changes = { before: {}, after: {} };
-
-  if (name && name !== client.name) {
-    updates.name = name;
-    changes.before.name = client.name;
-    changes.after.name = name;
-  }
-
-  if (status) {
-    updates.status = status;
-    changes.before.status = client.status;
-    changes.after.status = status;
-  }
-
-  if (subscription_amount !== undefined) {
-    updates.subscription_amount = parseFloat(subscription_amount);
-    changes.before.subscription_amount = client.subscription_amount;
-    changes.after.subscription_amount = parseFloat(subscription_amount);
-  }
-
-  if (plan) {
-    updates.plan = plan;
-    changes.before.plan = client.plan;
-    changes.after.plan = plan;
-  }
-
-  if (metadata) {
-    updates.metadata = { ...client.metadata, ...metadata };
-  }
-
-  // Perform update
-  const { data: updatedClient, error: updateError } = await supabaseAdmin
-    .from('clients')
-    .update(updates)
-    .eq('id', client_id)
-    .select()
-    .single();
-
-  if (updateError) {
-    throw new ApiError(500, 'Failed to update client', 'UPDATE_FAILED');
-  }
-
-  // Create audit log
-  await supabaseAdmin.from('audit_logs').insert([{
-    client_id: client_id,
-    user_id: req.user.id,
-    action: 'client_updated',
-    resource_type: 'client',
-    resource_id: client_id,
-    changes,
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.json({
-    success: true,
-    data: updatedClient
-  });
 }
 
 /**

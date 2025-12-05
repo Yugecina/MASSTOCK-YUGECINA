@@ -7,6 +7,8 @@ const { supabaseAdmin } = require('../config/database');
 const { ApiError } = require('../middleware/errorHandler');
 const bcrypt = require('bcryptjs');
 const { logger } = require('../config/logger');
+const { z } = require('zod');
+const { inviteCollaboratorSchema } = require('../validation/schemas');
 
 
 /**
@@ -143,12 +145,6 @@ async function inviteCollaborator(req, res) {
   const userId = req.user.id;
   const clientId = req.client?.id;
   const userClientRole = req.user.client_role;
-  const { email, role = 'user' } = req.body;
-
-  // Validation
-  if (!email) {
-    throw new ApiError(400, 'Email is required', 'MISSING_EMAIL');
-  }
 
   if (!clientId) {
     throw new ApiError(400, 'No client associated with user', 'NO_CLIENT');
@@ -160,6 +156,9 @@ async function inviteCollaborator(req, res) {
   }
 
   try {
+    // Validate input with Zod
+    const { email, role } = inviteCollaboratorSchema.parse(req.body);
+
     logger.debug('✉️ inviteCollaborator: Inviting', email, 'to client', clientId);
 
     // Check if user already exists
@@ -251,6 +250,17 @@ async function inviteCollaborator(req, res) {
       }
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
     logger.error('❌ inviteCollaborator: Error:', error);
     if (error instanceof ApiError) {
       throw error;
@@ -357,14 +367,21 @@ async function removeCollaborator(req, res) {
  */
 async function updateProfile(req, res) {
   const userId = req.user.id;
-  const { email } = req.body;
 
-  // Email updates not allowed through this endpoint
-  if (email && email !== req.user.email) {
-    throw new ApiError(400, 'Email cannot be changed', 'EMAIL_IMMUTABLE');
-  }
+  // Define inline schema for profile updates
+  const updateProfileSchema = z.object({
+    email: z.string().email().optional()
+  });
 
   try {
+    // Validate input with Zod
+    const { email } = updateProfileSchema.parse(req.body);
+
+    // Email updates not allowed through this endpoint
+    if (email && email !== req.user.email) {
+      throw new ApiError(400, 'Email cannot be changed', 'EMAIL_IMMUTABLE');
+    }
+
     // For now, just return success
     // In the future, add other updatable fields like name, preferences, etc.
 
@@ -373,7 +390,21 @@ async function updateProfile(req, res) {
       message: 'Profile updated successfully'
     });
   } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
     logger.error('❌ updateProfile: Error:', error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
     throw new ApiError(500, 'Failed to update profile', 'UPDATE_FAILED');
   }
 }

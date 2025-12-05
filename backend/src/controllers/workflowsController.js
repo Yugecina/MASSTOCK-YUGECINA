@@ -12,6 +12,8 @@ const { v4: uuidv4 } = require('uuid');
 const { parsePrompts, validatePrompts } = require('../utils/promptParser');
 const { filesToBase64 } = require('../middleware/upload');
 const { encryptApiKey } = require('../utils/encryption');
+const { z } = require('zod');
+const { executeWorkflowSchema, executionsQuerySchema } = require('../validation/schemas');
 
 // Create a fresh admin client for each query to avoid auth context contamination
 function getCleanAdmin() {
@@ -204,260 +206,300 @@ async function getWorkflow(req, res) {
  * Verifies access via client_workflows junction table (NEW ARCHITECTURE)
  */
 async function executeWorkflow(req, res) {
-  const { workflow_id } = req.params;
-  const clientId = req.client.id;
-
-  // Use a fresh admin client to avoid auth context issues
-  const admin = getCleanAdmin();
-
-  // Check access via client_workflows junction table
-  const { data: access, error: accessError } = await admin
-    .from('client_workflows')
-    .select('*')
-    .eq('client_id', clientId)
-    .eq('workflow_id', workflow_id)
-    .eq('is_active', true)
-    .maybeSingle();
-
-  if (accessError) {
-    logger.error('❌ Error checking workflow access:', accessError);
-    throw new ApiError(500, 'Database error', 'DATABASE_ERROR');
-  }
-
-  if (!access) {
-    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
-    throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
-  }
-
-  // Fetch workflow (without client_id filter)
-  const { data: workflow, error } = await admin
-    .from('workflows')
-    .select('*')
-    .eq('id', workflow_id)
-    .single();
-
-  if (error || !workflow) {
-    throw new ApiError(404, 'Workflow not found', 'WORKFLOW_NOT_FOUND');
-  }
-
-  // Check if workflow is deployed
-  if (workflow.status !== 'deployed') {
-    throw new ApiError(400, 'Workflow is not deployed', 'WORKFLOW_NOT_DEPLOYED');
-  }
-
-  // Prepare input_data based on workflow type
-  let input_data;
-  let updatedConfig = workflow.config;
-
-  if (workflow.config.workflow_type === 'nano_banana') {
-    // Nano Banana workflow: multipart form data with prompts and images
-    // Use default values if not provided
-    const prompts_text = req.body.prompts_text || process.env.DEFAULT_NANO_BANANA_PROMPT;
-    const api_key = req.body.api_key || process.env.DEFAULT_GEMINI_API_KEY;
-    const files = req.files || [];
-
-    // NEW: Get model, aspect_ratio, and resolution with defaults
-    const model = req.body.model || workflow.config.default_model || 'gemini-2.5-flash-image';
-    const aspect_ratio = req.body.aspect_ratio || workflow.config.default_aspect_ratio || '1:1';
-
-    // Determine resolution default based on model type
-    const isProModel = model === 'gemini-3-pro-image-preview';
-    const defaultResolution = isProModel
-      ? (workflow.config.default_resolution?.pro || '1K')
-      : (workflow.config.default_resolution?.flash || '1K');
-    const resolution = req.body.resolution || defaultResolution;
-
-    logger.debug('📥 Received workflow execution request:', {
-      hasPromptsText: !!req.body.prompts_text,
-      hasApiKey: !!req.body.api_key,
-      filesCount: files.length,
-      model,
-      aspectRatio: aspect_ratio,
-      resolution,
-      usingDefaultPrompt: !req.body.prompts_text && !!process.env.DEFAULT_NANO_BANANA_PROMPT,
-      usingDefaultApiKey: !req.body.api_key && !!process.env.DEFAULT_GEMINI_API_KEY
-    });
-
-    // Validate required fields (after applying defaults)
-    if (!prompts_text) {
-      throw new ApiError(400, 'prompts_text is required and no default is configured', 'MISSING_PROMPTS_TEXT');
-    }
-
-    if (!api_key) {
-      throw new ApiError(400, 'api_key is required and no default is configured', 'MISSING_API_KEY');
-    }
-
-    // NEW: Validate model
-    const validModels = workflow.config.available_models || ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
-    if (!validModels.includes(model)) {
-      throw new ApiError(400, `Invalid model. Must be one of: ${validModels.join(', ')}`, 'INVALID_MODEL');
-    }
-
-    // NEW: Validate aspect ratio
-    const validRatios = workflow.config.aspect_ratios || ['1:1', '16:9', '9:16', '4:3', '3:4'];
-    if (!validRatios.includes(aspect_ratio)) {
-      throw new ApiError(400, `Invalid aspect ratio. Must be one of: ${validRatios.join(', ')}`, 'INVALID_ASPECT_RATIO');
-    }
-
-    // NEW: Validate resolution for Pro model
-    if (isProModel) {
-      const validResolutions = workflow.config.available_resolutions?.pro || ['1K', '2K', '4K'];
-      if (!validResolutions.includes(resolution)) {
-        throw new ApiError(400, `Invalid resolution for Pro model. Must be one of: ${validResolutions.join(', ')}`, 'INVALID_RESOLUTION');
-      }
-    }
-
-    // Parse and validate prompts
-    const prompts = parsePrompts(prompts_text);
-    const validation = validatePrompts(prompts, {
-      maxPrompts: workflow.config.max_prompts || 100,
-      maxLength: 10000 // Allow detailed prompts with add/negative sections (was 1000)
-    });
-
-    if (!validation.valid) {
-      throw new ApiError(400, 'Invalid prompts', 'INVALID_PROMPTS', validation.errors);
-    }
-
-    // Convert files to base64
-    const referenceImages = filesToBase64(files);
-
-    if (referenceImages.length > (workflow.config.max_reference_images || 14)) {
-      throw new ApiError(400, `Maximum ${workflow.config.max_reference_images || 14} reference images allowed`, 'TOO_MANY_FILES');
-    }
-
-    // NEW: Calculate dynamic pricing based on model and resolution
-    const calculateDynamicPricing = (model, resolution, imageCount, pricingConfig) => {
-      let costPerImage, revenuePerImage;
-
-      if (model === 'gemini-2.5-flash-image') {
-        costPerImage = pricingConfig.flash.cost_per_image;
-        revenuePerImage = pricingConfig.flash.revenue_per_image;
-      } else {
-        // gemini-3-pro-image-preview
-        costPerImage = pricingConfig.pro[resolution].cost_per_image;
-        revenuePerImage = pricingConfig.pro[resolution].revenue_per_image;
-      }
-
-      const totalCost = costPerImage * imageCount;
-      const totalRevenue = revenuePerImage * imageCount;
-      const profit = totalRevenue - totalCost;
-
-      return {
-        cost_per_image_eur: costPerImage,
-        total_cost_eur: totalCost,
-        total_revenue_eur: totalRevenue,
-        profit_eur: profit,
-        image_count: imageCount
-      };
-    };
-
-    const pricing = calculateDynamicPricing(model, resolution, prompts.length, workflow.config.pricing);
-
-    logger.info('💰 Dynamic pricing calculated:', pricing);
-
-    // Encrypt API key
-    const encryptedApiKey = encryptApiKey(api_key);
-
-    // Update workflow config with encrypted API key and new params (ephemeral for this execution)
-    updatedConfig = {
-      ...workflow.config,
-      api_key_encrypted: encryptedApiKey,
-      model: model,
-      aspect_ratio: aspect_ratio,
-      resolution: resolution,
-      pricing_details: pricing
-    };
-
-    // Update workflow with encrypted key
-    await admin
-      .from('workflows')
-      .update({ config: updatedConfig })
-      .eq('id', workflow_id);
-
-    // Prepare input data
-    input_data = {
-      prompts,
-      reference_images: referenceImages,
-      total_prompts: prompts.length,
-      model: model,
-      aspect_ratio: aspect_ratio,
-      resolution: resolution,
-      pricing_details: pricing
-    };
-  } else {
-    // Standard workflow: JSON input
-    input_data = req.body.input_data;
-
-    if (!input_data) {
-      throw new ApiError(400, 'input_data is required', 'MISSING_INPUT_DATA');
-    }
-  }
-
-  // Create execution record
-  const executionId = uuidv4();
-  const { data: execution, error: execError } = await admin
-    .from('workflow_executions')
-    .insert([{
-      id: executionId,
-      workflow_id: workflow_id,
-      client_id: clientId,
-      triggered_by_user_id: req.user.id,
-      status: 'pending',
-      input_data,
-      started_at: new Date().toISOString()
-    }])
-    .select()
-    .single();
-
-  if (execError) {
-    throw new ApiError(500, 'Failed to create execution', 'EXECUTION_CREATION_FAILED');
-  }
-
-  // Add job to queue
   try {
-    await addWorkflowJob({
-      executionId,
-      workflowId: workflow_id,
-      clientId,
-      inputData: input_data,
-      config: updatedConfig
+    const { workflow_id } = req.params;
+    const clientId = req.client.id;
+
+    // Use a fresh admin client to avoid auth context issues
+    const admin = getCleanAdmin();
+
+    // Check access via client_workflows junction table
+    const { data: access, error: accessError } = await admin
+      .from('client_workflows')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('workflow_id', workflow_id)
+      .eq('is_active', true)
+      .maybeSingle();
+
+    if (accessError) {
+      logger.error('❌ Error checking workflow access:', accessError);
+      throw new ApiError(500, 'Database error', 'DATABASE_ERROR');
+    }
+
+    if (!access) {
+      logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+      throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
+    }
+
+    // Fetch workflow (without client_id filter)
+    const { data: workflow, error } = await admin
+      .from('workflows')
+      .select('*')
+      .eq('id', workflow_id)
+      .single();
+
+    if (error || !workflow) {
+      throw new ApiError(404, 'Workflow not found', 'WORKFLOW_NOT_FOUND');
+    }
+
+    // Check if workflow is deployed
+    if (workflow.status !== 'deployed') {
+      throw new ApiError(400, 'Workflow is not deployed', 'WORKFLOW_NOT_DEPLOYED');
+    }
+
+    // Validate input with Zod (for nano_banana workflows)
+    let validatedData;
+    if (workflow.config.workflow_type === 'nano_banana') {
+      validatedData = executeWorkflowSchema.parse(req.body);
+    }
+
+    // Prepare input_data based on workflow type
+    let input_data;
+    let updatedConfig = workflow.config;
+
+    if (workflow.config.workflow_type === 'nano_banana') {
+      // Nano Banana workflow: multipart form data with prompts and images
+      // Use default values if not provided
+      const prompts_text = validatedData.prompts_text || req.body.prompts_text || process.env.DEFAULT_NANO_BANANA_PROMPT;
+      const api_key = validatedData.api_key || req.body.api_key || process.env.DEFAULT_GEMINI_API_KEY;
+      const files = req.files || [];
+
+      // DEBUG: Log received files from Multer
+      logger.debug('🔍 MULTER FILES RECEIVED:', {
+        filesCount: files.length,
+        files: files.map(f => ({
+          fieldname: f.fieldname,
+          originalname: f.originalname,
+          mimetype: f.mimetype,
+          size: f.size,
+          buffer_length: f.buffer?.length
+        })),
+        req_body_keys: Object.keys(req.body),
+        req_files_type: typeof req.files,
+        req_files_is_array: Array.isArray(req.files)
+      });
+
+      // NEW: Get model, aspect_ratio, and resolution with defaults
+      const model = validatedData.model || req.body.model || workflow.config.default_model || 'gemini-2.5-flash-image';
+      const aspect_ratio = validatedData.aspect_ratio || req.body.aspect_ratio || workflow.config.default_aspect_ratio || '1:1';
+
+      // Determine resolution default based on model type
+      const isProModel = model === 'gemini-3-pro-image-preview';
+      const defaultResolution = isProModel
+        ? (workflow.config.default_resolution?.pro || '1K')
+        : (workflow.config.default_resolution?.flash || '1K');
+      const resolution = validatedData.resolution || req.body.resolution || defaultResolution;
+
+      logger.debug('📥 Received workflow execution request:', {
+        hasPromptsText: !!prompts_text,
+        hasApiKey: !!api_key,
+        filesCount: files.length,
+        model,
+        aspectRatio: aspect_ratio,
+        resolution,
+        usingDefaultPrompt: !req.body.prompts_text && !!process.env.DEFAULT_NANO_BANANA_PROMPT,
+        usingDefaultApiKey: !req.body.api_key && !!process.env.DEFAULT_GEMINI_API_KEY
+      });
+
+      // Validate required fields (after applying defaults)
+      if (!prompts_text) {
+        throw new ApiError(400, 'prompts_text is required and no default is configured', 'MISSING_PROMPTS_TEXT');
+      }
+
+      if (!api_key) {
+        throw new ApiError(400, 'api_key is required and no default is configured', 'MISSING_API_KEY');
+      }
+
+      // NEW: Validate model
+      const validModels = workflow.config.available_models || ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
+      if (!validModels.includes(model)) {
+        throw new ApiError(400, `Invalid model. Must be one of: ${validModels.join(', ')}`, 'INVALID_MODEL');
+      }
+
+      // NEW: Validate aspect ratio
+      const validRatios = workflow.config.aspect_ratios || ['1:1', '16:9', '9:16', '4:3', '3:4'];
+      if (!validRatios.includes(aspect_ratio)) {
+        throw new ApiError(400, `Invalid aspect ratio. Must be one of: ${validRatios.join(', ')}`, 'INVALID_ASPECT_RATIO');
+      }
+
+      // NEW: Validate resolution for Pro model
+      if (isProModel) {
+        const validResolutions = workflow.config.available_resolutions?.pro || ['1K', '2K', '4K'];
+        if (!validResolutions.includes(resolution)) {
+          throw new ApiError(400, `Invalid resolution for Pro model. Must be one of: ${validResolutions.join(', ')}`, 'INVALID_RESOLUTION');
+        }
+      }
+
+      // Parse and validate prompts
+      const prompts = parsePrompts(prompts_text);
+      const validation = validatePrompts(prompts, {
+        maxPrompts: workflow.config.max_prompts || 100,
+        maxLength: 10000 // Allow detailed prompts with add/negative sections (was 1000)
+      });
+
+      if (!validation.valid) {
+        throw new ApiError(400, 'Invalid prompts', 'INVALID_PROMPTS', validation.errors);
+      }
+
+      // Convert files to base64
+      const referenceImages = filesToBase64(files);
+
+      if (referenceImages.length > (workflow.config.max_reference_images || 14)) {
+        throw new ApiError(400, `Maximum ${workflow.config.max_reference_images || 14} reference images allowed`, 'TOO_MANY_FILES');
+      }
+
+      // NEW: Calculate dynamic pricing based on model and resolution
+      const calculateDynamicPricing = (model, resolution, imageCount, pricingConfig) => {
+        let costPerImage, revenuePerImage;
+
+        if (model === 'gemini-2.5-flash-image') {
+          costPerImage = pricingConfig.flash.cost_per_image;
+          revenuePerImage = pricingConfig.flash.revenue_per_image;
+        } else {
+          // gemini-3-pro-image-preview
+          costPerImage = pricingConfig.pro[resolution].cost_per_image;
+          revenuePerImage = pricingConfig.pro[resolution].revenue_per_image;
+        }
+
+        const totalCost = costPerImage * imageCount;
+        const totalRevenue = revenuePerImage * imageCount;
+        const profit = totalRevenue - totalCost;
+
+        return {
+          cost_per_image_eur: costPerImage,
+          total_cost_eur: totalCost,
+          total_revenue_eur: totalRevenue,
+          profit_eur: profit,
+          image_count: imageCount
+        };
+      };
+
+      const pricing = calculateDynamicPricing(model, resolution, prompts.length, workflow.config.pricing);
+
+      logger.info('💰 Dynamic pricing calculated:', pricing);
+
+      // Encrypt API key
+      const encryptedApiKey = encryptApiKey(api_key);
+
+      // Update workflow config with encrypted API key and new params (ephemeral for this execution)
+      updatedConfig = {
+        ...workflow.config,
+        api_key_encrypted: encryptedApiKey,
+        model: model,
+        aspect_ratio: aspect_ratio,
+        resolution: resolution,
+        pricing_details: pricing
+      };
+
+      // Update workflow with encrypted key
+      await admin
+        .from('workflows')
+        .update({ config: updatedConfig })
+        .eq('id', workflow_id);
+
+      // Prepare input data
+      input_data = {
+        prompts,
+        reference_images: referenceImages,
+        total_prompts: prompts.length,
+        model: model,
+        aspect_ratio: aspect_ratio,
+        resolution: resolution,
+        pricing_details: pricing
+      };
+    } else {
+      // Standard workflow: JSON input
+      input_data = req.body.input_data;
+
+      if (!input_data) {
+        throw new ApiError(400, 'input_data is required', 'MISSING_INPUT_DATA');
+      }
+    }
+
+    // Create execution record
+    const executionId = uuidv4();
+    const { data: execution, error: execError } = await admin
+      .from('workflow_executions')
+      .insert([{
+        id: executionId,
+        workflow_id: workflow_id,
+        client_id: clientId,
+        triggered_by_user_id: req.user.id,
+        status: 'pending',
+        input_data,
+        started_at: new Date().toISOString()
+      }])
+      .select()
+      .single();
+
+    if (execError) {
+      throw new ApiError(500, 'Failed to create execution', 'EXECUTION_CREATION_FAILED');
+    }
+
+    // Add job to queue
+    try {
+      await addWorkflowJob({
+        executionId,
+        workflowId: workflow_id,
+        clientId,
+        inputData: input_data,
+        config: updatedConfig
+      });
+
+      logWorkflowExecution(executionId, workflow_id, clientId, 'queued');
+    } catch (queueError) {
+      // Update execution status to failed
+      await admin
+        .from('workflow_executions')
+        .update({
+          status: 'failed',
+          error_message: 'Failed to queue job',
+          completed_at: new Date().toISOString()
+        })
+        .eq('id', executionId);
+
+      throw new ApiError(500, 'Failed to queue workflow execution', 'QUEUE_ERROR');
+    }
+
+    // Create audit log
+    await admin.from('audit_logs').insert([{
+      client_id: clientId,
+      user_id: req.user.id,
+      action: 'workflow_executed',
+      resource_type: 'workflow_execution',
+      resource_id: executionId,
+      changes: { workflow_id, status: 'pending' },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    res.status(202).json({
+      success: true,
+      data: {
+        execution_id: executionId,
+        status: 'pending',
+        message: 'Workflow execution queued successfully'
+      }
     });
 
-    logWorkflowExecution(executionId, workflow_id, clientId, 'queued');
-  } catch (queueError) {
-    // Update execution status to failed
-    await admin
-      .from('workflow_executions')
-      .update({
-        status: 'failed',
-        error_message: 'Failed to queue job',
-        completed_at: new Date().toISOString()
-      })
-      .eq('id', executionId);
-
-    throw new ApiError(500, 'Failed to queue workflow execution', 'QUEUE_ERROR');
-  }
-
-  // Create audit log
-  await admin.from('audit_logs').insert([{
-    client_id: clientId,
-    user_id: req.user.id,
-    action: 'workflow_executed',
-    resource_type: 'workflow_execution',
-    resource_id: executionId,
-    changes: { workflow_id, status: 'pending' },
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.status(202).json({
-    success: true,
-    data: {
-      execution_id: executionId,
-      status: 'pending',
-      message: 'Workflow execution queued successfully'
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
     }
-  });
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, `Failed to execute workflow: ${error.message}`, 'EXECUTION_ERROR');
+  }
 }
 
 /**
@@ -531,62 +573,84 @@ async function getExecution(req, res) {
  * Get execution history for a workflow
  */
 async function getWorkflowExecutions(req, res) {
-  const { workflow_id } = req.params;
-  const clientId = req.client.id;
-  const { limit = 50, offset = 0, status } = req.query;
+  try {
+    const { workflow_id } = req.params;
+    const clientId = req.client.id;
 
-  // Check access via client_workflows junction table
-  const { data: access, error: accessError } = await supabaseAdmin
-    .from('client_workflows')
-    .select('workflow_id')
-    .eq('client_id', clientId)
-    .eq('workflow_id', workflow_id)
-    .eq('is_active', true)
-    .maybeSingle();
+    // Validate query parameters with Zod
+    const validatedQuery = executionsQuerySchema.parse(req.query);
+    const { limit, offset, status } = validatedQuery;
 
-  if (accessError) {
-    logger.error('❌ Error checking workflow access:', accessError);
-    throw new ApiError(500, 'Database error', 'DATABASE_ERROR');
-  }
+    // Check access via client_workflows junction table
+    const { data: access, error: accessError } = await supabaseAdmin
+      .from('client_workflows')
+      .select('workflow_id')
+      .eq('client_id', clientId)
+      .eq('workflow_id', workflow_id)
+      .eq('is_active', true)
+      .maybeSingle();
 
-  if (!access) {
-    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
-    throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
-  }
-
-  // Build query with triggered_by user info
-  let query = supabaseAdmin
-    .from('workflow_executions')
-    .select(`
-      *,
-      triggered_by:triggered_by_user_id (
-        id,
-        email
-      )
-    `, { count: 'exact' })
-    .eq('workflow_id', workflow_id)
-    .order('created_at', { ascending: false })
-    .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
-
-  if (status) {
-    query = query.eq('status', status);
-  }
-
-  const { data: executions, error, count } = await query;
-
-  if (error) {
-    throw new ApiError(500, 'Failed to fetch executions', 'DATABASE_ERROR');
-  }
-
-  res.json({
-    success: true,
-    data: {
-      executions,
-      total: count,
-      limit: parseInt(limit),
-      offset: parseInt(offset)
+    if (accessError) {
+      logger.error('❌ Error checking workflow access:', accessError);
+      throw new ApiError(500, 'Database error', 'DATABASE_ERROR');
     }
-  });
+
+    if (!access) {
+      logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+      throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
+    }
+
+    // Build query with triggered_by user info
+    let query = supabaseAdmin
+      .from('workflow_executions')
+      .select(`
+        *,
+        triggered_by:triggered_by_user_id (
+          id,
+          email
+        )
+      `, { count: 'exact' })
+      .eq('workflow_id', workflow_id)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (status) {
+      query = query.eq('status', status);
+    }
+
+    const { data: executions, error, count } = await query;
+
+    if (error) {
+      throw new ApiError(500, 'Failed to fetch executions', 'DATABASE_ERROR');
+    }
+
+    res.json({
+      success: true,
+      data: {
+        executions,
+        total: count,
+        limit,
+        offset
+      }
+    });
+
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, `Failed to fetch workflow executions: ${error.message}`, 'FETCH_ERROR');
+  }
 }
 
 /**
@@ -843,142 +907,164 @@ async function getClientMembers(req, res) {
  * Get all executions for the client with pagination
  */
 async function getAllClientExecutions(req, res) {
-  const clientId = req.client.id;
-  const { limit = 20, offset = 0, status, workflow_id, user_id, fields } = req.query;
+  try {
+    const clientId = req.client.id;
 
-  logger.info('📡 getAllClientExecutions called:', {
-    clientId,
-    userId: req.user?.id,
-    filters: { limit, offset, status, workflow_id, user_id, fields }
-  });
+    // Validate query parameters with Zod
+    const validatedQuery = executionsQuerySchema.parse(req.query);
+    const { limit, offset, status, workflow_id, user_id, fields } = validatedQuery;
 
-  // Use a fresh admin client to avoid auth context issues
-  const admin = getCleanAdmin();
+    logger.info('📡 getAllClientExecutions called:', {
+      clientId,
+      userId: req.user?.id,
+      filters: { limit, offset, status, workflow_id, user_id, fields }
+    });
 
-  // Define allowed fields (whitelist for security)
-  const ALLOWED_FIELDS = [
-    'id', 'workflow_id', 'client_id', 'status', 'input_data', 'output_data',
-    'error_message', 'started_at', 'completed_at', 'duration_seconds',
-    'triggered_by_user_id', 'created_at', 'updated_at', 'retry_count'
-  ];
+    // Use a fresh admin client to avoid auth context issues
+    const admin = getCleanAdmin();
 
-  // Default lightweight fields for list view (excludes heavy input_data/output_data)
-  const DEFAULT_LIST_FIELDS = [
-    'id', 'status', 'workflow_id', 'created_at', 'duration_seconds',
-    'triggered_by_user_id', 'error_message', 'started_at', 'completed_at', 'retry_count'
-  ];
+    // Define allowed fields (whitelist for security)
+    const ALLOWED_FIELDS = [
+      'id', 'workflow_id', 'client_id', 'status', 'input_data', 'output_data',
+      'error_message', 'started_at', 'completed_at', 'duration_seconds',
+      'triggered_by_user_id', 'created_at', 'updated_at', 'retry_count'
+    ];
 
-  // Parse requested fields or use defaults
-  let selectFields = DEFAULT_LIST_FIELDS;
-  if (fields) {
-    const requestedFields = fields.split(',').map(f => f.trim());
-    selectFields = requestedFields.filter(f => ALLOWED_FIELDS.includes(f));
-    if (selectFields.length === 0) {
-      selectFields = DEFAULT_LIST_FIELDS;
+    // Default lightweight fields for list view (excludes heavy input_data/output_data)
+    const DEFAULT_LIST_FIELDS = [
+      'id', 'status', 'workflow_id', 'created_at', 'duration_seconds',
+      'triggered_by_user_id', 'error_message', 'started_at', 'completed_at', 'retry_count'
+    ];
+
+    // Parse requested fields or use defaults
+    let selectFields = DEFAULT_LIST_FIELDS;
+    if (fields) {
+      const requestedFields = fields.split(',').map(f => f.trim());
+      selectFields = requestedFields.filter(f => ALLOWED_FIELDS.includes(f));
+      if (selectFields.length === 0) {
+        selectFields = DEFAULT_LIST_FIELDS;
+      }
     }
-  }
 
-  const selectString = selectFields.join(', ');
+    const selectString = selectFields.join(', ');
 
-  logger.debug('Field selection:', {
-    requested: fields,
-    selected: selectString,
-    fieldCount: selectFields.length
-  });
+    logger.debug('Field selection:', {
+      requested: fields,
+      selected: selectString,
+      fieldCount: selectFields.length
+    });
 
-  // Fetch executions first
-  let executionsQuery = admin
-    .from('workflow_executions')
-    .select(selectString, { count: 'exact' })
-    .eq('client_id', clientId)
-    .order('created_at', { ascending: false })
-    .range(parseInt(offset), parseInt(offset) + parseInt(limit) - 1);
+    // Fetch executions first
+    let executionsQuery = admin
+      .from('workflow_executions')
+      .select(selectString, { count: 'exact' })
+      .eq('client_id', clientId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-  // Apply optional filters
-  if (status && status !== 'all') {
-    executionsQuery = executionsQuery.eq('status', status);
-  }
-  if (workflow_id && workflow_id !== 'all') {
-    executionsQuery = executionsQuery.eq('workflow_id', workflow_id);
-  }
-  if (user_id && user_id !== 'all') {
-    executionsQuery = executionsQuery.eq('triggered_by_user_id', user_id);
-  }
+    // Apply optional filters
+    if (status && status !== 'all') {
+      executionsQuery = executionsQuery.eq('status', status);
+    }
+    if (workflow_id && workflow_id !== 'all') {
+      executionsQuery = executionsQuery.eq('workflow_id', workflow_id);
+    }
+    if (user_id && user_id !== 'all') {
+      executionsQuery = executionsQuery.eq('triggered_by_user_id', user_id);
+    }
 
-  const { data: executions, error, count } = await executionsQuery;
+    const { data: executions, error, count } = await executionsQuery;
 
-  logger.info('📦 getAllClientExecutions: Query result:', {
-    executionsCount: executions?.length || 0,
-    totalCount: count,
-    error: error?.message || null,
-    firstExecution: executions?.[0] ? {
-      id: executions[0].id,
-      workflow_id: executions[0].workflow_id,
-      client_id: executions[0].client_id
-    } : null
-  });
+    logger.info('📦 getAllClientExecutions: Query result:', {
+      executionsCount: executions?.length || 0,
+      totalCount: count,
+      error: error?.message || null,
+      firstExecution: executions?.[0] ? {
+        id: executions[0].id,
+        workflow_id: executions[0].workflow_id,
+        client_id: executions[0].client_id
+      } : null
+    });
 
-  if (error) {
-    logger.error('❌ getAllClientExecutions: Database error:', { error });
-    throw new ApiError(500, 'Failed to fetch executions', 'DATABASE_ERROR');
-  }
+    if (error) {
+      logger.error('❌ getAllClientExecutions: Database error:', { error });
+      throw new ApiError(500, 'Failed to fetch executions', 'DATABASE_ERROR');
+    }
 
-  // Get unique workflow_ids and user_ids
-  const workflowIds = [...new Set(executions.map(e => e.workflow_id).filter(Boolean))];
-  const userIds = [...new Set(executions.map(e => e.triggered_by_user_id).filter(Boolean))];
+    // Get unique workflow_ids and user_ids
+    const workflowIds = [...new Set(executions.map(e => e.workflow_id).filter(Boolean))];
+    const userIds = [...new Set(executions.map(e => e.triggered_by_user_id).filter(Boolean))];
 
-  // Fetch workflows in separate query (bypasses RLS issues)
-  const { data: workflows } = await admin
-    .from('workflows')
-    .select('id, name, config')
-    .in('id', workflowIds);
+    // Fetch workflows in separate query (bypasses RLS issues)
+    const { data: workflows } = await admin
+      .from('workflows')
+      .select('id, name, config')
+      .in('id', workflowIds);
 
-  // Fetch users in separate query
-  const { data: users } = await admin
-    .from('users')
-    .select('id, email')
-    .in('id', userIds);
+    // Fetch users in separate query
+    const { data: users } = await admin
+      .from('users')
+      .select('id, email')
+      .in('id', userIds);
 
-  // Create lookup maps
-  const workflowsMap = {};
-  (workflows || []).forEach(w => {
-    workflowsMap[w.id] = w;
-  });
+    // Create lookup maps
+    const workflowsMap = {};
+    (workflows || []).forEach(w => {
+      workflowsMap[w.id] = w;
+    });
 
-  const usersMap = {};
-  (users || []).forEach(u => {
-    usersMap[u.id] = u;
-  });
+    const usersMap = {};
+    (users || []).forEach(u => {
+      usersMap[u.id] = u;
+    });
 
-  // Format executions with workflow info
-  const formattedExecutions = (executions || []).map(exec => {
-    const workflow = workflowsMap[exec.workflow_id];
-    const user = usersMap[exec.triggered_by_user_id];
+    // Format executions with workflow info
+    const formattedExecutions = (executions || []).map(exec => {
+      const workflow = workflowsMap[exec.workflow_id];
+      const user = usersMap[exec.triggered_by_user_id];
 
-    return {
-      ...exec,
-      workflow_name: workflow?.name || 'Unknown Workflow',
-      workflow_type: workflow?.config?.workflow_type || 'standard',
-      triggered_by_email: user?.email || null
-    };
-  });
+      return {
+        ...exec,
+        workflow_name: workflow?.name || 'Unknown Workflow',
+        workflow_type: workflow?.config?.workflow_type || 'standard',
+        triggered_by_email: user?.email || null
+      };
+    });
 
-  logger.info('✅ getAllClientExecutions: Sending response:', {
-    executionsCount: formattedExecutions.length,
-    total: count,
-    hasMore: parseInt(offset) + formattedExecutions.length < count
-  });
-
-  res.json({
-    success: true,
-    data: {
-      executions: formattedExecutions,
+    logger.info('✅ getAllClientExecutions: Sending response:', {
+      executionsCount: formattedExecutions.length,
       total: count,
-      limit: parseInt(limit),
-      offset: parseInt(offset),
-      hasMore: parseInt(offset) + formattedExecutions.length < count
+      hasMore: offset + formattedExecutions.length < count
+    });
+
+    res.json({
+      success: true,
+      data: {
+        executions: formattedExecutions,
+        total: count,
+        limit,
+        offset,
+        hasMore: offset + formattedExecutions.length < count
+      }
+    });
+
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
     }
-  });
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, `Failed to fetch client executions: ${error.message}`, 'FETCH_ERROR');
+  }
 }
 
 /**

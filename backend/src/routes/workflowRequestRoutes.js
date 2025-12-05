@@ -6,9 +6,13 @@ const express = require('express');
 const { body, param } = require('express-validator');
 const { asyncHandler, validate } = require('../middleware/errorHandler');
 const { authenticate, requireClient } = require('../middleware/auth');
+const { apiLimiter } = require('../middleware/rateLimit');
 const workflowRequestsController = require('../controllers/workflowRequestsController');
 
 const router = express.Router();
+
+// Apply rate limiting to all workflow request routes
+router.use(apiLimiter);
 
 /**
  * POST /api/workflow-requests

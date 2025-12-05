@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { ClientLayout } from '../components/layout/ClientLayout';
 import { Spinner } from '../components/ui/Spinner';
 import { workflowService } from '../services/workflows';
@@ -15,6 +15,7 @@ import './WorkflowExecute.css'
 export function WorkflowExecute() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [step, setStep] = useState(1);
   const [workflow, setWorkflow] = useState(null);
   const [formData, setFormData] = useState({});
@@ -26,7 +27,36 @@ export function WorkflowExecute() {
   const [startTime, setStartTime] = useState(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [showCancelModal, setShowCancelModal] = useState(false);
+  const [currentPrefillData, setCurrentPrefillData] = useState(null);
   const pollingIntervalRef = useRef(null);
+
+  // Extract prefill data from navigation state (for "Run Again" feature)
+  const prefillData = currentPrefillData || location.state?.prefillData || null;
+
+  // Log location state on every render (debugging)
+  useEffect(() => {
+    logger.debug('🔍 WorkflowExecute: Location state check', {
+      has_location_state: !!location.state,
+      location_state_keys: location.state ? Object.keys(location.state) : [],
+      has_prefillData: !!prefillData,
+      prefillData_keys: prefillData ? Object.keys(prefillData) : []
+    });
+
+    if (prefillData) {
+      logger.debug('✅ WorkflowExecute: Received prefill data from Run Again', {
+        prompts_text_length: prefillData.prompts_text?.length,
+        model: prefillData.model,
+        aspect_ratio: prefillData.aspect_ratio,
+        resolution: prefillData.resolution,
+        has_images: !!prefillData.reference_images_base64,
+        images_type: typeof prefillData.reference_images_base64,
+        images_is_array: Array.isArray(prefillData.reference_images_base64),
+        fromExecutionId: location.state?.fromExecutionId
+      });
+    } else {
+      logger.debug('⚠️ WorkflowExecute: No prefill data found');
+    }
+  }, [location.state, prefillData]);
 
   useEffect(() => {
     async function loadWorkflow() {
@@ -211,6 +241,38 @@ export function WorkflowExecute() {
   };
 
   const resetExecution = () => {
+    // Préparer les données de préfill à partir de l'exécution actuelle (pour "Run Again")
+    if (execution?.input_data && isNanoBanana) {
+      // Convertir "prompts" (array) en "prompts_text" (string)
+      const promptsArray = execution.input_data.prompts || [];
+      const promptsText = Array.isArray(promptsArray)
+        ? promptsArray.join('\n\n')
+        : '';
+
+      // Convertir le nom complet du modèle en 'flash' ou 'pro'
+      const modelName = execution.input_data.model || '';
+      const modelShortName = modelName.toLowerCase().includes('flash') ? 'flash' : 'pro';
+
+      const newPrefillData = {
+        prompts_text: promptsText,
+        model: modelShortName,
+        aspect_ratio: execution.input_data.aspect_ratio || '1:1',
+        resolution: execution.input_data.resolution || '1K',
+        reference_images_base64: execution.input_data.reference_images || null
+      };
+
+      logger.debug('🔄 WorkflowExecute: Preparing prefill data for Run Again', {
+        prompts_count: promptsArray.length,
+        model: modelShortName,
+        aspect_ratio: newPrefillData.aspect_ratio,
+        resolution: newPrefillData.resolution,
+        has_images: !!newPrefillData.reference_images_base64
+      });
+
+      setCurrentPrefillData(newPrefillData);
+    }
+
+    // Réinitialiser les states
     setStep(1);
     setFormData({});
     setExecution(null);
@@ -300,7 +362,12 @@ export function WorkflowExecute() {
             {isNanoBanana ? (
               <>
                 <h2 className="workflow-form-title">Configure Batch Image Generation</h2>
-                <NanoBananaForm onSubmit={handleExecute} loading={loading} workflow={workflow} />
+                <NanoBananaForm
+                  onSubmit={handleExecute}
+                  loading={loading}
+                  workflow={workflow}
+                  initialData={prefillData}
+                />
               </>
             ) : (
               <>

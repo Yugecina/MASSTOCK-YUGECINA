@@ -3,6 +3,7 @@
  * Centralized error handling and formatting
  */
 
+const { z } = require('zod');
 const { logError } = require('../config/logger');
 
 /**
@@ -109,11 +110,32 @@ function validate(req, res, next) {
   next();
 }
 
+/**
+ * Zod error handler helper
+ * Checks if error is a ZodError and formats it appropriately
+ * Returns null if not a Zod error (caller should handle other error types)
+ */
+function handleZodError(error, res) {
+  if (error instanceof z.ZodError) {
+    return res.status(400).json({
+      success: false,
+      message: 'Validation error',
+      code: 'VALIDATION_ERROR',
+      errors: error.errors.map(e => ({
+        field: e.path.join('.'),
+        message: e.message
+      }))
+    });
+  }
+  return null; // Not a Zod error
+}
+
 module.exports = {
   ApiError,
   notFoundHandler,
   errorHandler,
   asyncHandler,
   validationErrorHandler,
-  validate
+  validate,
+  handleZodError
 };

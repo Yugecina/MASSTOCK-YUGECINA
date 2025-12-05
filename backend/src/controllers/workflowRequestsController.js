@@ -3,66 +3,90 @@
  * Handles client requests for new workflow development
  */
 
+const { z } = require('zod');
 const { supabaseAdmin } = require('../config/database');
 const { logAudit } = require('../config/logger');
 const { ApiError } = require('../middleware/errorHandler');
 const { v4: uuidv4 } = require('uuid');
+const {
+  createWorkflowRequestSchema,
+  updateWorkflowRequestSchema
+} = require('../validation/schemas');
 
 /**
  * POST /api/workflow-requests
  * Create new workflow request
  */
 async function createWorkflowRequest(req, res) {
-  const { title, description, use_case, frequency, budget } = req.body;
-  const clientId = req.client.id;
+  try {
+    // Validate input with Zod
+    const { title, description, use_case, frequency, budget } = createWorkflowRequestSchema.parse(req.body);
+    const clientId = req.client.id;
 
-  // Validate input
-  if (!title || !description) {
-    throw new ApiError(400, 'Title and description are required', 'MISSING_REQUIRED_FIELDS');
-  }
+    // Create request
+    const { data: request, error } = await supabaseAdmin
+      .from('workflow_requests')
+      .insert([{
+        client_id: clientId,
+        title,
+        description,
+        use_case,
+        frequency,
+        budget,
+        status: 'submitted',
+        timeline: {
+          submitted_at: new Date().toISOString()
+        }
+      }])
+      .select()
+      .single();
 
-  // Create request
-  const { data: request, error } = await supabaseAdmin
-    .from('workflow_requests')
-    .insert([{
-      client_id: clientId,
-      title,
-      description,
-      use_case,
-      frequency,
-      budget,
-      status: 'submitted',
-      timeline: {
-        submitted_at: new Date().toISOString()
-      }
-    }])
-    .select()
-    .single();
-
-  if (error) {
-    throw new ApiError(500, 'Failed to create workflow request', 'DATABASE_ERROR');
-  }
-
-  // Create audit log
-  await supabaseAdmin.from('audit_logs').insert([{
-    client_id: clientId,
-    user_id: req.user.id,
-    action: 'workflow_request_created',
-    resource_type: 'workflow_request',
-    resource_id: request.id,
-    changes: { status: 'submitted' },
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.status(201).json({
-    success: true,
-    data: {
-      request_id: request.id,
-      status: request.status,
-      message: 'Workflow request submitted successfully'
+    if (error) {
+      throw new ApiError(500, 'Failed to create workflow request', 'DATABASE_ERROR');
     }
-  });
+
+    // Create audit log
+    await supabaseAdmin.from('audit_logs').insert([{
+      client_id: clientId,
+      user_id: req.user.id,
+      action: 'workflow_request_created',
+      resource_type: 'workflow_request',
+      resource_id: request.id,
+      changes: { status: 'submitted' },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    res.status(201).json({
+      success: true,
+      data: {
+        request_id: request.id,
+        status: request.status,
+        message: 'Workflow request submitted successfully'
+      }
+    });
+
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+
+    // If error is already ApiError, rethrow it
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    throw new ApiError(500, `Failed to create workflow request: ${error.message}`, 'REQUEST_CREATION_FAILED');
+  }
 }
 
 /**
@@ -121,10 +145,15 @@ async function getWorkflowRequest(req, res) {
  * Update workflow request (client can only update draft, admin can update any)
  */
 async function updateWorkflowRequest(req, res) {
-  const { request_id } = req.params;
-  const { status, notes, timeline_update, estimated_cost, estimated_dev_days } = req.body;
-  const isAdmin = req.user.role === 'admin';
-  const clientId = req.client?.id;
+  try {
+    const { request_id } = req.params;
+
+    // Validate input with Zod
+    const { status, notes, estimated_cost, estimated_dev_days } = updateWorkflowRequestSchema.parse(req.body);
+    const { timeline_update } = req.body; // Not in schema, admin-only field
+
+    const isAdmin = req.user.role === 'admin';
+    const clientId = req.client?.id;
 
   // Fetch existing request
   let query = supabaseAdmin
@@ -226,10 +255,32 @@ async function updateWorkflowRequest(req, res) {
     user_agent: req.get('user-agent')
   }]);
 
-  res.json({
-    success: true,
-    data: updatedRequest
-  });
+    res.json({
+      success: true,
+      data: updatedRequest
+    });
+
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.errors.map(e => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+    }
+
+    // If error is already ApiError, rethrow it
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    throw new ApiError(500, `Failed to update workflow request: ${error.message}`, 'REQUEST_UPDATE_FAILED');
+  }
 }
 
 module.exports = {

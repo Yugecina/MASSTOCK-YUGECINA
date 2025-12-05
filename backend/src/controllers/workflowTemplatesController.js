@@ -6,6 +6,33 @@
 const { supabaseAdmin } = require('../config/database');
 const { ApiError } = require('../middleware/errorHandler');
 const logger = require('../config/logger');
+const { z } = require('zod');
+
+// ============================================
+// Zod Validation Schemas
+// ============================================
+
+const createTemplateSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(255),
+  description: z.string().trim().optional(),
+  workflow_type: z.string().trim().min(1, 'Workflow type is required'),
+  config: z.record(z.unknown()).optional().default({}),
+  cost_per_execution: z.coerce.number().min(0).optional().default(0),
+  revenue_per_execution: z.coerce.number().min(0).optional().default(0),
+  icon: z.string().trim().optional().default('image'),
+});
+
+const updateTemplateSchema = z.object({
+  name: z.string().trim().min(1).max(255).optional(),
+  description: z.string().trim().optional(),
+  workflow_type: z.string().trim().min(1).optional(),
+  config: z.record(z.unknown()).optional(),
+  cost_per_execution: z.coerce.number().min(0).optional(),
+  revenue_per_execution: z.coerce.number().min(0).optional(),
+  icon: z.string().trim().optional(),
+  is_active: z.boolean().optional(),
+  display_order: z.coerce.number().int().min(0).optional(),
+});
 
 /**
  * GET /api/v1/admin/workflow-templates
@@ -64,51 +91,76 @@ async function getTemplate(req, res) {
  * Create a new workflow template (admin only)
  */
 async function createTemplate(req, res) {
-  const { name, description, workflow_type, config, cost_per_execution, revenue_per_execution, icon } = req.body;
+  try {
+    // Validate input with Zod
+    const validatedData = createTemplateSchema.parse(req.body);
+    const { name, description, workflow_type, config, cost_per_execution, revenue_per_execution, icon } = validatedData;
 
-  logger.debug('WorkflowTemplatesController.createTemplate:', { name, workflow_type });
+    logger.debug('WorkflowTemplatesController.createTemplate:', { name, workflow_type });
 
-  if (!name || !workflow_type) {
-    throw new ApiError(400, 'Name and workflow_type are required', 'MISSING_REQUIRED_FIELDS');
+    const { data: template, error } = await supabaseAdmin
+      .from('workflow_templates')
+      .insert([{
+        name,
+        description,
+        workflow_type,
+        config,
+        cost_per_execution,
+        revenue_per_execution,
+        icon,
+        is_active: true,
+        created_by: req.user.id
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('WorkflowTemplatesController.createTemplate error:', { error });
+      throw new ApiError(500, 'Failed to create template', 'DATABASE_ERROR');
+    }
+
+    // Audit log
+    await supabaseAdmin.from('audit_logs').insert([{
+      user_id: req.user.id,
+      action: 'template_created',
+      resource_type: 'workflow_template',
+      resource_id: template.id,
+      changes: { name, workflow_type },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Template created successfully',
+      data: template
+    });
+
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      logger.warn('WorkflowTemplatesController.createTemplate validation error:', {
+        errors: error.errors
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Validation error',
+        details: error.errors
+      });
+    }
+
+    // Re-throw ApiError for global error handler
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    // Log unexpected errors
+    logger.error('WorkflowTemplatesController.createTemplate unexpected error:', {
+      error: error.message,
+      stack: error.stack
+    });
+    throw new ApiError(500, 'Internal server error', 'INTERNAL_ERROR');
   }
-
-  const { data: template, error } = await supabaseAdmin
-    .from('workflow_templates')
-    .insert([{
-      name,
-      description,
-      workflow_type,
-      config: config || {},
-      cost_per_execution: cost_per_execution || 0,
-      revenue_per_execution: revenue_per_execution || 0,
-      icon: icon || 'image',
-      is_active: true,
-      created_by: req.user.id
-    }])
-    .select()
-    .single();
-
-  if (error) {
-    logger.error('WorkflowTemplatesController.createTemplate error:', { error });
-    throw new ApiError(500, 'Failed to create template', 'DATABASE_ERROR');
-  }
-
-  // Audit log
-  await supabaseAdmin.from('audit_logs').insert([{
-    user_id: req.user.id,
-    action: 'template_created',
-    resource_type: 'workflow_template',
-    resource_id: template.id,
-    changes: { name, workflow_type },
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.status(201).json({
-    success: true,
-    message: 'Template created successfully',
-    data: template
-  });
 }
 
 /**
@@ -116,52 +168,72 @@ async function createTemplate(req, res) {
  * Update a workflow template
  */
 async function updateTemplate(req, res) {
-  const { id } = req.params;
-  const { name, description, workflow_type, config, cost_per_execution, revenue_per_execution, icon, is_active, display_order } = req.body;
+  try {
+    const { id } = req.params;
 
-  logger.debug('WorkflowTemplatesController.updateTemplate:', { id });
+    // Validate input with Zod
+    const validatedData = updateTemplateSchema.parse(req.body);
 
-  // Fetch existing template
-  const { data: existing, error: fetchError } = await supabaseAdmin
-    .from('workflow_templates')
-    .select('*')
-    .eq('id', id)
-    .single();
+    logger.debug('WorkflowTemplatesController.updateTemplate:', { id });
 
-  if (fetchError || !existing) {
-    throw new ApiError(404, 'Template not found', 'TEMPLATE_NOT_FOUND');
+    // Fetch existing template
+    const { data: existing, error: fetchError } = await supabaseAdmin
+      .from('workflow_templates')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (fetchError || !existing) {
+      throw new ApiError(404, 'Template not found', 'TEMPLATE_NOT_FOUND');
+    }
+
+    // Build update object from validated data
+    const updates = { ...validatedData };
+    updates.updated_at = new Date().toISOString();
+
+    const { data: template, error } = await supabaseAdmin
+      .from('workflow_templates')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      logger.error('WorkflowTemplatesController.updateTemplate error:', { error });
+      throw new ApiError(500, 'Failed to update template', 'DATABASE_ERROR');
+    }
+
+    res.json({
+      success: true,
+      message: 'Template updated successfully',
+      data: template
+    });
+
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      logger.warn('WorkflowTemplatesController.updateTemplate validation error:', {
+        errors: error.errors
+      });
+      return res.status(400).json({
+        success: false,
+        error: 'Validation error',
+        details: error.errors
+      });
+    }
+
+    // Re-throw ApiError for global error handler
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    // Log unexpected errors
+    logger.error('WorkflowTemplatesController.updateTemplate unexpected error:', {
+      error: error.message,
+      stack: error.stack
+    });
+    throw new ApiError(500, 'Internal server error', 'INTERNAL_ERROR');
   }
-
-  // Build update object
-  const updates = {};
-  if (name !== undefined) updates.name = name;
-  if (description !== undefined) updates.description = description;
-  if (workflow_type !== undefined) updates.workflow_type = workflow_type;
-  if (config !== undefined) updates.config = config;
-  if (cost_per_execution !== undefined) updates.cost_per_execution = cost_per_execution;
-  if (revenue_per_execution !== undefined) updates.revenue_per_execution = revenue_per_execution;
-  if (icon !== undefined) updates.icon = icon;
-  if (is_active !== undefined) updates.is_active = is_active;
-  if (display_order !== undefined) updates.display_order = display_order;
-  updates.updated_at = new Date().toISOString();
-
-  const { data: template, error } = await supabaseAdmin
-    .from('workflow_templates')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) {
-    logger.error('WorkflowTemplatesController.updateTemplate error:', { error });
-    throw new ApiError(500, 'Failed to update template', 'DATABASE_ERROR');
-  }
-
-  res.json({
-    success: true,
-    message: 'Template updated successfully',
-    data: template
-  });
 }
 
 /**

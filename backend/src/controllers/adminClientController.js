@@ -6,6 +6,12 @@
 const { supabaseAdmin } = require('../config/database');
 const { ApiError } = require('../middleware/errorHandler');
 const { logger } = require('../config/logger');
+const { z } = require('zod');
+const {
+  addMemberSchema,
+  updateMemberRoleSchema,
+  assignWorkflowToClientSchema
+} = require('../validation/schemas');
 
 // ============================================
 // CLIENT MEMBERS ENDPOINTS
@@ -97,131 +103,153 @@ async function getClientMembers(req, res) {
  * Add a user to a client
  */
 async function addClientMember(req, res) {
-  const { client_id } = req.params;
-  const { user_id, role = 'collaborator' } = req.body;
+  try {
+    const { client_id } = req.params;
 
-  logger.debug('AdminClientController.addClientMember:', { client_id, user_id, role });
+    // Validate input with Zod
+    const validatedData = addMemberSchema.parse(req.body);
+    const { user_id, role } = validatedData;
 
-  // Validate role
-  if (!['owner', 'collaborator'].includes(role)) {
-    throw new ApiError(400, 'Invalid role. Must be owner or collaborator', 'INVALID_ROLE');
-  }
+    logger.debug('AdminClientController.addClientMember:', { client_id, user_id, role });
 
-  // Verify client exists
-  const { data: client, error: clientError } = await supabaseAdmin
-    .from('clients')
-    .select('id, name')
-    .eq('id', client_id)
-    .single();
+    // Verify client exists
+    const { data: client, error: clientError } = await supabaseAdmin
+      .from('clients')
+      .select('id, name')
+      .eq('id', client_id)
+      .single();
 
-  if (clientError || !client) {
-    throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
-  }
+    if (clientError || !client) {
+      throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
+    }
 
-  // Verify user exists
-  const { data: user, error: userError } = await supabaseAdmin
-    .from('users')
-    .select('id, email, status')
-    .eq('id', user_id)
-    .single();
+    // Verify user exists
+    const { data: user, error: userError } = await supabaseAdmin
+      .from('users')
+      .select('id, email, status')
+      .eq('id', user_id)
+      .single();
 
-  if (userError || !user) {
-    throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
-  }
+    if (userError || !user) {
+      throw new ApiError(404, 'User not found', 'USER_NOT_FOUND');
+    }
 
-  if (user.status !== 'active') {
-    throw new ApiError(400, 'User is not active', 'USER_NOT_ACTIVE');
-  }
+    if (user.status !== 'active') {
+      throw new ApiError(400, 'User is not active', 'USER_NOT_ACTIVE');
+    }
 
-  // Check if already a member
-  const { data: existingMember } = await supabaseAdmin
-    .from('client_members')
-    .select('id, status')
-    .eq('client_id', client_id)
-    .eq('user_id', user_id)
-    .single();
-
-  if (existingMember && existingMember.status === 'active') {
-    throw new ApiError(400, 'User is already a member of this client', 'ALREADY_MEMBER');
-  }
-
-  // If previously removed, reactivate
-  if (existingMember && existingMember.status === 'removed') {
-    const { data: reactivated, error: reactivateError } = await supabaseAdmin
+    // Check if already a member
+    const { data: existingMember } = await supabaseAdmin
       .from('client_members')
-      .update({
+      .select('id, status')
+      .eq('client_id', client_id)
+      .eq('user_id', user_id)
+      .single();
+
+    if (existingMember && existingMember.status === 'active') {
+      throw new ApiError(400, 'User is already a member of this client', 'ALREADY_MEMBER');
+    }
+
+    // If previously removed, reactivate
+    if (existingMember && existingMember.status === 'removed') {
+      const { data: reactivated, error: reactivateError } = await supabaseAdmin
+        .from('client_members')
+        .update({
+          role,
+          status: 'active',
+          invited_by: req.user.id,
+          invited_at: new Date().toISOString(),
+          accepted_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingMember.id)
+        .select()
+        .single();
+
+      if (reactivateError) {
+        logger.error('AdminClientController.addClientMember reactivate error:', { error: reactivateError });
+        throw new ApiError(500, 'Failed to reactivate member', 'DATABASE_ERROR');
+      }
+
+      // Audit log
+      await supabaseAdmin.from('audit_logs').insert([{
+        client_id,
+        user_id: req.user.id,
+        action: 'member_reactivated',
+        resource_type: 'client_member',
+        resource_id: reactivated.id,
+        changes: { user_email: user.email, role, reactivated: true },
+        ip_address: req.ip,
+        user_agent: req.get('user-agent')
+      }]);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Member reactivated successfully',
+        data: reactivated
+      });
+    }
+
+    // Add new member
+    const { data: member, error: insertError } = await supabaseAdmin
+      .from('client_members')
+      .insert([{
+        client_id,
+        user_id,
         role,
         status: 'active',
         invited_by: req.user.id,
         invited_at: new Date().toISOString(),
-        accepted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', existingMember.id)
+        accepted_at: new Date().toISOString()
+      }])
       .select()
       .single();
 
-    if (reactivateError) {
-      logger.error('AdminClientController.addClientMember reactivate error:', { error: reactivateError });
-      throw new ApiError(500, 'Failed to reactivate member', 'DATABASE_ERROR');
+    if (insertError) {
+      logger.error('AdminClientController.addClientMember insert error:', { error: insertError });
+      throw new ApiError(500, 'Failed to add member', 'DATABASE_ERROR');
     }
 
     // Audit log
     await supabaseAdmin.from('audit_logs').insert([{
       client_id,
       user_id: req.user.id,
-      action: 'member_reactivated',
+      action: 'member_added',
       resource_type: 'client_member',
-      resource_id: reactivated.id,
-      changes: { user_email: user.email, role, reactivated: true },
+      resource_id: member.id,
+      changes: { user_email: user.email, role },
       ip_address: req.ip,
       user_agent: req.get('user-agent')
     }]);
 
-    return res.status(200).json({
+    res.status(201).json({
       success: true,
-      message: 'Member reactivated successfully',
-      data: reactivated
+      message: 'Member added successfully',
+      data: member
     });
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      logger.error('AdminClientController.addClientMember validation error:', { errors: error.errors });
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.errors
+      });
+    }
+
+    // Re-throw ApiErrors to be handled by global error handler
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    // Log unexpected errors
+    logger.error('AdminClientController.addClientMember error:', {
+      error: error.message,
+      stack: error.stack
+    });
+    throw new ApiError(500, 'Internal server error', 'INTERNAL_ERROR');
   }
-
-  // Add new member
-  const { data: member, error: insertError } = await supabaseAdmin
-    .from('client_members')
-    .insert([{
-      client_id,
-      user_id,
-      role,
-      status: 'active',
-      invited_by: req.user.id,
-      invited_at: new Date().toISOString(),
-      accepted_at: new Date().toISOString()
-    }])
-    .select()
-    .single();
-
-  if (insertError) {
-    logger.error('AdminClientController.addClientMember insert error:', { error: insertError });
-    throw new ApiError(500, 'Failed to add member', 'DATABASE_ERROR');
-  }
-
-  // Audit log
-  await supabaseAdmin.from('audit_logs').insert([{
-    client_id,
-    user_id: req.user.id,
-    action: 'member_added',
-    resource_type: 'client_member',
-    resource_id: member.id,
-    changes: { user_email: user.email, role },
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.status(201).json({
-    success: true,
-    message: 'Member added successfully',
-    data: member
-  });
 }
 
 /**
@@ -229,92 +257,114 @@ async function addClientMember(req, res) {
  * Update member role
  */
 async function updateClientMemberRole(req, res) {
-  const { client_id, member_id } = req.params;
-  const { role } = req.body;
+  try {
+    const { client_id, member_id } = req.params;
 
-  logger.debug('AdminClientController.updateClientMemberRole:', { client_id, member_id, role });
+    // Validate input with Zod
+    const validatedData = updateMemberRoleSchema.parse(req.body);
+    const { role } = validatedData;
 
-  // Validate role
-  if (!['owner', 'collaborator'].includes(role)) {
-    throw new ApiError(400, 'Invalid role. Must be owner or collaborator', 'INVALID_ROLE');
-  }
+    logger.debug('AdminClientController.updateClientMemberRole:', { client_id, member_id, role });
 
-  // Get existing member
-  const { data: member, error: fetchError } = await supabaseAdmin
-    .from('client_members')
-    .select(`
-      *,
-      user:user_id (email)
-    `)
-    .eq('id', member_id)
-    .eq('client_id', client_id)
-    .single();
-
-  if (fetchError || !member) {
-    throw new ApiError(404, 'Member not found', 'MEMBER_NOT_FOUND');
-  }
-
-  if (member.status !== 'active') {
-    throw new ApiError(400, 'Member is not active', 'MEMBER_NOT_ACTIVE');
-  }
-
-  // Don't update if same role
-  if (member.role === role) {
-    return res.json({
-      success: true,
-      message: 'Member role unchanged',
-      data: member
-    });
-  }
-
-  // Check if this is the last owner (can't demote last owner)
-  if (member.role === 'owner' && role === 'collaborator') {
-    const { data: owners } = await supabaseAdmin
+    // Get existing member
+    const { data: member, error: fetchError } = await supabaseAdmin
       .from('client_members')
-      .select('id')
+      .select(`
+        *,
+        user:user_id (email)
+      `)
+      .eq('id', member_id)
       .eq('client_id', client_id)
-      .eq('role', 'owner')
-      .eq('status', 'active');
+      .single();
 
-    if (owners?.length === 1) {
-      throw new ApiError(400, 'Cannot demote the last owner. Promote another member first.', 'LAST_OWNER');
+    if (fetchError || !member) {
+      throw new ApiError(404, 'Member not found', 'MEMBER_NOT_FOUND');
     }
+
+    if (member.status !== 'active') {
+      throw new ApiError(400, 'Member is not active', 'MEMBER_NOT_ACTIVE');
+    }
+
+    // Don't update if same role
+    if (member.role === role) {
+      return res.json({
+        success: true,
+        message: 'Member role unchanged',
+        data: member
+      });
+    }
+
+    // Check if this is the last owner (can't demote last owner)
+    if (member.role === 'owner' && role === 'collaborator') {
+      const { data: owners } = await supabaseAdmin
+        .from('client_members')
+        .select('id')
+        .eq('client_id', client_id)
+        .eq('role', 'owner')
+        .eq('status', 'active');
+
+      if (owners?.length === 1) {
+        throw new ApiError(400, 'Cannot demote the last owner. Promote another member first.', 'LAST_OWNER');
+      }
+    }
+
+    // Update role
+    const { data: updated, error: updateError } = await supabaseAdmin
+      .from('client_members')
+      .update({ role, updated_at: new Date().toISOString() })
+      .eq('id', member_id)
+      .select()
+      .single();
+
+    if (updateError) {
+      logger.error('AdminClientController.updateClientMemberRole error:', { error: updateError });
+      throw new ApiError(500, 'Failed to update member role', 'DATABASE_ERROR');
+    }
+
+    // Audit log
+    await supabaseAdmin.from('audit_logs').insert([{
+      client_id,
+      user_id: req.user.id,
+      action: 'member_role_updated',
+      resource_type: 'client_member',
+      resource_id: member_id,
+      changes: {
+        user_email: member.user?.email,
+        before: { role: member.role },
+        after: { role }
+      },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    res.json({
+      success: true,
+      message: `Member role updated to ${role}`,
+      data: updated
+    });
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      logger.error('AdminClientController.updateClientMemberRole validation error:', { errors: error.errors });
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.errors
+      });
+    }
+
+    // Re-throw ApiErrors to be handled by global error handler
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    // Log unexpected errors
+    logger.error('AdminClientController.updateClientMemberRole error:', {
+      error: error.message,
+      stack: error.stack
+    });
+    throw new ApiError(500, 'Internal server error', 'INTERNAL_ERROR');
   }
-
-  // Update role
-  const { data: updated, error: updateError } = await supabaseAdmin
-    .from('client_members')
-    .update({ role, updated_at: new Date().toISOString() })
-    .eq('id', member_id)
-    .select()
-    .single();
-
-  if (updateError) {
-    logger.error('AdminClientController.updateClientMemberRole error:', { error: updateError });
-    throw new ApiError(500, 'Failed to update member role', 'DATABASE_ERROR');
-  }
-
-  // Audit log
-  await supabaseAdmin.from('audit_logs').insert([{
-    client_id,
-    user_id: req.user.id,
-    action: 'member_role_updated',
-    resource_type: 'client_member',
-    resource_id: member_id,
-    changes: {
-      user_email: member.user?.email,
-      before: { role: member.role },
-      after: { role }
-    },
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.json({
-    success: true,
-    message: `Member role updated to ${role}`,
-    data: updated
-  });
 }
 
 /**
@@ -476,137 +526,164 @@ async function getClientWorkflows(req, res) {
  * Assign a workflow template to a client
  */
 async function assignWorkflowToClient(req, res) {
-  const { client_id } = req.params;
-  const { template_id, name: customName } = req.body;
+  try {
+    const { client_id } = req.params;
 
-  logger.debug('AdminClientController.assignWorkflowToClient:', { client_id, template_id });
+    // Validate input with Zod
+    const validatedData = assignWorkflowToClientSchema.parse(req.body);
+    const { template_id, name: customName } = validatedData;
 
-  // Verify client exists
-  const { data: client, error: clientError } = await supabaseAdmin
-    .from('clients')
-    .select('id, name')
-    .eq('id', client_id)
-    .single();
+    logger.debug('AdminClientController.assignWorkflowToClient:', { client_id, template_id });
 
-  if (clientError || !client) {
-    throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
-  }
-
-  // Get template
-  const { data: template, error: templateError } = await supabaseAdmin
-    .from('workflow_templates')
-    .select('*')
-    .eq('id', template_id)
-    .eq('is_active', true)
-    .single();
-
-  if (templateError || !template) {
-    throw new ApiError(404, 'Workflow template not found or inactive', 'TEMPLATE_NOT_FOUND');
-  }
-
-  // NEW ARCHITECTURE: Check if shared workflow exists for this template
-  let { data: sharedWorkflow } = await supabaseAdmin
-    .from('workflows')
-    .select('id, name')
-    .eq('template_id', template_id)
-    .is('client_id', null)
-    .eq('is_shared', true)
-    .eq('status', 'deployed')
-    .maybeSingle();
-
-  let workflowId;
-  let workflowName = customName || template.name;
-
-  if (!sharedWorkflow) {
-    // Create shared workflow (first time for this template)
-    logger.debug('Creating new shared workflow for template:', template_id);
-
-    const { data: newWorkflow, error: insertError } = await supabaseAdmin
-      .from('workflows')
-      .insert([{
-        client_id: null,  // SHARED workflow
-        template_id,
-        name: workflowName,
-        description: template.description,
-        status: 'deployed',
-        config: template.config,
-        cost_per_execution: template.cost_per_execution,
-        revenue_per_execution: template.revenue_per_execution,
-        is_shared: true,
-        created_by_user_id: req.user.id,
-        deployed_at: new Date().toISOString()
-      }])
-      .select()
+    // Verify client exists
+    const { data: client, error: clientError } = await supabaseAdmin
+      .from('clients')
+      .select('id, name')
+      .eq('id', client_id)
       .single();
 
-    if (insertError) {
-      logger.error('AdminClientController.assignWorkflowToClient error:', { error: insertError });
-      throw new ApiError(500, 'Failed to create shared workflow', 'DATABASE_ERROR');
+    if (clientError || !client) {
+      throw new ApiError(404, 'Client not found', 'CLIENT_NOT_FOUND');
     }
 
-    workflowId = newWorkflow.id;
-  } else {
-    // Use existing shared workflow
-    logger.debug('Using existing shared workflow:', sharedWorkflow.id);
-    workflowId = sharedWorkflow.id;
-  }
+    // Get template
+    const { data: template, error: templateError } = await supabaseAdmin
+      .from('workflow_templates')
+      .select('*')
+      .eq('id', template_id)
+      .eq('is_active', true)
+      .single();
 
-  // Check if access already exists
-  const { data: existingAccess } = await supabaseAdmin
-    .from('client_workflows')
-    .select('id, is_active')
-    .eq('client_id', client_id)
-    .eq('workflow_id', workflowId)
-    .maybeSingle();
+    if (templateError || !template) {
+      throw new ApiError(404, 'Workflow template not found or inactive', 'TEMPLATE_NOT_FOUND');
+    }
 
-  if (existingAccess) {
-    if (existingAccess.is_active) {
-      throw new ApiError(400, 'Client already has access to this workflow', 'ALREADY_ASSIGNED');
+    // NEW ARCHITECTURE: Check if shared workflow exists for this template
+    let { data: sharedWorkflow } = await supabaseAdmin
+      .from('workflows')
+      .select('id, name')
+      .eq('template_id', template_id)
+      .is('client_id', null)
+      .eq('is_shared', true)
+      .eq('status', 'deployed')
+      .maybeSingle();
+
+    let workflowId;
+    let workflowName = customName || template.name;
+
+    if (!sharedWorkflow) {
+      // Create shared workflow (first time for this template)
+      logger.debug('Creating new shared workflow for template:', template_id);
+
+      const { data: newWorkflow, error: insertError } = await supabaseAdmin
+        .from('workflows')
+        .insert([{
+          client_id: null,  // SHARED workflow
+          template_id,
+          name: workflowName,
+          description: template.description,
+          status: 'deployed',
+          config: template.config,
+          cost_per_execution: template.cost_per_execution,
+          revenue_per_execution: template.revenue_per_execution,
+          is_shared: true,
+          created_by_user_id: req.user.id,
+          deployed_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (insertError) {
+        logger.error('AdminClientController.assignWorkflowToClient error:', { error: insertError });
+        throw new ApiError(500, 'Failed to create shared workflow', 'DATABASE_ERROR');
+      }
+
+      workflowId = newWorkflow.id;
     } else {
-      // Reactivate access
-      await supabaseAdmin
-        .from('client_workflows')
-        .update({ is_active: true, updated_at: new Date().toISOString() })
-        .eq('id', existingAccess.id);
+      // Use existing shared workflow
+      logger.debug('Using existing shared workflow:', sharedWorkflow.id);
+      workflowId = sharedWorkflow.id;
     }
-  } else {
-    // Grant access via client_workflows junction table
-    const { error: accessError } = await supabaseAdmin
+
+    // Check if access already exists
+    const { data: existingAccess } = await supabaseAdmin
       .from('client_workflows')
-      .insert([{
-        client_id,
-        workflow_id: workflowId,
-        assigned_by: req.user.id,
-        is_active: true
-      }]);
+      .select('id, is_active')
+      .eq('client_id', client_id)
+      .eq('workflow_id', workflowId)
+      .maybeSingle();
 
-    if (accessError) {
-      logger.error('AdminClientController.assignWorkflowToClient - access error:', { error: accessError });
-      throw new ApiError(500, 'Failed to grant workflow access', 'DATABASE_ERROR');
+    if (existingAccess) {
+      if (existingAccess.is_active) {
+        throw new ApiError(400, 'Client already has access to this workflow', 'ALREADY_ASSIGNED');
+      } else {
+        // Reactivate access
+        await supabaseAdmin
+          .from('client_workflows')
+          .update({ is_active: true, updated_at: new Date().toISOString() })
+          .eq('id', existingAccess.id);
+      }
+    } else {
+      // Grant access via client_workflows junction table
+      const { error: accessError } = await supabaseAdmin
+        .from('client_workflows')
+        .insert([{
+          client_id,
+          workflow_id: workflowId,
+          assigned_by: req.user.id,
+          is_active: true
+        }]);
+
+      if (accessError) {
+        logger.error('AdminClientController.assignWorkflowToClient - access error:', { error: accessError });
+        throw new ApiError(500, 'Failed to grant workflow access', 'DATABASE_ERROR');
+      }
     }
+
+    // Audit log
+    await supabaseAdmin.from('audit_logs').insert([{
+      client_id,
+      user_id: req.user.id,
+      action: 'workflow_assigned',
+      resource_type: 'workflow',
+      resource_id: workflowId,
+      changes: {
+        template_name: template.name,
+        workflow_name: workflowName,
+        shared: true
+      },
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Workflow access granted successfully',
+      data: { workflow_id: workflowId, client_id }
+    });
+  } catch (error) {
+    // Handle Zod validation errors
+    if (error instanceof z.ZodError) {
+      logger.error('AdminClientController.assignWorkflowToClient validation error:', { errors: error.errors });
+      return res.status(400).json({
+        success: false,
+        message: 'Validation error',
+        errors: error.errors
+      });
+    }
+
+    // Re-throw ApiErrors to be handled by global error handler
+    if (error instanceof ApiError) {
+      throw error;
+    }
+
+    // Log unexpected errors
+    logger.error('AdminClientController.assignWorkflowToClient error:', {
+      error: error.message,
+      stack: error.stack
+    });
+    throw new ApiError(500, 'Internal server error', 'INTERNAL_ERROR');
   }
-
-  // Audit log
-  await supabaseAdmin.from('audit_logs').insert([{
-    client_id,
-    user_id: req.user.id,
-    action: 'workflow_assigned',
-    resource_type: 'workflow',
-    resource_id: workflowId,
-    changes: {
-      template_name: template.name,
-      workflow_name: workflowName,
-      shared: true
-    },
-    ip_address: req.ip,
-    user_agent: req.get('user-agent')
-  }]);
-
-  res.status(201).json({
-    success: true,
-    message: 'Workflow access granted successfully',
-    data: { workflow_id: workflowId, client_id }
-  });
 }
 
 /**
@@ -850,8 +927,8 @@ async function getClientActivity(req, res) {
 async function searchUsersForMember(req, res) {
   const { q, exclude_client_id } = req.query;
 
-  logger.debug('🔍 AdminClientController.searchUsersForMember: Request received', { 
-    q, 
+  logger.debug('🔍 AdminClientController.searchUsersForMember: Request received', {
+    q,
     exclude_client_id,
     qLength: q?.length,
     qType: typeof q

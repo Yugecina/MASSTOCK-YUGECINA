@@ -29,6 +29,16 @@ async function processNanoBananaWorkflow(job, executionId, inputData, config) {
   const totalPrompts = prompts.length;
   const referenceImagesBase64 = reference_images || [];
 
+  // DEBUG: Log inputData structure
+  logger.debug(`🔍 WORKER INPUT DATA:`, {
+    inputData_keys: Object.keys(inputData),
+    reference_images_type: typeof reference_images,
+    reference_images_is_array: Array.isArray(reference_images),
+    reference_images_value: reference_images,
+    reference_images_length: reference_images?.length,
+    referenceImagesBase64_length: referenceImagesBase64.length
+  });
+
   logger.debug(`\n🎬 Processing Nano Banana workflow - Execution ID: ${executionId}`);
   logger.debug(`   Prompts: ${totalPrompts}, Reference images: ${referenceImagesBase64.length}`);
 

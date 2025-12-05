@@ -453,6 +453,49 @@ export function ExecutionDetail() {
             >
               View Workflow
             </button>
+            <button
+              onClick={() => {
+                // Préparer les données pour pré-remplissage
+                // ⚠️ IMPORTANT: Backend stocke "prompts" (array), on doit le convertir en "prompts_text" (string)
+                const promptsArray = execution.input_data?.prompts || []
+                const promptsText = Array.isArray(promptsArray)
+                  ? promptsArray.join('\n\n')  // Joindre avec double newline (format backend)
+                  : ''
+
+                // Convertir le nom complet du modèle en 'flash' ou 'pro'
+                const modelName = execution.input_data?.model || ''
+                const modelShortName = modelName.toLowerCase().includes('flash') ? 'flash' : 'pro'
+
+                const prefillData = {
+                  prompts_text: promptsText,
+                  model: modelShortName,
+                  aspect_ratio: execution.input_data?.aspect_ratio || '1:1',
+                  resolution: execution.input_data?.resolution || '1K',
+                  reference_images_base64: execution.input_data?.reference_images || null
+                }
+                logger.debug('🔄 ExecutionDetail: Run Again with prefill data', {
+                  workflow_id: execution.workflow_id,
+                  execution_input_data_keys: execution.input_data ? Object.keys(execution.input_data) : [],
+                  prompts_array_length: promptsArray.length,
+                  prefillData: {
+                    prompts_text_length: prefillData.prompts_text.length,
+                    prompts_count: promptsArray.length,
+                    model: prefillData.model,
+                    aspect_ratio: prefillData.aspect_ratio,
+                    resolution: prefillData.resolution,
+                    has_images: !!prefillData.reference_images_base64,
+                    images_type: typeof prefillData.reference_images_base64,
+                    images_keys: prefillData.reference_images_base64 ? Object.keys(prefillData.reference_images_base64) : []
+                  }
+                })
+                navigate(`/workflows/${execution.workflow_id}/execute`, {
+                  state: { prefillData, fromExecutionId: execution.id }
+                })
+              }}
+              className="execution-modal-btn-secondary"
+            >
+              Run Again
+            </button>
           </div>
         )}
       </div>
