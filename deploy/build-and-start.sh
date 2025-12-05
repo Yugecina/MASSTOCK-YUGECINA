@@ -163,7 +163,7 @@ build_frontend() {
     fi
 
     # Set production env variables for build
-    export VITE_API_URL="https://api.dorian-gonzalez.fr/api"
+    export VITE_API_URL="https://api.masstock.fr/api"
     export VITE_ENV="production"
     export VITE_LOG_LEVEL="none"
 
@@ -529,9 +529,10 @@ print_access_info() {
 
     log_success "Services are running:"
     echo ""
-    echo "  🌐 Frontend:  https://dorian-gonzalez.fr"
-    echo "  🔌 API:       https://api.dorian-gonzalez.fr"
-    echo "  📊 Health:    https://api.dorian-gonzalez.fr/health"
+    echo "  🌐 Site vitrine:  https://masstock.fr"
+    echo "  📱 Application:    https://app.masstock.fr"
+    echo "  🔌 API:            https://api.masstock.fr"
+    echo "  📊 Health:         https://api.masstock.fr/health"
     echo ""
 
     log_info "Useful commands:"
