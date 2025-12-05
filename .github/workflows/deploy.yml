@@ -70,16 +70,12 @@ jobs:
             echo "Checking site vitrine..."
             curl -f https://masstock.fr/ || exit 1
 
-            echo "Checking n8n..."
-            curl -f https://n8n.masstock.fr/healthz || exit 1
-
             echo "Checking Docker containers..."
             docker ps | grep masstock_api || exit 1
             docker ps | grep masstock_worker || exit 1
             docker ps | grep masstock_redis || exit 1
             docker ps | grep masstock_app || exit 1
             docker ps | grep masstock_vitrine || exit 1
-            docker ps | grep masstock_n8n || exit 1
 
             echo "✅ All health checks passed!"
           ENDSSH
@@ -104,7 +100,6 @@ jobs:
           echo "Site Vitrine: https://masstock.fr"
           echo "Application: https://app.masstock.fr"
           echo "Backend API: https://api.masstock.fr"
-          echo "n8n: https://n8n.masstock.fr"
 
       - name: Notify failure
         if: failure()
