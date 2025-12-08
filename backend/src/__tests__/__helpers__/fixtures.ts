@@ -3,6 +3,8 @@
  * Provides consistent test data across all tests
  */
 
+import { randomUUID } from 'crypto';
+
 /**
  * User Fixtures
  */
@@ -118,10 +120,10 @@ export function generateTestEmail(prefix: string = 'test'): string {
 }
 
 /**
- * Generate test ID
+ * Generate test ID (UUID v4)
  */
-export function generateTestId(prefix: string = 'test'): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+export function generateTestId(prefix?: string): string {
+  return randomUUID();
 }
 
 /**

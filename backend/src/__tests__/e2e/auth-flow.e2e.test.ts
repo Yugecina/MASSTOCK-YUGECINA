@@ -34,7 +34,7 @@ describe('Authentication Flow E2E', () => {
       expect(response.body.user.email).toBe(context.userEmail);
 
       // Verify httpOnly cookies are set
-      const cookies = response.headers['set-cookie'];
+      const cookies = (response.headers['set-cookie'] as unknown) as string[];
       expect(cookies).toBeDefined();
       expect(cookies.length).toBeGreaterThan(0);
 
@@ -98,7 +98,7 @@ describe('Authentication Flow E2E', () => {
           password: context.userPassword,
         });
 
-      const cookies = loginResponse.headers['set-cookie'];
+      const cookies = (loginResponse.headers['set-cookie'] as unknown) as string[];
       const refreshTokenCookie = cookies.find((c: string) => c.startsWith('refresh_token='));
       refreshToken = refreshTokenCookie?.split(';')[0].split('=')[1] || '';
     });
@@ -112,7 +112,7 @@ describe('Authentication Flow E2E', () => {
       expect(response.body).toHaveProperty('user');
 
       // Verify new access token cookie is set
-      const cookies = response.headers['set-cookie'];
+      const cookies = (response.headers['set-cookie'] as unknown) as string[];
       const accessTokenCookie = cookies?.find((c: string) => c.startsWith('access_token='));
       expect(accessTokenCookie).toBeDefined();
     });
@@ -147,7 +147,7 @@ describe('Authentication Flow E2E', () => {
           password: context.userPassword,
         });
 
-      const cookies = loginResponse.headers['set-cookie'];
+      const cookies = (loginResponse.headers['set-cookie'] as unknown) as string[];
       const accessTokenCookie = cookies.find((c: string) => c.startsWith('access_token='));
       accessToken = accessTokenCookie?.split(';')[0].split('=')[1] || '';
     });
@@ -161,7 +161,7 @@ describe('Authentication Flow E2E', () => {
       expect(response.body).toHaveProperty('message');
 
       // Verify cookies are cleared
-      const cookies = response.headers['set-cookie'];
+      const cookies = (response.headers['set-cookie'] as unknown) as string[];
       expect(cookies).toBeDefined();
 
       const accessTokenCookie = cookies?.find((c: string) => c.includes('access_token'));
@@ -193,7 +193,7 @@ describe('Authentication Flow E2E', () => {
           password: context.userPassword,
         });
 
-      const cookies = loginResponse.headers['set-cookie'];
+      const cookies = (loginResponse.headers['set-cookie'] as unknown) as string[];
       const accessTokenCookie = cookies.find((c: string) => c.startsWith('access_token='));
       accessToken = accessTokenCookie?.split(';')[0].split('=')[1] || '';
     });
