@@ -5,7 +5,7 @@
 
 // Mock the logger module properly for ES module exports
 // MUST be at the top before any imports that use it
-jest.mock('../../config/logger', () => ({
+jest.mock('../../../config/logger', () => ({
   logError: jest.fn(),
   logger: {
     info: jest.fn(),
@@ -19,14 +19,14 @@ jest.mock('../../config/logger', () => ({
   logAudit: jest.fn()
 }));
 
-import { 
+import {
   ApiError,
   notFoundHandler,
   errorHandler,
   asyncHandler,
   validationErrorHandler
- } from '../../middleware/errorHandler';
-import {  logError  } from '../../config/logger';
+ } from '../../../middleware/errorHandler';
+import {  logError  } from '../../../config/logger';
 
 describe('Error Handler Middleware', () => {
   let req, res, next;
