@@ -105,7 +105,12 @@ export async function getWorkflows(req: Request, res: Response): Promise<void> {
  */
 export async function getWorkflow(req: Request, res: Response): Promise<void> {
   const { workflow_id } = req.params;
-  const clientId = (req as any).client.id;
+  const clientId = (req as any).client?.id;
+
+  if (!clientId) {
+    logger.error('❌ No client ID in request');
+    throw new ApiError(403, 'No client account', 'NO_CLIENT');
+  }
 
   // Use a fresh admin client to avoid auth context issues
   const admin = getCleanAdmin();
@@ -209,7 +214,12 @@ export async function getWorkflow(req: Request, res: Response): Promise<void> {
 export async function executeWorkflow(req: Request, res: Response): Promise<void> {
   try {
     const { workflow_id } = req.params;
-    const clientId = (req as any).client.id;
+    const clientId = (req as any).client?.id;
+
+  if (!clientId) {
+    logger.error('❌ No client ID in request');
+    throw new ApiError(403, 'No client account', 'NO_CLIENT');
+  }
     const userId = (req as any).user.id;
 
     // Use a fresh admin client to avoid auth context issues
@@ -262,9 +272,23 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
 
     if (workflow.config.workflow_type === 'nano_banana') {
       // Nano Banana workflow: multipart form data with prompts and images
-      // Use default values if not provided
-      const prompts_text = validatedData.prompts_text || req.body.prompts_text || process.env.DEFAULT_NANO_BANANA_PROMPT;
-      const api_key = validatedData.api_key || req.body.api_key || process.env.DEFAULT_GEMINI_API_KEY;
+      // Validate required fields first (before falling back to defaults)
+      const prompts_text_input = validatedData?.prompts_text || req.body.prompts_text;
+      const prompts_input = req.body.prompts;
+
+      // Check if ANY prompt input is provided
+      if (!prompts_text_input && !prompts_input) {
+        throw new ApiError(400, 'prompts_text or prompts is required', 'MISSING_PROMPTS');
+      }
+
+      // Check if prompts array is empty
+      if (Array.isArray(prompts_input) && prompts_input.length === 0) {
+        throw new ApiError(400, 'prompts array cannot be empty', 'EMPTY_PROMPTS');
+      }
+
+      // Use provided values or fall back to defaults only after validation
+      const prompts_text = prompts_text_input || process.env.DEFAULT_NANO_BANANA_PROMPT;
+      const api_key = validatedData?.api_key || req.body.api_key || process.env.DEFAULT_GEMINI_API_KEY;
       const files = (req as any).files || [];
 
       // DEBUG: Log received files from Multer
@@ -512,7 +536,12 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
  */
 export async function getExecution(req: Request, res: Response): Promise<void> {
   const { execution_id } = req.params;
-  const clientId = (req as any).client.id;
+  const clientId = (req as any).client?.id;
+
+  if (!clientId) {
+    logger.error('❌ No client ID in request');
+    throw new ApiError(403, 'No client account', 'NO_CLIENT');
+  }
 
   // Use a fresh admin client to avoid auth context issues
   const admin = getCleanAdmin();
@@ -579,14 +608,22 @@ export async function getExecution(req: Request, res: Response): Promise<void> {
 export async function getWorkflowExecutions(req: Request, res: Response): Promise<void> {
   try {
     const { workflow_id } = req.params;
-    const clientId = (req as any).client.id;
+    const clientId = (req as any).client?.id;
+
+  if (!clientId) {
+    logger.error('❌ No client ID in request');
+    throw new ApiError(403, 'No client account', 'NO_CLIENT');
+  }
 
     // Validate query parameters with Zod
     const validatedQuery = executionsQuerySchema.parse(req.query);
     const { limit, offset, status } = validatedQuery;
 
+    // Use a fresh admin client to avoid auth context issues
+    const admin = getCleanAdmin();
+
     // Check access via client_workflows junction table
-    const { data: access, error: accessError } = await supabaseAdmin
+    const { data: access, error: accessError } = await admin
       .from('client_workflows')
       .select('workflow_id')
       .eq('client_id', clientId)
@@ -605,7 +642,7 @@ export async function getWorkflowExecutions(req: Request, res: Response): Promis
     }
 
     // Build query with triggered_by user info
-    let query = supabaseAdmin
+    let query = admin
       .from('workflow_executions')
       .select(`
         *,
@@ -664,7 +701,12 @@ export async function getWorkflowExecutions(req: Request, res: Response): Promis
  */
 export async function getWorkflowStats(req: Request, res: Response): Promise<void> {
   const { workflow_id } = req.params;
-  const clientId = (req as any).client.id;
+  const clientId = (req as any).client?.id;
+
+  if (!clientId) {
+    logger.error('❌ No client ID in request');
+    throw new ApiError(403, 'No client account', 'NO_CLIENT');
+  }
 
   // Check access via client_workflows junction table
   const { data: access, error: accessError } = await supabaseAdmin
@@ -754,7 +796,12 @@ export async function getExecutionBatchResults(req: Request, res: Response): Pro
     throw new ApiError(403, 'No client account', 'NO_CLIENT_ACCOUNT');
   }
 
-  const clientId = (req as any).client.id;
+  const clientId = (req as any).client?.id;
+
+  if (!clientId) {
+    logger.error('❌ No client ID in request');
+    throw new ApiError(403, 'No client account', 'NO_CLIENT');
+  }
 
   logger.info('🔍 getExecutionBatchResults: Starting', {
     execution_id,
@@ -871,7 +918,12 @@ export async function getExecutionBatchResults(req: Request, res: Response): Pro
  * Get all members of the current client (for filtering executions by collaborator)
  */
 export async function getClientMembers(req: Request, res: Response): Promise<void> {
-  const clientId = (req as any).client.id;
+  const clientId = (req as any).client?.id;
+
+  if (!clientId) {
+    logger.error('❌ No client ID in request');
+    throw new ApiError(403, 'No client account', 'NO_CLIENT');
+  }
 
   const { data: members, error } = await supabaseAdmin
     .from('client_members')
@@ -917,7 +969,12 @@ export async function getClientMembers(req: Request, res: Response): Promise<voi
  */
 export async function getAllClientExecutions(req: Request, res: Response): Promise<void> {
   try {
-    const clientId = (req as any).client.id;
+    const clientId = (req as any).client?.id;
+
+  if (!clientId) {
+    logger.error('❌ No client ID in request');
+    throw new ApiError(403, 'No client account', 'NO_CLIENT');
+  }
 
     // Validate query parameters with Zod
     const validatedQuery = executionsQuerySchema.parse(req.query);
@@ -1087,7 +1144,12 @@ export async function getAllClientExecutions(req: Request, res: Response): Promi
  * Get aggregated stats for client dashboard
  */
 export async function getDashboardStats(req: Request, res: Response): Promise<void> {
-  const clientId = (req as any).client.id;
+  const clientId = (req as any).client?.id;
+
+  if (!clientId) {
+    logger.error('❌ No client ID in request');
+    throw new ApiError(403, 'No client account', 'NO_CLIENT');
+  }
 
   // Use a fresh admin client to avoid auth context issues
   const admin = getCleanAdmin();

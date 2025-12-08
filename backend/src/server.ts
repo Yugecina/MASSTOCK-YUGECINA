@@ -4,6 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { logger } from './config/logger';
+import { errorHandler } from './middleware/errorHandler';
 import authRoutes from './routes/authRoutes';
 import workflowRoutes from './routes/workflowRoutes';
 import executionRoutes from './routes/executionRoutes';
@@ -56,10 +57,8 @@ app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/assets', assetsRoutes);
 app.use('/api/v1/admin', adminRoutes);
 
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
-  logger.error('Unhandled error', { error: err.message, stack: err.stack });
-  res.status(500).json({ error: 'Internal server error' });
-});
+// Global error handler (must be last middleware)
+app.use(errorHandler);
 
 // Start server if called directly
 if (require.main === module) {

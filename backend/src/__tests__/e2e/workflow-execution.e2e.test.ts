@@ -28,40 +28,12 @@ describe('Workflow Execution Flow E2E', () => {
     const accessTokenCookie = cookies.find((c: string) => c.startsWith('access_token='));
     accessToken = accessTokenCookie?.split(';')[0].split('=')[1] || '';
 
-    // Find an existing workflow (any status)
-    const { data: existingWorkflows, error: workflowError } = await supabaseAdmin
-      .from('workflows')
-      .select('id, name')
-      .limit(1);
-
-    if (workflowError || !existingWorkflows || existingWorkflows.length === 0) {
-      throw new Error(`No active workflows found in database: ${workflowError?.message}`);
-    }
-
-    testWorkflowId = existingWorkflows[0].id;
-
-    // Check if workflow is already assigned to test client
-    const { data: existingAssignment } = await supabaseAdmin
-      .from('client_workflows')
-      .select('id')
-      .eq('client_id', context.clientId)
-      .eq('workflow_id', testWorkflowId)
-      .single();
-
-    // Assign workflow to test client if not already assigned
-    if (!existingAssignment) {
-      const { error: assignError } = await supabaseAdmin
-        .from('client_workflows')
-        .insert({
-          client_id: context.clientId,
-          workflow_id: testWorkflowId,
-          is_active: true
-        });
-
-      if (assignError) {
-        throw new Error(`Failed to assign workflow: ${assignError.message}`);
-      }
-    }
+    // Use the known workflow ID (Image Factory)
+    // This workflow should be pre-assigned to the E2E test client via:
+    // INSERT INTO client_workflows (client_id, workflow_id, is_active)
+    // VALUES ('52d46ee8-4f95-4361-b2cf-6b6bd537fc92',
+    //         'f8b20b59-7d06-4599-8413-64da74225b0c', true);
+    testWorkflowId = 'f8b20b59-7d06-4599-8413-64da74225b0c';
   });
 
   afterAll(async () => {
@@ -84,6 +56,14 @@ describe('Workflow Execution Flow E2E', () => {
       const response = await request(app)
         .get('/api/v1/workflows')
         .set('Cookie', [`access_token=${accessToken}`]);
+
+      if (response.status !== 200) {
+        console.error('❌ Workflow list failed:', {
+          status: response.status,
+          body: response.body,
+          error: response.body?.error
+        });
+      }
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('success', true);
@@ -115,9 +95,12 @@ describe('Workflow Execution Flow E2E', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('success', true);
-      expect(response.body.data).toHaveProperty('id', testWorkflowId);
-      expect(response.body.data).toHaveProperty('name');
-      expect(response.body.data).toHaveProperty('status');
+      expect(response.body.data).toHaveProperty('workflow');
+      expect(response.body.data.workflow).toHaveProperty('id', testWorkflowId);
+      expect(response.body.data.workflow).toHaveProperty('name');
+      expect(response.body.data.workflow).toHaveProperty('status');
+      expect(response.body.data).toHaveProperty('stats');
+      expect(response.body.data).toHaveProperty('recent_executions');
     });
 
     it('should return 404 for non-existent workflow', async () => {
