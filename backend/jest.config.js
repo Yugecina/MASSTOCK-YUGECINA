@@ -2,18 +2,31 @@ module.exports = {
   // Test environment
   testEnvironment: 'node',
 
-  // Test file patterns
+  // TypeScript support
+  preset: 'ts-jest',
+
+  // Test file patterns (support both .js and .ts)
   testMatch: [
     '**/__tests__/**/*.test.js',
+    '**/__tests__/**/*.test.ts',
     '**/__tests__/**/*.spec.js',
+    '**/__tests__/**/*.spec.ts',
   ],
 
-  // Coverage configuration
+  // Transform TypeScript files
+  transform: {
+    '^.+\\.ts$': 'ts-jest',
+  },
+
+  // Coverage configuration (support both .js and .ts)
   collectCoverageFrom: [
     'src/**/*.js',
+    'src/**/*.ts',
     '!src/server.js',
+    '!src/server.ts',
     '!src/**/__tests__/**',
     '!src/**/index.js',
+    '!src/**/index.ts',
   ],
 
   coverageThreshold: {

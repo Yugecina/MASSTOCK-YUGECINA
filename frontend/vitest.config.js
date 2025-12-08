@@ -26,7 +26,10 @@ export default defineConfig({
         '**/*.config.js',
         '**/*.spec.js',
         '**/*.test.js',
+        '**/*.spec.ts',
+        '**/*.test.ts',
         '**/index.js',
+        '**/index.ts',
       ],
       thresholds: {
         branches: 70,
@@ -36,8 +39,8 @@ export default defineConfig({
       },
     },
 
-    // Test file patterns
-    include: ['src/**/__tests__/**/*.{test,spec}.{js,jsx}'],
+    // Test file patterns - now includes TypeScript files
+    include: ['src/**/__tests__/**/*.{test,spec}.{js,jsx,ts,tsx}'],
 
     // Watch options
     watch: false,
