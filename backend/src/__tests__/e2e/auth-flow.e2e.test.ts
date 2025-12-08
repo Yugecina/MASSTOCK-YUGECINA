@@ -58,7 +58,8 @@ describe('Authentication Flow E2E', () => {
         });
 
       expect(response.status).toBe(401);
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.status).toBe(401);
     });
 
     it('should return 400 with missing credentials', async () => {
@@ -70,7 +71,8 @@ describe('Authentication Flow E2E', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.message).toContain('Validation');
     });
 
     it('should return 400 with invalid email format', async () => {
@@ -82,7 +84,8 @@ describe('Authentication Flow E2E', () => {
         });
 
       expect(response.status).toBe(400);
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.message).toContain('Validation');
     });
   });
 
@@ -109,7 +112,8 @@ describe('Authentication Flow E2E', () => {
         .set('Cookie', [`refresh_token=${refreshToken}`]);
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('user');
+      expect(response.body).toHaveProperty('session');
+      expect(response.body.success).toBe(true);
 
       // Verify new access token cookie is set
       const cookies = (response.headers['set-cookie'] as unknown) as string[];
@@ -122,7 +126,8 @@ describe('Authentication Flow E2E', () => {
         .post('/api/v1/auth/refresh');
 
       expect(response.status).toBe(401);
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.code).toBe('NO_REFRESH_TOKEN');
     });
 
     it('should return 401 with invalid refresh token', async () => {
@@ -131,7 +136,8 @@ describe('Authentication Flow E2E', () => {
         .set('Cookie', ['refresh_token=invalid-token']);
 
       expect(response.status).toBe(401);
-      expect(response.body).toHaveProperty('error');
+      expect(response.body).toHaveProperty('message');
+      expect(response.body.code).toBe('INVALID_REFRESH_TOKEN');
     });
   });
 
@@ -167,9 +173,9 @@ describe('Authentication Flow E2E', () => {
       const accessTokenCookie = cookies?.find((c: string) => c.includes('access_token'));
       const refreshTokenCookie = cookies?.find((c: string) => c.includes('refresh_token'));
 
-      // Cleared cookies should have Max-Age=0 or expire in the past
-      expect(accessTokenCookie).toContain('Max-Age=0');
-      expect(refreshTokenCookie).toContain('Max-Age=0');
+      // Cleared cookies should have Max-Age=0 or Expires in the past (Thu, 01 Jan 1970)
+      expect(accessTokenCookie).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/);
+      expect(refreshTokenCookie).toMatch(/Max-Age=0|Expires=Thu, 01 Jan 1970/);
     });
 
     it('should return 401 without access token', async () => {

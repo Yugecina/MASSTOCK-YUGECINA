@@ -1,78 +1,62 @@
 /**
  * E2E Test Setup
  * Provides utilities for end-to-end testing with real database
+ *
+ * IMPORTANT: E2E tests use EXISTING users in the database, not dynamically created ones.
+ * This avoids slow Supabase Auth Admin API calls and rate limiting issues.
  */
 
 import { supabaseAdmin } from '../../config/database';
-import { generateTestId, generateTestEmail } from './fixtures';
 
 export interface E2ETestContext {
   clientId: string;
   userId: string;
   userEmail: string;
   userPassword: string;
-  cleanup: () => Promise<void>;
+  cleanup?: () => Promise<void>;
 }
 
 /**
- * Setup E2E test with isolated test data
- * Creates a test client and user, returns cleanup function
+ * Setup E2E test - uses EXISTING test user from database
+ * This avoids slow Auth API calls and focuses on testing the actual endpoints
  */
 export async function setupE2ETest(): Promise<E2ETestContext> {
-  const clientId = generateTestId('test-client');
-  const userEmail = generateTestEmail('e2e-user');
-  const userPassword = 'Test123!@#';
+  // Use a known test user that should exist in your database
+  // You should manually create this user once in your Supabase dashboard:
+  // Email: e2e-test@masstock.fr
+  // Password: E2eTest123!@#
+  // Role: user
 
-  // Create test client
-  const { data: client, error: clientError } = await supabaseAdmin
-    .from('clients')
-    .insert({
-      id: clientId,
-      name: `E2E Test Client ${clientId}`,
-      status: 'active',
-    })
-    .select()
+  const testEmail = 'e2e-test@masstock.fr';
+  const testPassword = 'E2eTest123!@#';
+
+  // Try to find the existing test user
+  const { data: existingUser, error: userError } = await supabaseAdmin
+    .from('users')
+    .select('id, email, client_id')
+    .eq('email', testEmail)
     .single();
 
-  if (clientError) {
-    throw new Error(`Failed to create test client: ${clientError.message}`);
+  if (userError || !existingUser) {
+    throw new Error(
+      `E2E test user not found: ${testEmail}\n\n` +
+      `Please create this user manually in your Supabase dashboard:\n` +
+      `1. Go to Authentication > Users\n` +
+      `2. Create user with email: ${testEmail}\n` +
+      `3. Set password: ${testPassword}\n` +
+      `4. Confirm email\n` +
+      `5. Ensure user record exists in 'users' table with role='user'\n\n` +
+      `Error: ${userError?.message || 'User not found'}`
+    );
   }
 
-  // Create test user in auth
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    email: userEmail,
-    password: userPassword,
-    email_confirm: true,
-  });
-
-  if (authError || !authData.user) {
-    throw new Error(`Failed to create test user: ${authError?.message}`);
-  }
-
-  const userId = authData.user.id;
-
-  // Create user record in database
-  const { error: userError } = await supabaseAdmin
-    .from('users')
-    .insert({
-      id: userId,
-      email: userEmail,
-      client_id: clientId,
-      role: 'user',
-      status: 'active',
-    });
-
-  if (userError) {
-    throw new Error(`Failed to create user record: ${userError.message}`);
-  }
-
-  // Return context with cleanup function
+  // Return context (no cleanup needed for existing user)
   return {
-    clientId,
-    userId,
-    userEmail,
-    userPassword,
-    cleanup: async () => await cleanupE2ETest(clientId, userId),
+    clientId: existingUser.client_id,
+    userId: existingUser.id,
+    userEmail: existingUser.email,
+    userPassword: testPassword,
+    cleanup: undefined, // No cleanup for existing users
   };
 }
 
