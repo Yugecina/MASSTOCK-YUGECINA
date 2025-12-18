@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none">
+  <!-- MasStock Logo Icon - Square with M -->
+
+  <!-- Background Square -->
+  <rect width="48" height="48" rx="6" fill="#2E6B7B"/>
+
+  <!-- M Letter in White -->
+  <path
+    d="M 12 36 L 12 12 L 17 19 L 24 12 L 31 19 L 36 12 L 36 36 L 31 36 L 31 24 L 24 32 L 17 24 L 17 36 Z"
+    fill="#FFFFFF"
+  />
+</svg>
