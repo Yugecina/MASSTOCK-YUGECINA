@@ -29,7 +29,12 @@ app.use(helmet({
       scriptSrc: ["'self'"],
       styleSrc: ["'self'", "'unsafe-inline'"],
       imgSrc: ["'self'", "data:", "blob:", "https:"],
-      connectSrc: ["'self'", process.env.CORS_ORIGIN || 'http://localhost:5173'],
+      connectSrc: [
+        "'self'",
+        process.env.CORS_ORIGIN || 'http://localhost:5173',
+        'https://masstock.fr',
+        'https://www.masstock.fr'
+      ],
     }
   },
   crossOriginEmbedderPolicy: false, // Allow cross-origin images
@@ -39,8 +44,10 @@ app.use(helmet({
 const corsOptions = {
   origin: [
     process.env.CORS_ORIGIN || 'http://localhost:5173',
-    'http://localhost:5174', // Frontend vitrine (landing page)
-    'http://localhost:3002'  // Frontend vitrine (alt port)
+    'http://localhost:5174', // Frontend vitrine (landing page - dev)
+    'http://localhost:3002',  // Frontend vitrine (alt port - dev)
+    'https://masstock.fr',    // Frontend vitrine (production)
+    'https://www.masstock.fr' // Frontend vitrine (production with www)
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
