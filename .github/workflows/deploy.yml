@@ -1,10 +1,9 @@
 name: Deploy to Production
 
 on:
-  # Auto-deploy disabled - use manual trigger only
-  # push:
-  #   branches: [main]
-  workflow_dispatch: # Manual trigger only (safer for CORS deployment)
+  push:
+    branches: [main]
+  workflow_dispatch: # Keep manual trigger option
 
 jobs:
   deploy:
@@ -43,8 +42,15 @@ jobs:
             git fetch origin
             git reset --hard origin/main
 
+            echo "🗄️  Running database migrations..."
+            cd backend && npm run migrate && cd ..
+
             echo "🏗️  Building and restarting services..."
             ./deploy/build-and-start.sh --rebuild
+
+            echo "📊 Setting up monitoring..."
+            chmod +x deploy/setup-monitoring.sh
+            ./deploy/setup-monitoring.sh --interval 5
 
             echo "✅ Deployment complete!"
           ENDSSH
