@@ -1,0 +1,45 @@
+# Node modules (will be installed in container)
+node_modules
+npm-debug.log
+
+# Build output
+dist
+
+# Test files
+**/*.test.ts
+**/*.test.js
+**/__tests__/**
+src/__tests__
+coverage
+jest.config.js
+jest.setup.js
+
+# Environment files (will be copied separately)
+.env
+.env.local
+.env.development
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
+
+# Uploads (not needed in build)
+uploads
+
+# Documentation
+*.md
+!README.md
+
+# OS files
+.DS_Store
+Thumbs.db

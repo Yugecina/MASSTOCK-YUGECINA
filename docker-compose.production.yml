@@ -57,7 +57,7 @@ services:
       target: production
     container_name: masstock_worker
     restart: unless-stopped
-    command: npm run worker
+    command: npm run worker:prod
     depends_on:
       redis:
         condition: service_healthy

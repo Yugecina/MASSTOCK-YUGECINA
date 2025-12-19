@@ -4,8 +4,9 @@
   "description": "MasStock SaaS Backend - Workflow automation for AI content agencies",
   "main": "src/server.ts",
   "scripts": {
-    "start": "ts-node src/server.ts",
+    "start": "node dist/server.js",
     "dev": "nodemon src/server.ts",
+    "build": "tsc",
     "test": "jest --coverage",
     "test:unit": "jest --testPathIgnorePatterns=integration",
     "test:integration": "jest --testPathPattern=integration",
@@ -15,7 +16,9 @@
     "test:changed": "jest --onlyChanged",
     "test:file": "jest --findRelatedTests",
     "migrate": "ts-node src/database/migrate.ts",
-    "worker": "ts-node src/workers/workflow-worker.ts"
+    "migrate:prod": "node dist/database/migrate.js",
+    "worker": "ts-node src/workers/workflow-worker.ts",
+    "worker:prod": "node dist/workers/workflow-worker.js"
   },
   "keywords": [
     "saas",
