@@ -103,11 +103,12 @@ backend/
 
 **✅ DO: Zod Validation + Try/Catch + Winston Logging**
 
-Example: `src/controllers/authController.js`
-```javascript
-const { supabaseAdmin } = require('../config/database');
-const { logger } = require('../config/logger');
-const { z } = require('zod');
+Example: `src/controllers/authController.ts`
+```typescript
+import { Request, Response } from 'express';
+import { supabaseAdmin } from '../config/database';
+import { logger } from '../config/logger';
+import { z } from 'zod';
 
 // Define Zod schema
 const loginSchema = z.object({
@@ -115,7 +116,7 @@ const loginSchema = z.object({
   password: z.string().min(8, 'Password must be at least 8 characters')
 });
 
-async function login(req, res) {
+export async function login(req: Request, res: Response): Promise<void> {
   try {
     // 1. Validate input with Zod
     const validatedData = loginSchema.parse(req.body);
@@ -129,17 +130,18 @@ async function login(req, res) {
 
     if (error) {
       logger.error('Login failed', { email, error: error.message });
-      return res.status(401).json({
+      res.status(401).json({
         message: 'Invalid credentials',
         status: 401
       });
+      return;
     }
 
     // 3. Set httpOnly cookies
     const cookieOptions = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      sameSite: 'lax' as const,
       maxAge: 15 * 60 * 1000 // 15 minutes
     };
 
@@ -155,19 +157,18 @@ async function login(req, res) {
   } catch (error) {
     // Handle Zod validation errors
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         message: 'Validation error',
         errors: error.errors
       });
+      return;
     }
 
     // Log and return generic error
-    logger.error('Login error', { error: error.message });
+    logger.error('Login error', { error: (error as Error).message });
     res.status(500).json({ message: 'Internal server error' });
   }
 }
-
-module.exports = { login };
 ```
 
 **Pattern:**
@@ -179,15 +180,15 @@ module.exports = { login };
 6. Export functions
 
 **❌ DON'T:**
-```javascript
+```typescript
 // ❌ No validation
-async function login(req, res) {
+async function login(req: Request, res: Response) {
   const { email, password } = req.body; // Dangerous!
   // ...
 }
 
 // ❌ No error logging
-async function login(req, res) {
+async function login(req: Request, res: Response) {
   try {
     // ...
   } catch (error) {
@@ -205,12 +206,23 @@ res.json({ token: 'xxx' }); // Should be httpOnly cookie!
 
 **✅ DO: Extract to Middleware for Reusability**
 
-Example: `src/middleware/auth.js`
-```javascript
-const { supabaseAdmin } = require('../config/database');
-const { logger } = require('../config/logger');
+Example: `src/middleware/auth.ts`
+```typescript
+import { Request, Response, NextFunction } from 'express';
+import { User } from '@supabase/supabase-js';
+import { supabaseAdmin } from '../config/database';
+import { logger } from '../config/logger';
 
-async function authenticate(req, res, next) {
+// Extend Express Request type to include user
+export interface AuthenticatedRequest extends Request {
+  user?: User;
+}
+
+export async function authenticate(
+  req: AuthenticatedRequest,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   try {
     // 1. Extract token from httpOnly cookie
     let token = req.cookies?.access_token;
@@ -224,20 +236,22 @@ async function authenticate(req, res, next) {
     }
 
     if (!token) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Missing authorization token',
         code: 'UNAUTHORIZED'
       });
+      return;
     }
 
     // 2. Verify token with Supabase
     const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
 
     if (error || !user) {
-      return res.status(401).json({
+      res.status(401).json({
         error: 'Invalid or expired token',
         code: 'UNAUTHORIZED'
       });
+      return;
     }
 
     // 3. Attach user to request
@@ -245,18 +259,16 @@ async function authenticate(req, res, next) {
     next();
 
   } catch (error) {
-    logger.error('Auth middleware error', { error: error.message });
+    logger.error('Auth middleware error', { error: (error as Error).message });
     res.status(500).json({ error: 'Internal server error' });
   }
 }
-
-module.exports = { authenticate };
 ```
 
 **Common Middleware:**
-- `src/middleware/auth.js` - JWT verification
-- `src/middleware/rateLimiter.js` - Rate limiting
-- `src/middleware/errorHandler.js` - Global error handler
+- `src/middleware/auth.ts` - JWT verification
+- `src/middleware/rateLimiter.ts` - Rate limiting
+- `src/middleware/errorHandler.ts` - Global error handler
 
 ---
 
@@ -264,13 +276,14 @@ module.exports = { authenticate };
 
 **✅ DO: Separate Routes from Controllers**
 
-Example: `src/routes/authRoutes.js`
-```javascript
-const express = require('express');
+Example: `src/routes/authRoutes.ts`
+```typescript
+import express from 'express';
+import { login, refresh, logout } from '../controllers/authController';
+import { authenticate } from '../middleware/auth';
+import { rateLimiter } from '../middleware/rateLimiter';
+
 const router = express.Router();
-const { login, refresh, logout } = require('../controllers/authController');
-const { authenticate } = require('../middleware/auth');
-const { rateLimiter } = require('../middleware/rateLimiter');
 
 // Public routes with rate limiting
 router.post('/login', rateLimiter.auth, login);
@@ -279,7 +292,7 @@ router.post('/refresh', rateLimiter.auth, refresh);
 // Protected routes
 router.post('/logout', authenticate, logout);
 
-module.exports = router;
+export default router;
 ```
 
 **Pattern:**
@@ -289,10 +302,10 @@ module.exports = router;
 4. Define routes with middleware chain
 5. Export router
 
-**Route Registration in `src/server.js`:**
-```javascript
-const authRoutes = require('./routes/authRoutes');
-const workflowRoutes = require('./routes/workflowRoutes');
+**Route Registration in `src/server.ts`:**
+```typescript
+import authRoutes from './routes/authRoutes';
+import workflowRoutes from './routes/workflowRoutes';
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/workflows', workflowRoutes);
@@ -304,22 +317,33 @@ app.use('/api/v1/workflows', workflowRoutes);
 
 **✅ DO: Encapsulate External API Logic**
 
-Example: `src/services/geminiImageService.js`
-```javascript
-const axios = require('axios');
-const { logger } = require('../config/logger');
+Example: `src/services/geminiImageService.ts`
+```typescript
+import axios, { AxiosError } from 'axios';
+import { logger } from '../config/logger';
+
+interface GeminiOptions {
+  [key: string]: unknown;
+}
+
+interface GeminiResponse {
+  predictions?: unknown[];
+}
 
 class GeminiImageService {
+  private apiKey: string;
+  private baseUrl: string;
+
   constructor() {
-    this.apiKey = process.env.GEMINI_API_KEY;
+    this.apiKey = process.env.GEMINI_API_KEY || '';
     this.baseUrl = 'https://generativelanguage.googleapis.com/v1beta';
   }
 
-  async generateImage(prompt, options = {}) {
+  async generateImage(prompt: string, options: GeminiOptions = {}): Promise<GeminiResponse> {
     try {
       logger.debug('Generating image with Gemini', { prompt, options });
 
-      const response = await axios.post(
+      const response = await axios.post<GeminiResponse>(
         `${this.baseUrl}/models/imagen-3.0-generate-001:predict`,
         {
           instances: [{ prompt }],
@@ -340,16 +364,17 @@ class GeminiImageService {
       return response.data;
 
     } catch (error) {
+      const axiosError = error as AxiosError;
       logger.error('Gemini API error', {
-        error: error.message,
-        response: error.response?.data
+        error: axiosError.message,
+        response: axiosError.response?.data
       });
       throw error;
     }
   }
 }
 
-module.exports = new GeminiImageService();
+export default new GeminiImageService();
 ```
 
 **Pattern:**
@@ -364,14 +389,26 @@ module.exports = new GeminiImageService();
 
 **✅ DO: Use Bull for Async Processing**
 
-Example: `src/workers/workflow-worker.js`
-```javascript
-const { workflowQueue } = require('../queues/workflowQueue');
-const geminiService = require('../services/geminiImageService');
-const { logger } = require('../config/logger');
+Example: `src/workers/workflow-worker.ts`
+```typescript
+import { Job } from 'bull';
+import { workflowQueue } from '../queues/workflowQueue';
+import geminiService from '../services/geminiImageService';
+import { logger } from '../config/logger';
+
+interface WorkflowJobData {
+  executionId: string;
+  prompts: string[];
+  config: Record<string, unknown>;
+}
+
+interface WorkflowResult {
+  executionId: string;
+  results: unknown[];
+}
 
 // Process workflow jobs
-workflowQueue.process(async (job) => {
+workflowQueue.process(async (job: Job<WorkflowJobData>): Promise<WorkflowResult> => {
   const { executionId, prompts, config } = job.data;
 
   logger.debug('Processing workflow', { executionId, promptCount: prompts.length });
@@ -392,18 +429,18 @@ workflowQueue.process(async (job) => {
   } catch (error) {
     logger.error('Workflow processing failed', {
       executionId,
-      error: error.message
+      error: (error as Error).message
     });
     throw error;
   }
 });
 
 // Event listeners
-workflowQueue.on('completed', (job, result) => {
+workflowQueue.on('completed', (job: Job, result: WorkflowResult) => {
   logger.debug('Workflow completed', { jobId: job.id });
 });
 
-workflowQueue.on('failed', (job, err) => {
+workflowQueue.on('failed', (job: Job, err: Error) => {
   logger.error('Workflow failed', { jobId: job.id, error: err.message });
 });
 
@@ -417,14 +454,14 @@ logger.debug('Workflow worker started');
 - Handle errors gracefully
 
 **Queue Configuration:**
-Example: `src/queues/workflowQueue.js`
-```javascript
-const Queue = require('bull');
-const Redis = require('ioredis');
+Example: `src/queues/workflowQueue.ts`
+```typescript
+import Queue from 'bull';
+import Redis from 'ioredis';
 
-const redisClient = new Redis(process.env.REDIS_URL);
+const redisClient = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
 
-const workflowQueue = new Queue('workflow-queue', {
+export const workflowQueue = new Queue('workflow-queue', {
   redis: redisClient,
   defaultJobOptions: {
     attempts: 3,
@@ -436,8 +473,6 @@ const workflowQueue = new Queue('workflow-queue', {
     removeOnFail: false
   }
 });
-
-module.exports = { workflowQueue };
 ```
 
 ---
@@ -447,8 +482,9 @@ module.exports = { workflowQueue };
 **✅ DO: Use Supabase Client with RLS**
 
 Example: Query with RLS
-```javascript
-const { supabaseAdmin } = require('../config/database');
+```typescript
+import { supabaseAdmin } from '../config/database';
+import { logger } from '../config/logger';
 
 // Query respects RLS policies
 const { data, error } = await supabaseAdmin
@@ -465,7 +501,7 @@ return data;
 ```
 
 **Common Patterns:**
-```javascript
+```typescript
 // SELECT
 const { data, error } = await supabaseAdmin
   .from('table')
@@ -496,7 +532,7 @@ const { error } = await supabaseAdmin
 ```
 
 **❌ DON'T:**
-```javascript
+```typescript
 // ❌ Direct SQL (use Supabase client instead)
 const result = await db.query('SELECT * FROM users WHERE id = $1', [userId]);
 
@@ -576,7 +612,7 @@ res.json({ apiKey: process.env.SUPABASE_SERVICE_ROLE_KEY }); // NEVER!
 ### API Response Format
 
 **✅ Success Response:**
-```javascript
+```typescript
 res.status(200).json({
   success: true,
   data: { /* result */ }
@@ -584,7 +620,7 @@ res.status(200).json({
 ```
 
 **✅ Error Response:**
-```javascript
+```typescript
 res.status(400).json({
   success: false,
   error: 'Descriptive error message',
@@ -594,8 +630,12 @@ res.status(400).json({
 
 ### Error Handling Pattern
 
-```javascript
-async function controllerFunction(req, res) {
+```typescript
+import { Request, Response } from 'express';
+import { z } from 'zod';
+import { logger } from '../config/logger';
+
+async function controllerFunction(req: Request, res: Response): Promise<void> {
   try {
     // Validate input
     const validated = schema.parse(req.body);
@@ -609,18 +649,20 @@ async function controllerFunction(req, res) {
   } catch (error) {
     // Zod validation errors
     if (error instanceof z.ZodError) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Validation error',
         details: error.errors
       });
+      return;
     }
 
     // Log unexpected errors
+    const err = error as Error;
     logger.error('Controller error', {
       function: 'controllerFunction',
-      error: error.message,
-      stack: error.stack
+      error: err.message,
+      stack: err.stack
     });
 
     // Generic error response
@@ -634,10 +676,13 @@ async function controllerFunction(req, res) {
 
 ### Pagination Pattern
 
-```javascript
-async function getItems(req, res) {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 20;
+```typescript
+import { Request, Response } from 'express';
+import { supabaseAdmin } from '../config/database';
+
+async function getItems(req: Request, res: Response): Promise<void> {
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 20;
   const offset = (page - 1) * limit;
 
   const { data, error, count } = await supabaseAdmin
@@ -651,7 +696,7 @@ async function getItems(req, res) {
       page,
       limit,
       total: count,
-      totalPages: Math.ceil(count / limit)
+      totalPages: Math.ceil((count || 0) / limit)
     }
   });
 }
@@ -750,10 +795,10 @@ rg -n "describe\(|it\(" backend/src/__tests__
 
 **Pattern:** AAA (Arrange, Act, Assert)
 
-**Example:** `src/__tests__/controllers/authController.test.js`
-```javascript
-const request = require('supertest');
-const app = require('../../server');
+**Example:** `src/__tests__/controllers/authController.test.ts`
+```typescript
+import request from 'supertest';
+import app from '../../server';
 
 describe('Auth Controller', () => {
   describe('POST /api/v1/auth/login', () => {
@@ -793,8 +838,11 @@ describe('Auth Controller', () => {
 
 **Purpose:** Test full request/response cycle with database
 
-**Example:** `src/__tests__/integration/auth-persistence.integration.test.js`
-```javascript
+**Example:** `src/__tests__/integration/auth-persistence.integration.test.ts`
+```typescript
+import request from 'supertest';
+import app from '../../server';
+
 describe('Auth Persistence Integration', () => {
   it('should maintain session across requests', async () => {
     // Login
@@ -816,7 +864,7 @@ describe('Auth Persistence Integration', () => {
 
 ### Mocking Supabase
 
-```javascript
+```typescript
 jest.mock('../config/database', () => ({
   supabaseAdmin: {
     auth: {

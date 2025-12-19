@@ -117,13 +117,25 @@ frontend/
 
 **✅ DO: Functional Components + Hooks + Pure CSS**
 
-Example: `src/components/admin/WorkflowTable.jsx`
-```javascript
+Example: `src/components/admin/WorkflowTable.tsx`
+```typescript
 import React from 'react';
 
-export function WorkflowTable({ workflows = [], onViewDetails, loading = false }) {
+interface Workflow {
+  id: string;
+  name: string;
+  status: 'deployed' | 'draft' | string;
+}
+
+interface WorkflowTableProps {
+  workflows?: Workflow[];
+  onViewDetails: (id: string) => void;
+  loading?: boolean;
+}
+
+export function WorkflowTable({ workflows = [], onViewDetails, loading = false }: WorkflowTableProps) {
   // Helper functions
-  const getStatusBadgeClass = (status) => {
+  const getStatusBadgeClass = (status: string): string => {
     switch (status) {
       case 'deployed':
         return 'badge-success';  // CSS class from components.css
@@ -203,7 +215,7 @@ export function WorkflowTable({ workflows = [], onViewDetails, loading = false }
 6. Inline styles only for dynamic values using CSS variables
 
 **❌ DON'T:**
-```javascript
+```typescript
 // ❌ Class components
 class WorkflowTable extends React.Component { }
 

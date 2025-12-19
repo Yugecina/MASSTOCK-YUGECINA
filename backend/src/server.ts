@@ -13,6 +13,7 @@ import supportTicketRoutes from './routes/supportTicketRoutes';
 import settingsRoutes from './routes/settingsRoutes';
 import adminRoutes from './routes/adminRoutes';
 import assetsRoutes from './routes/assetsRoutes';
+import contactRoutes from './routes/contactRoutes';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -34,10 +35,24 @@ app.use(helmet({
   crossOriginEmbedderPolicy: false, // Allow cross-origin images
 }));
 
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
-  credentials: true
-}));
+// CORS configuration with explicit preflight handling (Defense in Depth)
+const corsOptions = {
+  origin: [
+    process.env.CORS_ORIGIN || 'http://localhost:5173',
+    'http://localhost:5174', // Frontend vitrine (landing page)
+    'http://localhost:3002'  // Frontend vitrine (alt port)
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['set-cookie'],
+  maxAge: 86400 // 24 hours - cache preflight response
+};
+
+app.use(cors(corsOptions));
+
+// Explicit OPTIONS handling for all routes (preflight requests)
+app.options('*', cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -49,6 +64,7 @@ app.get('/health', (req: Request, res: Response) => {
 
 // API Routes - v1
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/contact', contactRoutes); // Public contact form (no auth)
 app.use('/api/v1/workflows', workflowRoutes);
 app.use('/api/v1/executions', executionRoutes);
 app.use('/api/v1/workflow-requests', workflowRequestRoutes);

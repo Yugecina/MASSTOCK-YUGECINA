@@ -293,6 +293,23 @@ server {
 
     # Proxy to MasStock API container
     location / {
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # CORS - Defense in Depth (handled by nginx + backend)
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+        # Handle preflight OPTIONS requests at nginx level
+        if ($request_method = 'OPTIONS') {
+            add_header 'Access-Control-Allow-Origin' 'https://app.masstock.fr' always;
+            add_header 'Access-Control-Allow-Credentials' 'true' always;
+            add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, PATCH, OPTIONS' always;
+            add_header 'Access-Control-Allow-Headers' 'Content-Type, Authorization, X-Requested-With' always;
+            add_header 'Access-Control-Max-Age' 86400 always;
+            add_header 'Content-Length' 0;
+            add_header 'Content-Type' 'text/plain charset=UTF-8';
+            return 204;
+        }
+
+        # Proxy to backend
         proxy_pass http://masstock_api;
 
         # Standard proxy headers
@@ -314,6 +331,12 @@ server {
         proxy_buffering on;
         proxy_buffer_size 8k;
         proxy_buffers 16 8k;
+
+        # Pass through CORS headers from backend (double protection)
+        proxy_pass_header Access-Control-Allow-Origin;
+        proxy_pass_header Access-Control-Allow-Credentials;
+        proxy_pass_header Access-Control-Allow-Methods;
+        proxy_pass_header Access-Control-Allow-Headers;
     }
 
     # Health check endpoint

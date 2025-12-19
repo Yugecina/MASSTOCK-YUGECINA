@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="MasStock - AI Content Automation Infrastructure. Transform creative workflows into production-ready assets at scale.">
+    <title>MasStock — AI Content Automation Infrastructure</title>
+
+    <!-- Fonts: Clash Display (display) + Inter (body) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://api.fontshare.com/v2/css?f[]=clash-display@200,300,400,500,600,700&display=swap" rel="stylesheet">
+
+    <style>
+        /* ========================================
+           MASSTOCK VITRINE - FACTORY DARK MINIMAL
+           Aesthetic: Dark-first, Minimal, Tech Premium
+           Inspired by: Factory.ai, Linear, Vercel
+           ======================================== */
+
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            /* Colors - Dark Minimal Palette */
+            --noir: #0A0A0A;
+            --noir-soft: #121212;
+            --noir-card: #1A1A1A;
+            --noir-border: #2A2A2A;
+
+            --white: #FFFFFF;
+            --white-soft: #E5E5E5;
+            --white-muted: #A0A0A0;
+
+            /* Accent Magenta/Purple - Modern SaaS */
+            --accent: #C026D3;
+            --accent-light: #E879F9;
+            --accent-dark: #A21CAF;
+            --accent-darker: #86198F;
+
+            /* Semantic */
+            --success: #10B981;
+            --warning: #F59E0B;
+            --error: #EF4444;
+
+            /* Typography - Factory-inspired */
+            --font-display: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+
+            /* Spacing - 12-column grid system */
+            --container: 1200px;
+            --gap: clamp(16px, 3vw, 24px);
+            --grid-cols: 12;
+        }
+
+        /* ===== BASE STYLES ===== */
+
+        html {
+            scroll-behavior: smooth;
+            overflow-x: hidden;
+        }
+
+        body {
+            font-family: var(--font-body);
+            background: var(--noir);
+            color: var(--white);
+            line-height: 1.6;
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+        }
+
+
+
+        /* ===== CONTAINER ===== */
+
+        .container {
+            max-width: var(--container);
+            margin: 0 auto;
+            padding: 0 clamp(20px, 5vw, 80px);
+        }
+
+        /* ===== HEADER ===== */
+
+        header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: rgba(10, 10, 12, 0.6);
+            backdrop-filter: blur(40px) saturate(180%);
+            border-bottom: 1px solid rgba(192, 38, 211, 0.15);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            animation: slideDown 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 0;
+        }
+
+        .logo {
+            font-family: var(--font-display);
+            font-size: 22px;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            color: var(--white);
+            text-decoration: none;
+            position: relative;
+        }
+
+        .logo::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--petrole), var(--petrole-light));
+            transition: width 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .logo:hover::after {
+            width: 100%;
+        }
+
+        .nav-link {
+            padding: 10px 24px;
+            background: transparent;
+            border: 1px solid var(--noir-border);
+            border-radius: 8px;
+            color: var(--white);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .nav-link:hover {
+            border-color: var(--petrole);
+            background: rgba(46, 107, 123, 0.1);
+            transform: translateY(-1px);
+        }
+
+        /* ===== HERO SECTION ===== */
+
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 140px 0 80px;
+            position: relative;
+        }
+
+        .hero-content {
+            position: relative;
+            z-index: 10;
+            animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s backwards;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(40px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: rgba(46, 107, 123, 0.1);
+            border: 1px solid rgba(46, 107, 123, 0.2);
+            border-radius: 24px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--petrole-light);
+            margin-bottom: 32px;
+            animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.5s backwards;
+        }
+
+        .badge-dot {
+            width: 6px;
+            height: 6px;
+            background: var(--petrole-light);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.6; transform: scale(0.9); }
+        }
+
+        .hero-title {
+            font-family: var(--font-display);
+            font-size: clamp(48px, 8vw, 88px);
+            font-weight: 600;
+            line-height: 1.05;
+            letter-spacing: -0.03em;
+            margin-bottom: 28px;
+            background: linear-gradient(135deg, var(--white) 0%, var(--white-soft) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.6s backwards;
+        }
+
+        .gradient-text {
+            color: var(--petrole-light);
+        }
+
+        .hero-subtitle {
+            font-size: clamp(18px, 2.5vw, 22px);
+            font-weight: 400;
+            color: var(--white-muted);
+            max-width: 680px;
+            line-height: 1.65;
+            margin-bottom: 48px;
+            animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.7s backwards;
+        }
+
+        .hero-cta {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+            animation: fadeInUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.8s backwards;
+        }
+
+        /* ===== BUTTONS ===== */
+
+        .btn {
+            padding: 16px 32px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            border: none;
+            cursor: pointer;
+            font-family: var(--font-body);
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: var(--petrole);
+            color: white;
+            box-shadow: 0 4px 20px var(--petrole-glow);
+            position: relative;
+        }
+
+        .btn-primary::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn-primary:hover::before {
+            left: 100%;
+        }
+
+        .btn-primary:hover {
+            background: var(--petrole-dark);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px var(--petrole-glow);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--white);
+            border: 1px solid var(--noir-border);
+        }
+
+        .btn-secondary:hover {
+            border-color: var(--petrole);
+            background: rgba(46, 107, 123, 0.1);
+            transform: translateY(-2px);
+        }
+
+        .btn-icon {
+            width: 20px;
+            height: 20px;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .btn:hover .btn-icon {
+            transform: translateX(4px);
+        }
+
+        /* ===== SECTION ===== */
+
+        section {
+            padding: clamp(80px, 12vw, 140px) 0;
+            position: relative;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: clamp(60px, 8vw, 100px);
+        }
+
+        .section-label {
+            display: inline-block;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--petrole-light);
+            margin-bottom: 16px;
+        }
+
+        .section-title {
+            font-family: var(--font-display);
+            font-size: clamp(36px, 6vw, 64px);
+            font-weight: 600;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+            color: var(--white);
+            margin-bottom: 20px;
+        }
+
+        .section-subtitle {
+            font-size: clamp(16px, 2vw, 20px);
+            color: var(--white-muted);
+            max-width: 700px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* ===== TAGLINE ===== */
+
+        .tagline {
+            padding: clamp(60px, 10vw, 120px) 0;
+            background: transparent;
+            position: relative;
+        }
+
+        .tagline-text {
+            font-family: var(--font-display);
+            font-size: clamp(28px, 5vw, 48px);
+            font-weight: 500;
+            font-style: italic;
+            line-height: 1.35;
+            text-align: center;
+            max-width: 900px;
+            margin: 0 auto;
+            color: var(--white-muted);
+            position: relative;
+            z-index: 1;
+        }
+
+        .tagline-highlight {
+            color: var(--white);
+            font-style: normal;
+        }
+
+        /* ===== FEATURES GRID ===== */
+
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 32px;
+        }
+
+        .feature-card {
+            background: rgba(22, 22, 26, 0.6);
+            backdrop-filter: blur(20px) saturate(130%);
+            border: 1px solid rgba(192, 38, 211, 0.15);
+            border-radius: 16px;
+            padding: 40px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .feature-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, var(--petrole), var(--petrole-light));
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+
+        .feature-card:hover {
+            border-color: rgba(192, 38, 211, 0.4);
+            background: rgba(22, 22, 26, 0.7);
+            transform: translateY(-6px);
+            box-shadow:
+                0 20px 50px rgba(192, 38, 211, 0.15),
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .feature-card:hover::before {
+            opacity: 1;
+        }
+
+        .feature-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px;
+            height: 56px;
+            background: rgba(46, 107, 123, 0.1);
+            border: 1px solid rgba(46, 107, 123, 0.2);
+            border-radius: 12px;
+            font-family: var(--font-display);
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--petrole-light);
+            margin-bottom: 24px;
+        }
+
+        .feature-title {
+            font-family: var(--font-display);
+            font-size: 24px;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--white);
+            margin-bottom: 16px;
+        }
+
+        .feature-description {
+            font-size: 15px;
+            line-height: 1.7;
+            color: var(--white-muted);
+        }
+
+        /* ===== CASE STUDIES ===== */
+
+        .case-study {
+            background: rgba(22, 22, 26, 0.6);
+            backdrop-filter: blur(20px) saturate(130%);
+            border: 1px solid rgba(192, 38, 211, 0.15);
+            border-radius: 20px;
+            padding: 48px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .case-study:hover {
+            border-color: rgba(192, 38, 211, 0.4);
+            background: rgba(22, 22, 26, 0.7);
+            box-shadow:
+                0 20px 60px rgba(192, 38, 211, 0.2),
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .case-title {
+            font-family: var(--font-display);
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--petrole-light);
+            margin-bottom: 12px;
+        }
+
+        .case-subtitle {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--white-soft);
+            margin-bottom: 24px;
+        }
+
+        .case-row {
+            margin-bottom: 20px;
+        }
+
+        .case-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .case-label {
+            font-weight: 600;
+            color: var(--white);
+            display: block;
+            margin-bottom: 6px;
+        }
+
+        .case-label-highlight {
+            color: var(--petrole-light);
+        }
+
+        .case-text {
+            color: var(--white-muted);
+            line-height: 1.7;
+        }
+
+        /* ===== PRICING ===== */
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 32px;
+            margin-bottom: 80px;
+        }
+
+        .pricing-card {
+            background: rgba(22, 22, 26, 0.6);
+            backdrop-filter: blur(20px) saturate(130%);
+            border: 1px solid rgba(192, 38, 211, 0.15);
+            border-radius: 20px;
+            padding: 48px 36px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .pricing-card.featured {
+            background: rgba(192, 38, 211, 0.08);
+            border-color: rgba(192, 38, 211, 0.4);
+            transform: scale(1.05);
+            box-shadow:
+                0 20px 60px rgba(192, 38, 211, 0.25),
+                0 8px 32px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .pricing-badge {
+            position: absolute;
+            top: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, var(--petrole) 0%, var(--petrole-light) 100%);
+            color: white;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            box-shadow: 0 4px 16px rgba(192, 38, 211, 0.4);
+        }
+
+        .pricing-card:hover {
+            transform: scale(1.05) translateY(-8px);
+            background: rgba(22, 22, 26, 0.75);
+            border-color: rgba(192, 38, 211, 0.4);
+            box-shadow:
+                0 24px 70px rgba(192, 38, 211, 0.2),
+                0 12px 40px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .pricing-name {
+            font-family: var(--font-display);
+            font-size: 24px;
+            font-weight: 600;
+            color: var(--white);
+            margin-bottom: 16px;
+        }
+
+        .pricing-price {
+            font-family: var(--font-display);
+            font-size: 48px;
+            font-weight: 700;
+            color: var(--petrole-light);
+            margin-bottom: 8px;
+        }
+
+        .pricing-price span {
+            font-size: 18px;
+            color: var(--white-muted);
+            font-weight: 500;
+        }
+
+        .pricing-features {
+            list-style: none;
+            margin: 32px 0;
+        }
+
+        .pricing-features li {
+            padding: 12px 0;
+            color: var(--white-muted);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .pricing-features li::before {
+            content: '✓';
+            color: var(--petrole-light);
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .pricing-commitment {
+            font-size: 12px;
+            color: var(--white-muted);
+            text-align: center;
+            margin-top: 24px;
+        }
+
+        /* ===== CTA BOX ===== */
+
+        .cta-box {
+            background: rgba(22, 22, 26, 0.6);
+            backdrop-filter: blur(24px) saturate(140%);
+            border: 1px solid rgba(192, 38, 211, 0.2);
+            border-radius: 24px;
+            padding: clamp(48px, 8vw, 80px) clamp(32px, 6vw, 64px);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            box-shadow:
+                0 12px 40px rgba(192, 38, 211, 0.1),
+                0 8px 32px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .cta-box::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--petrole), transparent);
+            animation: shimmer 3s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { transform: translateX(-100%); }
+            50% { transform: translateX(100%); }
+        }
+
+        .cta-title {
+            font-family: var(--font-display);
+            font-size: clamp(32px, 5vw, 48px);
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            margin-bottom: 20px;
+        }
+
+        .cta-description {
+            font-size: 18px;
+            color: var(--white-muted);
+            max-width: 600px;
+            margin: 0 auto 32px;
+            line-height: 1.6;
+        }
+
+        .cta-list {
+            list-style: none;
+            max-width: 600px;
+            margin: 32px auto;
+            text-align: left;
+        }
+
+        .cta-list li {
+            padding: 12px 0;
+            color: var(--white-muted);
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            line-height: 1.6;
+        }
+
+        .cta-list li::before {
+            content: '✓';
+            color: var(--petrole-light);
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .cta-price {
+            font-family: var(--font-display);
+            font-size: 56px;
+            font-weight: 700;
+            color: var(--petrole-light);
+            margin: 32px 0;
+        }
+
+        /* ===== TEAM ===== */
+
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 40px;
+        }
+
+        .team-card {
+            background: rgba(22, 22, 26, 0.6);
+            backdrop-filter: blur(20px) saturate(130%);
+            border: 1px solid rgba(192, 38, 211, 0.15);
+            border-radius: 20px;
+            padding: 48px;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+        }
+
+        .team-card:hover {
+            border-color: rgba(192, 38, 211, 0.4);
+            background: rgba(22, 22, 26, 0.7);
+            transform: translateY(-6px);
+            box-shadow:
+                0 20px 60px rgba(192, 38, 211, 0.15),
+                0 12px 40px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+        }
+
+        .team-name {
+            font-family: var(--font-display);
+            font-size: 28px;
+            font-weight: 600;
+            color: var(--petrole-light);
+            margin-bottom: 8px;
+        }
+
+        .team-role {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--white-soft);
+            margin-bottom: 8px;
+        }
+
+        .team-meta {
+            font-size: 14px;
+            color: var(--white-muted);
+            margin-bottom: 20px;
+        }
+
+        .team-bio {
+            color: var(--white-muted);
+            line-height: 1.7;
+            margin-bottom: 20px;
+        }
+
+        .team-expertise {
+            font-size: 13px;
+            color: var(--white-muted);
+            margin-bottom: 12px;
+        }
+
+        .team-expertise strong {
+            color: var(--white);
+            font-weight: 600;
+        }
+
+        .team-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--petrole-light);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 500;
+            margin-top: 20px;
+            transition: gap 0.3s;
+        }
+
+        .team-link:hover {
+            gap: 12px;
+        }
+
+        /* ===== CONTACT ===== */
+
+        .contact-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 32px;
+            margin: 48px 0;
+        }
+
+        .contact-person {
+            text-align: center;
+        }
+
+        .contact-person-name {
+            font-weight: 600;
+            color: var(--petrole-light);
+            margin-bottom: 8px;
+        }
+
+        .contact-person-role {
+            font-size: 14px;
+            color: var(--white-muted);
+            margin-bottom: 16px;
+        }
+
+        /* ===== FOOTER ===== */
+
+        footer {
+            padding: 80px 0 40px;
+            border-top: 1px solid var(--noir-border);
+        }
+
+        .footer-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 32px;
+            margin-bottom: 40px;
+        }
+
+        .footer-logo {
+            font-family: var(--font-display);
+            font-size: 20px;
+            font-weight: 600;
+            color: var(--white);
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+
+        .footer-link {
+            color: var(--white-muted);
+            text-decoration: none;
+            font-size: 14px;
+            transition: color 0.3s;
+        }
+
+        .footer-link:hover {
+            color: var(--petrole-light);
+        }
+
+        .footer-bottom {
+            padding-top: 32px;
+            border-top: 1px solid var(--noir-border);
+            text-align: center;
+            font-size: 13px;
+            color: var(--white-muted);
+        }
+
+        .footer-bottom p {
+            margin-bottom: 8px;
+        }
+
+        /* ===== RESPONSIVE ===== */
+
+        @media (max-width: 768px) {
+            .hero {
+                padding: 120px 0 60px;
+            }
+
+            .hero-cta {
+                flex-direction: column;
+            }
+
+            .btn {
+                justify-content: center;
+            }
+
+            .features-grid,
+            .pricing-grid,
+            .team-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .footer-content {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .footer-links {
+                justify-content: center;
+            }
+        }
+
+        /* ===== SCROLL ANIMATIONS ===== */
+
+        [data-animate] {
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        [data-animate].in-view {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header>
+        <div class="container">
+            <nav>
+                <a href="/" class="logo">MasStock</a>
+                <a href="mailto:contact@masstock.fr" class="nav-link">Contact</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <div class="hero-badge">
+                    <span class="badge-dot"></span>
+                    AI Content Automation
+                </div>
+                <!-- ARCS: ASK (Yes-ladder question) -->
+                <p style="font-size: 20px; color: var(--petrole-light); font-weight: 600; margin-bottom: 16px;">
+                    Tired of content backlogs eating up your creative time?
+                </p>
+                <h1 class="hero-title">
+                    Scale Content Production<br>
+                    Without <span class="gradient-text">Sacrificing Quality</span>
+                </h1>
+                <!-- Enhanced subtitle with emotional impact (Harmonizers) -->
+                <p class="hero-subtitle">
+                    Finally focus on creative vision while AI handles execution. MasStock automates your production workflows—transform weeks of manual work into days of scalable, on-brand content.
+                </p>
+                <!-- Explicit benefits bullets (Clarity + All PCM types) -->
+                <ul style="list-style: none; margin: 32px 0; padding: 0; max-width: 680px;">
+                    <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; font-size: 16px;">
+                        <span style="color: var(--petrole-light); font-weight: 700; flex-shrink: 0;">✓</span>
+                        <span><strong style="color: var(--white);">10x faster production</strong> – from weeks to days</span>
+                    </li>
+                    <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; font-size: 16px;">
+                        <span style="color: var(--petrole-light); font-weight: 700; flex-shrink: 0;">✓</span>
+                        <span><strong style="color: var(--white);">No more manual busywork</strong> – reclaim creative hours</span>
+                    </li>
+                    <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; font-size: 16px;">
+                        <span style="color: var(--petrole-light); font-weight: 700; flex-shrink: 0;">✓</span>
+                        <span><strong style="color: var(--white);">Brand consistency guaranteed</strong> – agency-grade quality</span>
+                    </li>
+                </ul>
+                <!-- Risk reducer (FREE consultation) -->
+                <p style="font-size: 14px; color: var(--white-muted); margin-bottom: 24px;">
+                    <span style="color: var(--petrole-light); font-weight: 600;">→ Start with a FREE content audit</span> – no commitment, no credit card
+                </p>
+                <div class="hero-cta">
+                    <a href="https://app.masstock.fr" class="btn btn-primary">
+                        Try Free Audit
+                        <svg class="btn-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                            <path d="M7 13l5-5-5-5"/>
+                        </svg>
+                    </a>
+                    <a href="#contact" class="btn btn-secondary">Book Demo</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Social Proof (Early placement for credibility) -->
+    <section style="padding: clamp(60px, 10vw, 100px) 0; background: transparent;">
+        <div class="container">
+            <div class="section-header" style="margin-bottom: 48px;">
+                <span class="section-label">Real Results</span>
+                <h2 class="section-title" style="font-size: clamp(28px, 4vw, 40px);">Trusted by Creative Teams</h2>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 32px;">
+                <!-- Thinker testimonial (logic/data) -->
+                <div class="feature-card" style="border-color: rgba(192, 38, 211, 0.25);">
+                    <p style="font-size: 16px; line-height: 1.7; color: var(--white-muted); margin-bottom: 24px; font-style: italic;">
+                        "We went from 2 weeks per campaign to 3 days. The ROI was immediate—10x output with the same team size."
+                    </p>
+                    <p style="font-weight: 600; color: var(--petrole-light); margin-bottom: 4px;">Sophie Laurent</p>
+                    <p style="font-size: 14px; color: var(--white-muted);">Creative Director, Mira Studio</p>
+                </div>
+
+                <!-- Harmonizer testimonial (emotion/relief) -->
+                <div class="feature-card" style="border-color: rgba(192, 38, 211, 0.25);">
+                    <p style="font-size: 16px; line-height: 1.7; color: var(--white-muted); margin-bottom: 24px; font-style: italic;">
+                        "Finally caught up with our backlog. My team can focus on strategy instead of drowning in production tasks."
+                    </p>
+                    <p style="font-weight: 600; color: var(--petrole-light); margin-bottom: 4px;">Marc Dubois</p>
+                    <p style="font-size: 14px; color: var(--white-muted);">Head of Content, Simmeo</p>
+                </div>
+
+                <!-- Persister testimonial (quality/values) -->
+                <div class="feature-card" style="border-color: rgba(192, 38, 211, 0.25);">
+                    <p style="font-size: 16px; line-height: 1.7; color: var(--white-muted); margin-bottom: 24px; font-style: italic;">
+                        "Quality stayed consistent even at 100+ assets/month. Our brand standards are never compromised."
+                    </p>
+                    <p style="font-weight: 600; color: var(--petrole-light); margin-bottom: 4px;">Claire Martin</p>
+                    <p style="font-size: 14px; color: var(--white-muted);">Brand Manager, UGC Agency</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Tagline (Updated with Imaginer messaging) -->
+    <section class="tagline">
+        <div class="container">
+            <p class="tagline-text">
+                Imagine <span class="tagline-highlight">what your team could create</span> if production was never a bottleneck again.
+            </p>
+        </div>
+    </section>
+
+    <!-- Our Pillars -->
+    <section data-animate>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Foundation</span>
+                <h2 class="section-title">Our Pillars</h2>
+            </div>
+            <div class="features-grid">
+                <div class="feature-card">
+                    <div class="feature-number">01</div>
+                    <h3 class="feature-title">Automation Engineering</h3>
+                    <p class="feature-description">
+                        We design and operate custom AI production pipelines tailored to each brand's specific requirements. Our technical infrastructure transforms creative briefs into automated workflows that execute consistently. <strong style="color: var(--white);">No more repetitive tasks</strong>—let AI handle the grind.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-number">02</div>
+                    <h3 class="feature-title">Creative Fidelity</h3>
+                    <p class="feature-description">
+                        Quality and brand consistency at every touchpoint. Our workflows are engineered to maintain strict adherence to creative direction and brand guidelines, ensuring every asset meets agency standards. <strong style="color: var(--white);">Your vision, scaled</strong>—not compromised.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <div class="feature-number">03</div>
+                    <h3 class="feature-title">Content at Scale</h3>
+                    <p class="feature-description">
+                        Delivering hundreds of production-ready assets per month across all formats. What takes weeks through traditional production, we execute in days through systematic automation. <strong style="color: var(--white);">Done with production bottlenecks?</strong> Welcome to scale.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Who It's For / Not For (Qualification) -->
+    <section style="padding: clamp(60px, 10vw, 100px) 0; background: rgba(192, 38, 211, 0.03); border-top: 1px solid var(--noir-border); border-bottom: 1px solid var(--noir-border);">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Is This For You?</span>
+                <h2 class="section-title">Who We Work With</h2>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 48px; max-width: 1000px; margin: 0 auto;">
+                <!-- Perfect For -->
+                <div>
+                    <h3 style="font-family: var(--font-display); font-size: 24px; font-weight: 600; color: var(--petrole-light); margin-bottom: 24px; display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 32px;">✓</span> Perfect For
+                    </h3>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; line-height: 1.6;">
+                            <span style="color: var(--petrole-light); font-weight: 700; flex-shrink: 0;">→</span>
+                            <span>Creative agencies drowning in production backlogs</span>
+                        </li>
+                        <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; line-height: 1.6;">
+                            <span style="color: var(--petrole-light); font-weight: 700; flex-shrink: 0;">→</span>
+                            <span>Marketing teams needing 50+ assets/month with consistent branding</span>
+                        </li>
+                        <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; line-height: 1.6;">
+                            <span style="color: var(--petrole-light); font-weight: 700; flex-shrink: 0;">→</span>
+                            <span>Brands tired of choosing between speed and quality</span>
+                        </li>
+                        <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; line-height: 1.6;">
+                            <span style="color: var(--petrole-light); font-weight: 700; flex-shrink: 0;">→</span>
+                            <span>Teams ready to automate workflows (not replace creativity)</span>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Not For -->
+                <div>
+                    <h3 style="font-family: var(--font-display); font-size: 24px; font-weight: 600; color: var(--white-muted); margin-bottom: 24px; display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 32px;">✗</span> Not For
+                    </h3>
+                    <ul style="list-style: none; padding: 0;">
+                        <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; line-height: 1.6; opacity: 0.7;">
+                            <span style="color: var(--white-muted); font-weight: 700; flex-shrink: 0;">→</span>
+                            <span>One-off projects or small ad-hoc requests</span>
+                        </li>
+                        <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; line-height: 1.6; opacity: 0.7;">
+                            <span style="color: var(--white-muted); font-weight: 700; flex-shrink: 0;">→</span>
+                            <span>Teams looking for "set it and forget it" solutions (we're collaborative)</span>
+                        </li>
+                        <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; line-height: 1.6; opacity: 0.7;">
+                            <span style="color: var(--white-muted); font-weight: 700; flex-shrink: 0;">→</span>
+                            <span>Brands without defined brand guidelines or creative direction</span>
+                        </li>
+                        <li style="padding: 12px 0; color: var(--white-muted); display: flex; align-items: flex-start; gap: 12px; line-height: 1.6; opacity: 0.7;">
+                            <span style="color: var(--white-muted); font-weight: 700; flex-shrink: 0;">→</span>
+                            <span>Companies producing fewer than 20 assets/month</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Case Studies -->
+    <section data-animate>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Proof of Work</span>
+                <h2 class="section-title">Case Studies</h2>
+            </div>
+            <div class="features-grid">
+                <div class="case-study">
+                    <h3 class="case-title">Mira Studio</h3>
+                    <p class="case-subtitle">Creative Brief to Product Integration at Scale</p>
+                    <div class="case-row">
+                        <span class="case-label">Challenge:</span>
+                        <p class="case-text">Manual client brief analysis creating bottlenecks.</p>
+                    </div>
+                    <div class="case-row">
+                        <span class="case-label">Solution:</span>
+                        <p class="case-text">Automated workflow from brief input to batch generation. 300 images for review, 30 selected and upscaled.</p>
+                    </div>
+                    <div class="case-row">
+                        <span class="case-label case-label-highlight">Result:</span>
+                        <p class="case-text">5x faster compared to existing process</p>
+                    </div>
+                </div>
+
+                <div class="case-study">
+                    <h3 class="case-title">Simmeo</h3>
+                    <p class="case-subtitle">2D Floor Plan to 3D Rendering</p>
+                    <div class="case-row">
+                        <span class="case-label">Challenge:</span>
+                        <p class="case-text">Transform 2D floor plans into 3D designs for sales process.</p>
+                    </div>
+                    <div class="case-row">
+                        <span class="case-label">Solution:</span>
+                        <p class="case-text">Automated PDF → JPG → AI processing → 3D output with style customization.</p>
+                    </div>
+                    <div class="case-row">
+                        <span class="case-label case-label-highlight">Result:</span>
+                        <p class="case-text">5x cheaper and 10x faster. 50+ visuals across 3 formats.</p>
+                    </div>
+                </div>
+
+                <div class="case-study">
+                    <h3 class="case-title">UGC Content at Scale</h3>
+                    <p class="case-subtitle">Authentic Creator-Style Videos</p>
+                    <div class="case-row">
+                        <span class="case-label">Challenge:</span>
+                        <p class="case-text">Need authentic UGC content without hiring dozens of creators.</p>
+                    </div>
+                    <div class="case-row">
+                        <span class="case-label">Solution:</span>
+                        <p class="case-text">AI-generated presenters with natural environments. 50-100 videos/month.</p>
+                    </div>
+                    <div class="case-row">
+                        <span class="case-label case-label-highlight">Result:</span>
+                        <p class="case-text">Cost from €200-500 to €20 per video. 40% higher engagement.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Pricing -->
+    <section data-animate>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Investment</span>
+                <h2 class="section-title">Our Offers</h2>
+                <p class="section-subtitle">Automation Development • Platform Access • Content Production Audit</p>
+            </div>
+
+            <!-- Risk Reduction Box -->
+            <div style="max-width: 800px; margin: 0 auto 60px; padding: 32px; background: rgba(192, 38, 211, 0.08); border: 1px solid rgba(192, 38, 211, 0.3); border-radius: 16px; text-align: center;">
+                <h3 style="font-family: var(--font-display); font-size: 24px; font-weight: 600; color: var(--petrole-light); margin-bottom: 16px;">
+                    Risk-Free Guarantee
+                </h3>
+                <ul style="list-style: none; padding: 0; margin: 0; display: inline-block; text-align: left;">
+                    <li style="padding: 8px 0; color: var(--white-muted); display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--petrole-light); font-weight: 700;">✓</span>
+                        <span><strong style="color: var(--white);">30-day money-back guarantee</strong> on all plans</span>
+                    </li>
+                    <li style="padding: 8px 0; color: var(--white-muted); display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--petrole-light); font-weight: 700;">✓</span>
+                        <span><strong style="color: var(--white);">Free content audit</strong> (€2,500 value) for Starter+ plans</span>
+                    </li>
+                    <li style="padding: 8px 0; color: var(--white-muted); display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--petrole-light); font-weight: 700;">✓</span>
+                        <span><strong style="color: var(--white);">Cancel anytime</strong> after minimum commitment</span>
+                    </li>
+                    <li style="padding: 8px 0; color: var(--white-muted); display: flex; align-items: center; gap: 12px;">
+                        <span style="color: var(--petrole-light); font-weight: 700;">✓</span>
+                        <span><strong style="color: var(--white);">No hidden fees</strong> – transparent pricing, always</span>
+                    </li>
+                </ul>
+            </div>
+
+            <h3 style="font-size: 24px; font-weight: 600; margin-bottom: 48px; text-align: center; color: var(--petrole-light);">Platform Access</h3>
+            <div class="pricing-grid">
+                <div class="pricing-card">
+                    <h4 class="pricing-name">Starter</h4>
+                    <div class="pricing-price">299€<span>/month</span></div>
+                    <ul class="pricing-features">
+                        <li>Up to 3 active workflows</li>
+                        <li>3 seats</li>
+                        <li>100 GB storage</li>
+                        <li>Email support</li>
+                        <li>Maintenance & Updates</li>
+                    </ul>
+                    <p class="pricing-commitment">6 months commitment</p>
+                </div>
+
+                <div class="pricing-card featured">
+                    <div class="pricing-badge">Popular</div>
+                    <h4 class="pricing-name">Scale</h4>
+                    <div class="pricing-price">599€<span>/month</span></div>
+                    <ul class="pricing-features">
+                        <li>Up to 10 active workflows</li>
+                        <li>5 seats</li>
+                        <li>500 GB storage</li>
+                        <li>Advanced analytics</li>
+                        <li>Email + Slack support</li>
+                    </ul>
+                    <p class="pricing-commitment">3 months commitment</p>
+                </div>
+
+                <div class="pricing-card">
+                    <h4 class="pricing-name">Enterprise</h4>
+                    <div class="pricing-price">1,299€<span>/month</span></div>
+                    <ul class="pricing-features">
+                        <li>Unlimited workflows</li>
+                        <li>15 seats</li>
+                        <li>1 TB storage</li>
+                        <li>Advanced analytics + alerts</li>
+                        <li>Dedicated support</li>
+                    </ul>
+                    <p class="pricing-commitment">3 months commitment</p>
+                </div>
+            </div>
+
+            <!-- Content Production Audit -->
+            <div class="cta-box">
+                <h3 class="cta-title">Content Production Process Audit</h3>
+                <p class="cta-description">
+                    Starting from scratch? We'll analyze your processes to identify where AI delivers the greatest value.
+                </p>
+                <ul class="cta-list">
+                    <li>Two 2-hour strategic workshops</li>
+                    <li>Current process mapping and analysis</li>
+                    <li>AI tool research and recommendations</li>
+                    <li>Automation implementation roadmap</li>
+                    <li>Prompt engineering best practices handbook</li>
+                </ul>
+                <div class="cta-price">2,500€</div>
+                <a href="#contact" class="btn btn-primary">Get in Touch</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Legal & CSR -->
+    <section data-animate>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Responsibility</span>
+                <h2 class="section-title">Legal & CSR</h2>
+                <p class="section-subtitle">
+                    We design automation with built-in processes and checkpoints to ensure the legal compliance of the content we create using AI.
+                </p>
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 32px; max-width: 900px; margin: 0 auto;">
+                <div class="feature-card">
+                    <h3 class="feature-title" style="color: var(--petrole-light);">Copyright Compliance</h3>
+                    <p class="feature-description">
+                        Strict compliance with licensing requirements. Only authorized assets and cleared IP in our production pipelines. We ensure all generated content respects intellectual property rights.
+                    </p>
+                </div>
+                <div class="feature-card">
+                    <h3 class="feature-title" style="color: var(--petrole-light);">AI Act Friendly</h3>
+                    <p class="feature-description">
+                        Fully aligned with EU AI Act requirements—documented systems, human oversight protocols, and transparent processes across all automated workflows.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Team -->
+    <section data-animate style="background: rgba(46, 107, 123, 0.02); border-top: 1px solid var(--noir-border); border-bottom: 1px solid var(--noir-border);">
+        <div class="container">
+            <div class="section-header">
+                <span class="section-label">Who We Are</span>
+                <h2 class="section-title">Our Team</h2>
+            </div>
+            <div class="team-grid">
+                <div class="team-card">
+                    <h3 class="team-name">Etienne Roure</h3>
+                    <p class="team-role">Co-founder • AI Expert</p>
+                    <p class="team-meta">5 years experience • CentraleSupélec Paris</p>
+                    <p class="team-bio">
+                        Specialized in generative AI for process optimization. Previously at Cartier (Hong Kong) and Artefact (European data & AI leader).
+                    </p>
+                    <p class="team-expertise"><strong>Expertise:</strong> Gen AI content & solutions, LLM architecture, Data pipeline engineering</p>
+                    <p class="team-expertise"><strong>Clients:</strong> Cartier, Canada Goose, Lancôme, Total Energies, Danone</p>
+                    <a href="mailto:etienne.roure@masstock.com" class="team-link">
+                        etienne.roure@masstock.com
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M7 13l5-5-5-5"/>
+                        </svg>
+                    </a>
+                </div>
+
+                <div class="team-card">
+                    <h3 class="team-name">Dorian Gonzalez</h3>
+                    <p class="team-role">Co-founder • Full Stack Developer & AI Expert</p>
+                    <p class="team-meta">5 years experience • Epitech</p>
+                    <p class="team-bio">
+                        Specialized in full-stack development and generative AI for business process transformation. Built scalable SaaS platforms generating millions in revenue.
+                    </p>
+                    <p class="team-expertise"><strong>Expertise:</strong> Full-stack development, AI solutions & agents, n8n automation, Product ownership & CTO</p>
+                    <p class="team-expertise"><strong>Clients:</strong> Ontrain, Moove, Les Erudits, Glaaster, Hati Hati</p>
+                    <a href="mailto:dorian.gonzalez@masstock.com" class="team-link">
+                        dorian.gonzalez@masstock.com
+                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M7 13l5-5-5-5"/>
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact -->
+    <section id="contact" data-animate>
+        <div class="container">
+            <div class="cta-box">
+                <h2 class="cta-title">Ready to Scale Your Content Production?</h2>
+                <p class="cta-description">
+                    Let's discuss how MasStock can transform your content workflow. Book a demo or reach out to our team directly.
+                </p>
+                <div class="contact-grid">
+                    <div class="contact-person">
+                        <p class="contact-person-name">Etienne Roure</p>
+                        <p class="contact-person-role">Co-founder • AI Expert</p>
+                        <a href="mailto:etienne.roure@masstock.com" class="btn btn-secondary">Contact Etienne</a>
+                    </div>
+                    <div class="contact-person">
+                        <p class="contact-person-name">Dorian Gonzalez</p>
+                        <p class="contact-person-role">Co-founder • Tech Lead</p>
+                        <a href="mailto:dorian.gonzalez@masstock.com" class="btn btn-secondary">Contact Dorian</a>
+                    </div>
+                </div>
+                <div style="margin-top: 48px;">
+                    <a href="https://app.masstock.fr" class="btn btn-primary">Try the Platform</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-logo">MasStock</div>
+                <div class="footer-links">
+                    <a href="https://app.masstock.fr" class="footer-link">Platform</a>
+                    <a href="#contact" class="footer-link">Contact</a>
+                    <a href="mailto:etienne.roure@masstock.com" class="footer-link">Etienne</a>
+                    <a href="mailto:dorian.gonzalez@masstock.com" class="footer-link">Dorian</a>
+                </div>
+            </div>
+            <div class="footer-bottom">
+                <p>&copy; 2025 MasStock. All rights reserved.</p>
+                <p>AI Content Automation Infrastructure</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Scroll Animation Script -->
+    <script>
+        // Smooth scroll reveal animation
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('in-view');
+                }
+            });
+        }, observerOptions);
+
+        document.querySelectorAll('[data-animate]').forEach(el => {
+            observer.observe(el);
+        });
+    </script>
+</body>
+</html>

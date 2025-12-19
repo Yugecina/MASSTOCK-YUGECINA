@@ -1,10 +1,11 @@
 # MasStock - SaaS Workflow Automation Platform
 
 ## Overview
-- **Type:** Standard monorepo (Backend + Frontend)
+- **Type:** Standard monorepo (Backend + Frontend + Landing)
 - **Stack:** React 19 + Node.js/Express + Supabase + Redis + Gemini AI
 - **Architecture:** 3-tier (Frontend → API → Database + Workers)
 - **Deployment:** Docker Compose, Nginx, SSL, CI/CD (GitHub Actions)
+- **Landing Page:** React 19 + TypeScript + Vite + Tailwind CSS (masstock.fr)
 
 This CLAUDE.md is the authoritative source for development guidelines.
 Subdirectories contain specialized CLAUDE.md files that extend these rules.
@@ -18,7 +19,8 @@ Subdirectories contain specialized CLAUDE.md files that extend these rules.
 ### Code Quality (MUST)
 - **MUST** write tests for all new features (TDD approach: Red → Green → Refactor)
 - **MUST** maintain ≥70% test coverage (branches, functions, lines, statements)
-- **MUST** use **Pure CSS ONLY** - **ZERO Tailwind classes** (code review blocker)
+- **MUST** write ALL new files in TypeScript (.ts/.tsx) - JavaScript (.js/.jsx) is deprecated
+- **MUST** use **Pure CSS** for main app (`frontend/`) - Tailwind allowed ONLY in `frontend-vitrine/` (landing page)
 - **MUST** validate ALL inputs with Zod on backend
 - **MUST** enable Row Level Security (RLS) on ALL new Supabase tables
 - **MUST** use httpOnly cookies for JWT tokens (NEVER localStorage)
@@ -40,7 +42,8 @@ Subdirectories contain specialized CLAUDE.md files that extend these rules.
 - **SHOULD** log all errors to console with detailed context (component name, error object, data)
 
 ### Anti-Patterns (MUST NOT)
-- **MUST NOT** use Tailwind classes anywhere (`px-4`, `py-2`, `bg-blue-500`, etc.) - BLOCKED
+- **MUST NOT** use Tailwind classes in main app (`frontend/`) - Pure CSS only. Tailwind is allowed ONLY in `frontend-vitrine/`
+- **MUST NOT** create new JavaScript files (.js/.jsx) - use TypeScript (.ts/.tsx) instead
 - **MUST NOT** bypass TypeScript errors without explicit justification
 - **MUST NOT** push directly to main branch without PR
 - **MUST NOT** skip RLS policies on database tables
@@ -59,6 +62,9 @@ Subdirectories contain specialized CLAUDE.md files that extend these rules.
 cd backend && npm run dev &          # API on http://localhost:3000
 cd frontend && npm run dev &         # UI on http://localhost:5173
 cd backend && npm run worker &       # Background job worker
+
+# Start landing page separately
+cd frontend-vitrine && npm run dev  # Landing on http://localhost:5174
 
 # Or use the slash command:
 /start_masstock
@@ -131,6 +137,13 @@ npm install <package-name>
 - Hooks: `src/hooks/` - Custom React hooks
 - Styles: `src/styles/` - **Pure CSS only (NO Tailwind)**
 - Tests: `src/__tests__/` - Vitest + React Testing Library
+
+**`frontend-vitrine/`** → Landing Page (masstock.fr)
+- Entry point: `index.html`, `index.tsx`
+- Stack: React 19 + TypeScript + Vite + Tailwind CSS
+- Components: Single-file `App.tsx` with all landing sections
+- Styles: **Tailwind CSS** (via CDN)
+- Deployment: Static build, served separately from main app
 
 ### Infrastructure
 

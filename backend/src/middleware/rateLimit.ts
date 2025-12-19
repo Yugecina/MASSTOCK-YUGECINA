@@ -116,9 +116,38 @@ const adminLimiter: RateLimitRequestHandler = rateLimit({
   }
 });
 
+/**
+ * Strict rate limiter for public contact form
+ */
+const contactLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 submissions per window per IP
+  message: {
+    success: false,
+    error: 'Too many submissions, please try again later',
+    code: 'CONTACT_RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: Request, res: Response) => {
+    logError(new Error('Contact rate limit exceeded'), {
+      ip: req.ip,
+      email: (req.body as any)?.email
+    });
+
+    res.status(429).json({
+      success: false,
+      error: 'Too many contact form submissions. Please try again after 15 minutes.',
+      code: 'CONTACT_RATE_LIMIT_EXCEEDED',
+      retry_after: (req as AuthRequest).rateLimit?.resetTime
+    });
+  }
+});
+
 export {
   apiLimiter,
   authLimiter,
   executionLimiter,
-  adminLimiter
+  adminLimiter,
+  contactLimiter
 };

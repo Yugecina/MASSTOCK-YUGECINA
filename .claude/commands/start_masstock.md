@@ -10,21 +10,54 @@ Lance les 3 services essentiels de MasStock de manière propre et sans doublons.
 
 ## Étapes d'exécution
 
-### 1. Nettoyage des processus existants
+### 1. Nettoyage intelligent des processus existants
 
-**CRITICAL:** Avant de lancer de nouveaux processus, tu DOIS :
+**CRITICAL:** Avant de lancer de nouveaux processus, implémente cette logique intelligente :
 
-1. **Utiliser BashOutput** pour vérifier le statut de TOUS les shells background actuels
-2. **Tuer TOUS les shells** qui exécutent ces commandes (même s'ils sont crashed/killed) :
-   - `npm run dev` (backend ou frontend)
-   - `npm run worker`
-   - `vite`
-   - `nodemon`
-3. **Vérifier les ports** avec `lsof` et tuer les processus zombies si nécessaire :
-   ```bash
-   lsof -ti:3000 | xargs kill -9 2>/dev/null || true
-   lsof -ti:5173 | xargs kill -9 2>/dev/null || true
-   ```
+#### Logique de kill/restart automatique
+
+```
+Pour chaque service (Backend API, Frontend):
+  1. Vérifier si le port est occupé (lsof -ti:PORT)
+  2. Si le port est libre → Lancer le service
+  3. Si le port est occupé:
+     a. Identifier le processus (PID + nom)
+     b. Vérifier si c'est le bon service (npm, node, vite, etc.)
+     c. SI c'est le bon service:
+        - Kill le processus (kill -9 PID)
+        - Attendre 1 seconde
+        - Lancer le nouveau service (clean restart)
+     d. SI c'est un autre service (conflit):
+        - ERREUR: Port utilisé par autre chose
+        - Afficher le processus conflictuel
+        - Demander confirmation avant de kill
+```
+
+#### Implémentation
+
+**Ports à vérifier:**
+| Service | Port | Commande de check |
+|---------|------|-------------------|
+| Backend API | 3000 | `lsof -ti:3000` |
+| Frontend | 5173 | `lsof -ti:5173` |
+
+**Worker (pas de port):**
+- Vérifier avec `pgrep -f workflow-worker`
+- Tuer avec `pkill -9 -f workflow-worker`
+
+**Commandes de nettoyage:**
+```bash
+# Backend API (port 3000)
+lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+
+# Frontend (port 5173)
+lsof -ti:5173 | xargs kill -9 2>/dev/null || true
+
+# Worker (pas de port, chercher par nom de processus)
+pkill -9 -f workflow-worker 2>/dev/null || true
+```
+
+**Note:** Cette approche garantit qu'on ne lance pas de doublons et qu'on redémarre proprement les services qui tournent déjà.
 
 ### 2. Lancer les services en background
 
