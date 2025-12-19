@@ -56,7 +56,7 @@ jobs:
 
             echo "📊 Setting up monitoring..."
             chmod +x deploy/setup-monitoring.sh
-            ./deploy/setup-monitoring.sh --interval 5
+            ./deploy/setup-monitoring.sh --interval 5 || echo "⚠️  Monitoring setup failed (non-critical)"
 
             echo "✅ Deployment complete!"
           ENDSSH
