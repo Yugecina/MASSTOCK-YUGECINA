@@ -1,9 +1,10 @@
 name: Deploy to Production
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch: # Allow manual trigger
+  # Auto-deploy disabled - use manual trigger only
+  # push:
+  #   branches: [main]
+  workflow_dispatch: # Manual trigger only (safer for CORS deployment)
 
 jobs:
   deploy:
