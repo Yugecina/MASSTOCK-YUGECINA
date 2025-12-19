@@ -42,8 +42,14 @@ jobs:
             git fetch origin
             git reset --hard origin/main
 
+            echo "🔧 Installing dependencies and compiling TypeScript..."
+            cd backend
+            npm install
+            npm run build
+            cd ..
+
             echo "🗄️  Running database migrations..."
-            cd backend && npm run migrate && cd ..
+            cd backend && npm run migrate:prod && cd ..
 
             echo "🏗️  Building and restarting services..."
             ./deploy/build-and-start.sh --rebuild
