@@ -10,6 +10,7 @@ import { WorkflowExecute } from './pages/WorkflowExecute'
 import { Executions } from './pages/Executions'
 import { ExecutionDetail } from './pages/ExecutionDetail'
 import { Assets } from './pages/Assets'
+import SmartResizer from './pages/SmartResizer'
 import { Requests } from './pages/Requests'
 import { Settings } from './pages/Settings'
 import { AdminDashboard } from './pages/admin/AdminDashboard'
@@ -130,6 +131,14 @@ export default function App(_props: AppProps): React.ReactElement {
             element={
               <ProtectedRoute>
                 <Assets />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/smart-resizer"
+            element={
+              <ProtectedRoute>
+                <SmartResizer />
               </ProtectedRoute>
             }
           />
