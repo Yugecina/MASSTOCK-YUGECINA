@@ -658,6 +658,38 @@ class GeminiImageService {
   private _sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+
+  /**
+   * Generate image with reference image (wrapper for Smart Resizer)
+   * Returns image as Buffer instead of base64 string
+   *
+   * @param params.prompt - Generation prompt
+   * @param params.referenceImage - Base64 encoded reference image
+   * @param params.aspectRatio - Target aspect ratio (e.g., "16:9", "1080:1920")
+   * @returns Image as Buffer
+   */
+  async generateImageWithReference(params: {
+    prompt: string;
+    referenceImage: string;
+    aspectRatio: string;
+  }): Promise<Buffer> {
+    const { prompt, referenceImage, aspectRatio } = params;
+
+    const result = await this.generateImage(prompt, {
+      referenceImages: [{
+        data: referenceImage,
+        mimeType: 'image/png',
+      }],
+      aspectRatio,
+    });
+
+    if (!result.success || !result.imageData) {
+      throw new Error('Failed to generate image with reference');
+    }
+
+    // Convert base64 to Buffer
+    return Buffer.from(result.imageData, 'base64');
+  }
 }
 
 /**
@@ -669,6 +701,12 @@ class GeminiImageService {
 function createGeminiImageService(apiKey: string): GeminiImageService {
   return new GeminiImageService(apiKey);
 }
+
+// Export singleton instance for convenience
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY || '';
+const geminiService = new GeminiImageService(GEMINI_API_KEY);
+
+export default geminiService;
 
 export {
   GeminiImageService,
