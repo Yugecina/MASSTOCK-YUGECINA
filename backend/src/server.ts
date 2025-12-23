@@ -14,6 +14,7 @@ import settingsRoutes from './routes/settingsRoutes';
 import adminRoutes from './routes/adminRoutes';
 import assetsRoutes from './routes/assetsRoutes';
 import contactRoutes from './routes/contactRoutes';
+import smartResizerRoutes from './routes/smartResizerRoutes';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -79,6 +80,7 @@ app.use('/api/v1/support-tickets', supportTicketRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/assets', assetsRoutes);
 app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/smart-resizer', smartResizerRoutes);
 
 // Global error handler (must be last middleware)
 app.use(errorHandler);
