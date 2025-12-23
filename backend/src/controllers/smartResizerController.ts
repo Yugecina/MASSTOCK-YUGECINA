@@ -191,7 +191,7 @@ export async function createJob(req: Request, res: Response): Promise<void> {
       res.status(400).json({
         success: false,
         error: 'Validation error',
-        details: error.errors,
+        details: error.issues,
         code: 'VALIDATION_ERROR',
       });
       return;

@@ -4,7 +4,7 @@
  * API client for Smart Resizer workflow
  */
 
-import axios from './axios';
+import api from './api';
 
 export interface CreateJobRequest {
   masterImage: File;
@@ -90,7 +90,7 @@ export async function createJob(data: CreateJobRequest): Promise<CreateJobRespon
     formData.append('quality', data.quality);
   }
 
-  const response = await axios.post<CreateJobResponse>('/smart-resizer/jobs', formData, {
+  const response = await api.post<CreateJobResponse>('/smart-resizer/jobs', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -103,7 +103,7 @@ export async function createJob(data: CreateJobRequest): Promise<CreateJobRespon
  * Get job status and results
  */
 export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
-  const response = await axios.get<JobStatusResponse>(`/smart-resizer/jobs/${jobId}`);
+  const response = await api.get<JobStatusResponse>(`/smart-resizer/jobs/${jobId}`);
   return response.data;
 }
 
@@ -112,7 +112,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
  */
 export async function getFormats(platform?: string): Promise<FormatsResponse> {
   const params = platform ? { platform } : {};
-  const response = await axios.get<FormatsResponse>('/smart-resizer/formats', { params });
+  const response = await api.get<FormatsResponse>('/smart-resizer/formats', { params });
   return response.data;
 }
 
@@ -120,6 +120,6 @@ export async function getFormats(platform?: string): Promise<FormatsResponse> {
  * Retry failed formats
  */
 export async function retryJob(jobId: string): Promise<any> {
-  const response = await axios.post(`/smart-resizer/jobs/${jobId}/retry`);
+  const response = await api.post(`/smart-resizer/jobs/${jobId}/retry`);
   return response.data;
 }

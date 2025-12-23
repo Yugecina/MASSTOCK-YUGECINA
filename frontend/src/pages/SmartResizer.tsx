@@ -350,7 +350,7 @@ const SmartResizer: React.FC = () => {
 
       <div className="selection-summary">
         <p>Selected: <strong>{globalFormats.length}</strong> formats</p>
-        <p>Total images to generate: <strong>{uploadedImages.length × globalFormats.length}</strong></p>
+        <p>Total images to generate: <strong>{uploadedImages.length * globalFormats.length}</strong></p>
       </div>
 
       <div className="step-actions">
