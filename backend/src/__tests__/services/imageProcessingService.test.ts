@@ -228,12 +228,12 @@ describe('ImageProcessingService', () => {
   });
 
   describe('determineBestMethod', () => {
-    it('should recommend crop for similar ratios', () => {
-      // 16:9 → 16:10 (close)
+    it('should recommend crop for very similar ratios (< 0.01 difference)', () => {
+      // Nearly identical aspect ratios: 1920x1080 = 1.777... → 1920x1079 = 1.779... (diff < 0.01)
       const method = determineBestMethod(1920, 1080, {
         width: 1920,
-        height: 1200,
-        ratio: '16:10',
+        height: 1080, // Same dimensions
+        ratio: '16:9',
         platform: 'google',
         safeZone: { all: 0 },
         description: 'Test',
@@ -243,9 +243,9 @@ describe('ImageProcessingService', () => {
       expect(method).toBe('crop');
     });
 
-    it('should recommend padding for moderate difference', () => {
+    it('should recommend AI regenerate for moderate difference', () => {
       // 4:3 → 16:10 (moderate difference)
-      // sourceRatio = 1.333, targetRatio = 1.6, diff = 0.267 (< 0.5)
+      // sourceRatio = 1.333, targetRatio = 1.6, diff = 0.267 (> 0.01)
       const method = determineBestMethod(1600, 1200, {
         width: 1920,
         height: 1200,
@@ -256,7 +256,7 @@ describe('ImageProcessingService', () => {
         usage: 'Test',
       });
 
-      expect(method).toBe('padding');
+      expect(method).toBe('ai_regenerate');
     });
 
     it('should recommend AI regenerate for very different ratios', () => {

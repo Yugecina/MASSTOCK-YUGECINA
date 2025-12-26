@@ -11,6 +11,7 @@
 
 import sharp from 'sharp';
 import { FormatPreset } from '../utils/formatPresets';
+import { logger } from '../config/logger';
 
 export interface CropOptions {
   strategy: 'attention' | 'entropy' | 'center';
@@ -42,7 +43,7 @@ export async function smartCrop(
   options: CropOptions = { strategy: 'attention' }
 ): Promise<ResizeResult> {
   if (process.env.NODE_ENV === 'development') {
-    console.log('🎯 ImageProcessing: Smart crop started', {
+    logger.debug('🎯 ImageProcessing: Smart crop started', {
       targetWidth,
       targetHeight,
       strategy: options.strategy,
@@ -73,7 +74,7 @@ export async function smartCrop(
     const processingTime = Date.now() - startTime;
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ ImageProcessing: Smart crop complete', {
+      logger.debug('✅ ImageProcessing: Smart crop complete', {
         width: result.info.width,
         height: result.info.height,
         format: result.info.format,
@@ -90,7 +91,7 @@ export async function smartCrop(
       size: result.info.size,
     };
   } catch (error: any) {
-    console.error('❌ ImageProcessing.smartCrop: Failed', {
+    logger.error('❌ ImageProcessing.smartCrop: Failed', {
       error: error.message,
       targetWidth,
       targetHeight,
@@ -111,7 +112,7 @@ export async function resizeWithPadding(
   backgroundColor: string = '#FFFFFF'
 ): Promise<ResizeResult> {
   if (process.env.NODE_ENV === 'development') {
-    console.log('📐 ImageProcessing: Resize with padding started', {
+    logger.debug('📐 ImageProcessing: Resize with padding started', {
       targetWidth,
       targetHeight,
       backgroundColor,
@@ -133,7 +134,7 @@ export async function resizeWithPadding(
     const processingTime = Date.now() - startTime;
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ ImageProcessing: Resize with padding complete', {
+      logger.debug('✅ ImageProcessing: Resize with padding complete', {
         width: resized.info.width,
         height: resized.info.height,
         size: `${(resized.info.size / 1024).toFixed(2)}KB`,
@@ -149,7 +150,7 @@ export async function resizeWithPadding(
       size: resized.info.size,
     };
   } catch (error: any) {
-    console.error('❌ ImageProcessing.resizeWithPadding: Failed', {
+    logger.error('❌ ImageProcessing.resizeWithPadding: Failed', {
       error: error.message,
       targetWidth,
       targetHeight,
@@ -169,7 +170,7 @@ export async function generatePreview(
   const { maxWidth = 400, maxHeight = 400, quality = 80 } = options;
 
   if (process.env.NODE_ENV === 'development') {
-    console.log('🖼️  ImageProcessing: Generate preview started', {
+    logger.debug('🖼️  ImageProcessing: Generate preview started', {
       maxWidth,
       maxHeight,
       quality,
@@ -186,7 +187,7 @@ export async function generatePreview(
       .toBuffer({ resolveWithObject: true });
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ ImageProcessing: Preview generated', {
+      logger.debug('✅ ImageProcessing: Preview generated', {
         width: result.info.width,
         height: result.info.height,
         size: `${(result.info.size / 1024).toFixed(2)}KB`,
@@ -201,7 +202,7 @@ export async function generatePreview(
       size: result.info.size,
     };
   } catch (error: any) {
-    console.error('❌ ImageProcessing.generatePreview: Failed', {
+    logger.error('❌ ImageProcessing.generatePreview: Failed', {
       error: error.message,
     });
     throw new Error(`Preview generation failed: ${error.message}`);
@@ -219,6 +220,16 @@ export async function getImageMetadata(imageBuffer: Buffer): Promise<{
   aspectRatio: string;
 }> {
   try {
+    // Log buffer info for debugging
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('🔍 ImageProcessing: Analyzing buffer', {
+        bufferLength: imageBuffer.length,
+        bufferType: imageBuffer.constructor.name,
+        isBuffer: Buffer.isBuffer(imageBuffer),
+        first10Bytes: imageBuffer.slice(0, 10).toString('hex'),
+      });
+    }
+
     const metadata = await sharp(imageBuffer).metadata();
     const width = metadata.width || 0;
     const height = metadata.height || 0;
@@ -229,7 +240,7 @@ export async function getImageMetadata(imageBuffer: Buffer): Promise<{
     const aspectRatio = `${width / divisor}:${height / divisor}`;
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 ImageProcessing: Metadata extracted', {
+      logger.debug('📊 ImageProcessing: Metadata extracted', {
         width,
         height,
         format: metadata.format,
@@ -246,8 +257,11 @@ export async function getImageMetadata(imageBuffer: Buffer): Promise<{
       aspectRatio,
     };
   } catch (error: any) {
-    console.error('❌ ImageProcessing.getImageMetadata: Failed', {
+    logger.error('❌ ImageProcessing.getImageMetadata: Failed', {
       error: error.message,
+      errorName: error.name,
+      bufferLength: imageBuffer?.length || 0,
+      isBuffer: Buffer.isBuffer(imageBuffer),
     });
     throw new Error(`Metadata extraction failed: ${error.message}`);
   }
@@ -255,7 +269,7 @@ export async function getImageMetadata(imageBuffer: Buffer): Promise<{
 
 /**
  * Determine best processing method based on aspect ratio similarity
- * Returns 'crop' if ratios are similar, 'padding' if very different
+ * Uses AI regeneration for aspect ratio changes (Nano Banana Pro handles text preservation)
  */
 export function determineBestMethod(
   sourceWidth: number,
@@ -266,18 +280,26 @@ export function determineBestMethod(
   const targetRatio = targetFormat.width / targetFormat.height;
   const ratioDifference = Math.abs(sourceRatio - targetRatio);
 
-  // Thresholds for method selection
-  const CROP_THRESHOLD = 0.2; // If difference < 20%, use smart crop
-  const PADDING_THRESHOLD = 0.5; // If difference < 50%, use padding
-  // Above 50% difference → recommend AI regeneration
+  // Determine method based on aspect ratio difference
+  const method = ratioDifference < 0.01 ? 'crop' : 'ai_regenerate';
 
-  if (ratioDifference < CROP_THRESHOLD) {
-    return 'crop';
-  } else if (ratioDifference < PADDING_THRESHOLD) {
-    return 'padding';
-  } else {
-    return 'ai_regenerate';
+  // CRITICAL LOGGING FOR DEBUGGING
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug('🔍 ImageProcessing.determineBestMethod:', {
+      source: `${sourceWidth}x${sourceHeight}`,
+      target: `${targetFormat.width}x${targetFormat.height}`,
+      sourceRatio: sourceRatio.toFixed(3),
+      targetRatio: targetRatio.toFixed(3),
+      ratioDifference: ratioDifference.toFixed(3),
+      threshold: 0.01,
+      decision: method,
+      reason: ratioDifference < 0.01
+        ? 'Same aspect ratio - simple resize'
+        : 'Aspect ratio change - AI regeneration required'
+    });
   }
+
+  return method;
 }
 
 /**

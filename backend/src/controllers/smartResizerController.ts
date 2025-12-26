@@ -10,9 +10,11 @@
 
 import { Request, Response } from 'express';
 import { z } from 'zod';
+import { fileTypeFromBuffer } from 'file-type';
 import { supabaseAdmin } from '../config/database';
 import smartResizerQueue from '../queues/smartResizerQueue';
 import { SmartResizerJobData } from '../services/smartResizerService';
+import * as imageProcessing from '../services/imageProcessingService';
 import {
   getAllFormatKeys,
   getFormatsByPlatform,
@@ -20,6 +22,7 @@ import {
   FORMAT_PACKS,
   FormatPresetKey,
 } from '../utils/formatPresets';
+import { logger } from '../config/logger';
 
 /**
  * Validation Schemas
@@ -35,18 +38,26 @@ const createJobSchema = z.object({
  */
 export async function createJob(req: Request, res: Response): Promise<void> {
   if (process.env.NODE_ENV === 'development') {
-    console.log('📁 SmartResizerController: Create job request', {
+    logger.debug('📁 SmartResizerController: Create job request', {
       files: req.files ? (Array.isArray(req.files) ? req.files.length : Object.keys(req.files).length) : 0,
       body: req.body,
     });
   }
 
   try {
-    // 1. Validate request body
-    const validatedData = createJobSchema.parse(req.body);
+    // 1. Parse FormData fields (FormData sends all values as strings)
+    const parsedBody = {
+      ...req.body,
+      formats: typeof req.body.formats === 'string'
+        ? JSON.parse(req.body.formats)
+        : req.body.formats,
+    };
+
+    // 2. Validate request body
+    const validatedData = createJobSchema.parse(parsedBody);
     const { formats, quality } = validatedData;
 
-    // 2. Validate uploaded file
+    // 3. Validate uploaded file
     if (!req.file) {
       res.status(400).json({
         success: false,
@@ -56,7 +67,70 @@ export async function createJob(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // 3. Get authenticated user
+    // 3b. Validate file type with magic bytes (security)
+    const fileType = await fileTypeFromBuffer(req.file.buffer);
+
+    if (!fileType || !['image/jpeg', 'image/png', 'image/webp'].includes(fileType.mime)) {
+      logger.error('❌ SmartResizerController: Invalid file type detected', {
+        detectedMime: fileType?.mime,
+        uploadedMime: req.file.mimetype,
+        fileName: req.file.originalname,
+      });
+      res.status(400).json({
+        success: false,
+        error: 'Invalid file type detected. Only JPEG, PNG, and WebP images are allowed.',
+        code: 'INVALID_FILE_TYPE',
+      });
+      return;
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('✅ SmartResizerController: File type validated', {
+        mime: fileType.mime,
+        extension: fileType.ext,
+        size: `${(req.file.buffer.length / 1024).toFixed(2)}KB`,
+      });
+    }
+
+    // 3c. Validate image dimensions (prevent Sharp crashes)
+    const MAX_DIMENSION = 8000; // 8K max
+    try {
+      const metadata = await imageProcessing.getImageMetadata(req.file.buffer);
+
+      if (metadata.width > MAX_DIMENSION || metadata.height > MAX_DIMENSION) {
+        logger.error('❌ SmartResizerController: Image dimensions too large', {
+          width: metadata.width,
+          height: metadata.height,
+          maxAllowed: MAX_DIMENSION,
+        });
+        res.status(400).json({
+          success: false,
+          error: `Image dimensions too large. Maximum ${MAX_DIMENSION}px per side. Your image is ${metadata.width}x${metadata.height}px.`,
+          code: 'IMAGE_TOO_LARGE',
+        });
+        return;
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('✅ SmartResizerController: Image dimensions validated', {
+          width: metadata.width,
+          height: metadata.height,
+          format: metadata.format,
+        });
+      }
+    } catch (error) {
+      logger.error('❌ SmartResizerController: Failed to read image metadata', {
+        error: (error as Error).message,
+      });
+      res.status(400).json({
+        success: false,
+        error: 'Failed to read image metadata. Please ensure the file is a valid image.',
+        code: 'INVALID_IMAGE',
+      });
+      return;
+    }
+
+    // 4. Get authenticated user
     const user = (req as any).user;
     if (!user) {
       res.status(401).json({
@@ -67,25 +141,33 @@ export async function createJob(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // 4. Get user's client_id
-    const { data: userData, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('client_id')
-      .eq('id', user.id)
-      .single();
-
-    if (userError || !userData) {
-      res.status(500).json({
+    // 5. Get user's client_id (already loaded by auth middleware)
+    // No need to query client_members - user.client_id is set in auth.ts line 140
+    if (!user.client_id) {
+      logger.error('❌ SmartResizerController: User has no client_id', {
+        userId: user.id,
+        userEmail: user.email,
+        hint: 'User must have a client_id in users table',
+      });
+      res.status(403).json({
         success: false,
-        error: 'Failed to get user data',
-        code: 'USER_DATA_ERROR',
+        error: 'User is not associated with any client. Please contact support.',
+        code: 'NO_CLIENT_ASSOCIATION',
       });
       return;
     }
 
-    const clientId = userData.client_id;
+    const clientId = user.client_id;
 
-    // 5. Validate format keys
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('✅ SmartResizerController: Resolved client', {
+        userId: user.id,
+        clientId,
+        source: 'users.client_id (via auth middleware)',
+      });
+    }
+
+    // 6. Validate format keys
     const allFormatKeys = getAllFormatKeys();
     const invalidFormats = formats.filter(f => !allFormatKeys.includes(f as FormatPresetKey));
 
@@ -98,7 +180,7 @@ export async function createJob(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // 6. Upload master image to Supabase Storage
+    // 7. Upload master image to Supabase Storage
     const timestamp = Date.now();
     const storagePath = `smart-resizer/masters/${clientId}/${timestamp}_${req.file.originalname}`;
 
@@ -110,7 +192,7 @@ export async function createJob(req: Request, res: Response): Promise<void> {
       });
 
     if (uploadError) {
-      console.error('❌ SmartResizerController: Upload failed', {
+      logger.error('❌ SmartResizerController: Upload failed', {
         error: uploadError.message,
       });
       res.status(500).json({
@@ -127,7 +209,7 @@ export async function createJob(req: Request, res: Response): Promise<void> {
 
     const masterImageUrl = urlData.publicUrl;
 
-    // 7. Create job record in database
+    // 8. Create job record in database
     const { data: jobRecord, error: jobError } = await supabaseAdmin
       .from('smart_resizer_jobs')
       .insert({
@@ -142,7 +224,7 @@ export async function createJob(req: Request, res: Response): Promise<void> {
       .single();
 
     if (jobError || !jobRecord) {
-      console.error('❌ SmartResizerController: Job creation failed', {
+      logger.error('❌ SmartResizerController: Job creation failed', {
         error: jobError?.message,
       });
       res.status(500).json({
@@ -153,12 +235,13 @@ export async function createJob(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    // 8. Add job to Bull queue
+    // 9. Add job to Bull queue
+    // Convert buffer to base64 string for Redis/Bull serialization
     const jobData: SmartResizerJobData = {
       jobId: jobRecord.id,
       clientId,
       userId: user.id,
-      masterImageBuffer: req.file.buffer,
+      masterImageBuffer: req.file.buffer.toString('base64'), // Base64 string for Redis
       formatsRequested: formats as FormatPresetKey[],
     };
 
@@ -167,14 +250,14 @@ export async function createJob(req: Request, res: Response): Promise<void> {
     });
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('✅ SmartResizerController: Job created', {
+      logger.debug('✅ SmartResizerController: Job created', {
         jobId: jobRecord.id,
         bullJobId: bullJob.id,
         formatCount: formats.length,
       });
     }
 
-    // 9. Return response
+    // 10. Return response
     res.status(201).json({
       success: true,
       data: {
@@ -197,7 +280,16 @@ export async function createJob(req: Request, res: Response): Promise<void> {
       return;
     }
 
-    console.error('❌ SmartResizerController.createJob: Error', {
+    if (error instanceof SyntaxError && error.message.includes('JSON')) {
+      res.status(400).json({
+        success: false,
+        error: 'Invalid JSON format in request data',
+        code: 'INVALID_JSON',
+      });
+      return;
+    }
+
+    logger.error('❌ SmartResizerController.createJob: Error', {
       error: (error as Error).message,
     });
 
@@ -235,13 +327,8 @@ export async function getJobById(req: Request, res: Response): Promise<void> {
     }
 
     // 2. Check authorization (user's client only)
-    const { data: userData } = await supabaseAdmin
-      .from('users')
-      .select('client_id')
-      .eq('id', user.id)
-      .single();
-
-    if (userData?.client_id !== jobRecord.client_id) {
+    // Use user.client_id from auth middleware (no DB query needed)
+    if (!user.client_id || user.client_id !== jobRecord.client_id) {
       res.status(403).json({
         success: false,
         error: 'Access denied',
@@ -258,7 +345,7 @@ export async function getJobById(req: Request, res: Response): Promise<void> {
       .order('created_at', { ascending: true });
 
     if (resultsError) {
-      console.error('❌ SmartResizerController: Failed to fetch results', {
+      logger.error('❌ SmartResizerController: Failed to fetch results', {
         error: resultsError.message,
       });
     }
@@ -270,7 +357,7 @@ export async function getJobById(req: Request, res: Response): Promise<void> {
     const progressPercent = totalFormats > 0 ? Math.round((completedFormats / totalFormats) * 100) : 0;
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('📊 SmartResizerController: Job status', {
+      logger.debug('📊 SmartResizerController: Job status', {
         jobId: id,
         status: jobRecord.status,
         progress: `${completedFormats}/${totalFormats} (${progressPercent}%)`,
@@ -301,7 +388,7 @@ export async function getJobById(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    console.error('❌ SmartResizerController.getJobById: Error', {
+    logger.error('❌ SmartResizerController.getJobById: Error', {
       error: (error as Error).message,
     });
 
@@ -340,7 +427,7 @@ export async function listFormats(req: Request, res: Response): Promise<void> {
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('📋 SmartResizerController: List formats', {
+      logger.debug('📋 SmartResizerController: List formats', {
         platform: platform || 'all',
         count: formats.length,
       });
@@ -355,7 +442,7 @@ export async function listFormats(req: Request, res: Response): Promise<void> {
       },
     });
   } catch (error) {
-    console.error('❌ SmartResizerController.listFormats: Error', {
+    logger.error('❌ SmartResizerController.listFormats: Error', {
       error: (error as Error).message,
     });
 
@@ -393,13 +480,8 @@ export async function retryJob(req: Request, res: Response): Promise<void> {
     }
 
     // 2. Check authorization
-    const { data: userData } = await supabaseAdmin
-      .from('users')
-      .select('client_id')
-      .eq('id', user.id)
-      .single();
-
-    if (userData?.client_id !== jobRecord.client_id) {
+    // Use user.client_id from auth middleware (no DB query needed)
+    if (!user.client_id || user.client_id !== jobRecord.client_id) {
       res.status(403).json({
         success: false,
         error: 'Access denied',
@@ -425,7 +507,7 @@ export async function retryJob(req: Request, res: Response): Promise<void> {
     }
 
     if (process.env.NODE_ENV === 'development') {
-      console.log('🔄 SmartResizerController: Retry job', {
+      logger.debug('🔄 SmartResizerController: Retry job', {
         jobId: id,
         failedCount: failedResults.length,
       });
@@ -438,7 +520,7 @@ export async function retryJob(req: Request, res: Response): Promise<void> {
       code: 'NOT_IMPLEMENTED',
     });
   } catch (error) {
-    console.error('❌ SmartResizerController.retryJob: Error', {
+    logger.error('❌ SmartResizerController.retryJob: Error', {
       error: (error as Error).message,
     });
 

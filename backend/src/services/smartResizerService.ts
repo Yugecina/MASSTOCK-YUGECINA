@@ -2,27 +2,28 @@
  * Smart Resizer Service - Core Orchestration
  *
  * Coordinates the entire workflow:
- * 1. Master image analysis (OCR)
- * 2. Format-by-format generation
- * 3. Storage management
- * 4. Database updates
+ * 1. Format-by-format generation (AI adapts image to new aspect ratio)
+ * 2. Storage management
+ * 3. Database updates
+ *
+ * Nano Banana Pro handles text/visual preservation natively - no OCR needed.
  */
 
 import { supabaseAdmin } from '../config/database';
-import ocrService, { DetectedContent } from './ocrService';
 import * as imageProcessing from './imageProcessingService';
 import geminiService from './geminiImageService';
 import {
   FormatPresetKey,
   getFormatPreset,
-  calculateSafeZonePixels,
 } from '../utils/formatPresets';
+import pLimit from 'p-limit';
+import { logger } from '../config/logger';
 
 export interface SmartResizerJobData {
   jobId: string;
   clientId: string;
   userId: string;
-  masterImageBuffer: Buffer;
+  masterImageBuffer: string; // Base64 encoded string (for Redis/Bull serialization)
   formatsRequested: FormatPresetKey[];
 }
 
@@ -42,8 +43,24 @@ export interface FormatResult {
 export interface SmartResizerResult {
   jobId: string;
   status: 'completed' | 'failed';
-  detectedContent: DetectedContent;
   results: FormatResult[];
+  totalProcessingTimeMs: number;
+}
+
+export interface ProcessImageFormatsParams {
+  clientId: string;
+  userId: string;
+  executionId: string;
+  imageIndex: number;
+  imageName: string;
+  masterImageBuffer: Buffer;
+  masterImageBase64: string;
+  formatsRequested: FormatPresetKey[];
+}
+
+export interface ProcessImageFormatsResult {
+  imageName: string;
+  formatResults: FormatResult[];
   totalProcessingTimeMs: number;
 }
 
@@ -53,41 +70,42 @@ class SmartResizerService {
    * Processes a single master image into multiple formats
    */
   async processJob(jobData: SmartResizerJobData): Promise<SmartResizerResult> {
-    const { jobId, clientId, userId, masterImageBuffer, formatsRequested } = jobData;
+    const { jobId, clientId, userId, masterImageBuffer: masterImageBase64, formatsRequested } = jobData;
     const startTime = Date.now();
 
+    // Convert base64 string to Buffer
+    const masterImageBuffer = Buffer.from(masterImageBase64, 'base64');
+
+    // Validate buffer
+    if (!masterImageBuffer || masterImageBuffer.length === 0) {
+      throw new Error('Master image buffer is empty or invalid');
+    }
+
     if (process.env.NODE_ENV === 'development') {
-      console.log('🚀 SmartResizer: Starting job', {
+      logger.debug('🚀 SmartResizer: Starting job', {
         jobId,
         formatCount: formatsRequested.length,
         imageSize: `${(masterImageBuffer.length / 1024).toFixed(2)}KB`,
+        bufferLength: masterImageBuffer.length,
+        base64Length: masterImageBase64.length,
       });
     }
 
     try {
       // ===============================================
-      // PHASE 1: Analyze Master Image with OCR
+      // PHASE 1: Get Master Image Metadata
       // ===============================================
       await this.updateJobStatus(jobId, 'processing');
 
-      const masterImageBase64 = imageProcessing.bufferToBase64(masterImageBuffer);
-      const detectedContent = await ocrService.analyzeImage(masterImageBase64);
-
-      if (process.env.NODE_ENV === 'development') {
-        console.log('✅ SmartResizer: OCR complete', {
-          textCount: detectedContent.texts.length,
-          visualCount: detectedContent.visual_elements.length,
-        });
-      }
-
-      // Save detected content to job
-      await supabaseAdmin
-        .from('smart_resizer_jobs')
-        .update({ detected_content: detectedContent })
-        .eq('id', jobId);
-
       // Get master image metadata
       const masterMetadata = await imageProcessing.getImageMetadata(masterImageBuffer);
+
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('✅ SmartResizer: Image analyzed', {
+          dimensions: `${masterMetadata.width}x${masterMetadata.height}`,
+          format: masterMetadata.format,
+        });
+      }
 
       // ===============================================
       // PHASE 2: Generate Each Format
@@ -100,15 +118,15 @@ class SmartResizerService {
           clientId,
           formatKey,
           masterImageBuffer,
+          masterImageBase64,
           masterMetadata,
-          detectedContent,
         });
 
         results.push(formatResult);
 
         if (process.env.NODE_ENV === 'development') {
           const emoji = formatResult.status === 'completed' ? '✅' : '❌';
-          console.log(`${emoji} SmartResizer: Format ${formatKey}`, {
+          logger.debug(`${emoji} SmartResizer: Format ${formatKey}`, {
             status: formatResult.status,
             method: formatResult.processingMethod,
             time: `${formatResult.processingTimeMs}ms`,
@@ -125,7 +143,7 @@ class SmartResizerService {
       await this.updateJobStatus(jobId, allCompleted ? 'completed' : 'failed');
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('🎉 SmartResizer: Job complete', {
+        logger.debug('🎉 SmartResizer: Job complete', {
           jobId,
           totalFormats: results.length,
           successful: results.filter(r => r.status === 'completed').length,
@@ -137,12 +155,11 @@ class SmartResizerService {
       return {
         jobId,
         status: allCompleted ? 'completed' : 'failed',
-        detectedContent,
         results,
         totalProcessingTimeMs,
       };
     } catch (error: any) {
-      console.error('❌ SmartResizer.processJob: Failed', {
+      logger.error('❌ SmartResizer.processJob: Failed', {
         jobId,
         error: error.message,
         stack: error.stack,
@@ -155,6 +172,226 @@ class SmartResizerService {
   }
 
   /**
+   * Process image formats for workflow execution
+   * This method does NOT create smart_resizer_jobs or smart_resizer_results entries
+   * It returns results directly for the workflow to store in workflow_batch_results
+   */
+  async processImageFormats(params: ProcessImageFormatsParams): Promise<ProcessImageFormatsResult> {
+    const {
+      clientId,
+      executionId,
+      imageIndex,
+      imageName,
+      masterImageBuffer,
+      masterImageBase64,
+      formatsRequested
+    } = params;
+
+    const startTime = Date.now();
+
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('🚀 SmartResizer.processImageFormats: Starting', {
+        executionId,
+        imageIndex,
+        imageName,
+        formatCount: formatsRequested.length,
+        imageSize: `${(masterImageBuffer.length / 1024).toFixed(2)}KB`
+      });
+    }
+
+    try {
+      // ===============================================
+      // PHASE 1: Get Master Image Metadata
+      // ===============================================
+      const masterMetadata = await imageProcessing.getImageMetadata(masterImageBuffer);
+
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('✅ SmartResizer.processImageFormats: Image analyzed', {
+          dimensions: `${masterMetadata.width}x${masterMetadata.height}`,
+          format: masterMetadata.format
+        });
+      }
+
+      // ===============================================
+      // PHASE 2: Generate Each Format (Parallel Processing)
+      // ===============================================
+      // Process formats in parallel with concurrency limit of 3
+      // This reduces total processing time by ~3x while avoiding API rate limits
+      const limit = pLimit(3);
+
+      const formatPromises = formatsRequested.map(formatKey =>
+        limit(() => this.processFormatForWorkflow({
+          clientId,
+          executionId,
+          imageIndex,
+          formatKey,
+          masterImageBuffer,
+          masterImageBase64,
+          masterMetadata
+        }))
+      );
+
+      const formatResults = await Promise.all(formatPromises);
+
+      // Log results
+      if (process.env.NODE_ENV === 'development') {
+        formatResults.forEach(formatResult => {
+          const emoji = formatResult.status === 'completed' ? '✅' : '❌';
+          logger.debug(`${emoji} SmartResizer.processImageFormats: Format ${formatResult.formatName}`, {
+            status: formatResult.status,
+            method: formatResult.processingMethod,
+            time: `${formatResult.processingTimeMs}ms`
+          });
+        });
+      }
+
+      const totalProcessingTimeMs = Date.now() - startTime;
+
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('🎉 SmartResizer.processImageFormats: Complete', {
+          imageName,
+          totalFormats: formatResults.length,
+          successful: formatResults.filter(r => r.status === 'completed').length,
+          failed: formatResults.filter(r => r.status === 'failed').length,
+          totalTime: `${totalProcessingTimeMs}ms`
+        });
+      }
+
+      return {
+        imageName,
+        formatResults,
+        totalProcessingTimeMs
+      };
+    } catch (error: any) {
+      logger.error('❌ SmartResizer.processImageFormats: Failed', {
+        imageName,
+        error: error.message,
+        stack: error.stack
+      });
+      throw error;
+    }
+  }
+
+  /**
+   * Process a single format for workflow execution
+   * Does NOT create database records - returns results for caller to store
+   */
+  private async processFormatForWorkflow(params: {
+    clientId: string;
+    executionId: string;
+    imageIndex: number;
+    formatKey: FormatPresetKey;
+    masterImageBuffer: Buffer;
+    masterImageBase64: string;
+    masterMetadata: any;
+  }): Promise<FormatResult> {
+    const { clientId, executionId, imageIndex, formatKey, masterImageBuffer, masterImageBase64, masterMetadata } = params;
+    const startTime = Date.now();
+
+    const formatPreset = getFormatPreset(formatKey);
+    const { width, height, platform } = formatPreset;
+
+    try {
+      // Determine best processing method
+      const method = imageProcessing.determineBestMethod(
+        masterMetadata.width,
+        masterMetadata.height,
+        formatPreset
+      );
+
+      if (process.env.NODE_ENV === 'development') {
+        logger.debug('🔍 SmartResizer.processFormatForWorkflow: Processing', {
+          formatKey,
+          method,
+          dimensions: `${width}x${height}`
+        });
+      }
+
+      let processedBuffer: Buffer;
+
+      // =============================================
+      // Apply processing method
+      // =============================================
+      if (method === 'crop') {
+        const result = await imageProcessing.smartCrop(
+          masterImageBuffer,
+          width,
+          height,
+          { strategy: 'attention' }
+        );
+        processedBuffer = result.buffer;
+      } else if (method === 'padding') {
+        const result = await imageProcessing.resizeWithPadding(
+          masterImageBuffer,
+          width,
+          height,
+          '#FFFFFF'
+        );
+        processedBuffer = result.buffer;
+      } else {
+        // AI regeneration with Gemini (Nano Banana Pro)
+        processedBuffer = await this.generateWithAI(
+          masterImageBase64,
+          formatKey
+        );
+      }
+
+      // =============================================
+      // Upload to Supabase Storage
+      // =============================================
+      const storagePath = `smart-resizer/${executionId}/${imageIndex}_${formatKey}.png`;
+      const { error: uploadError } = await supabaseAdmin.storage
+        .from('workflow-results')
+        .upload(storagePath, processedBuffer, {
+          contentType: 'image/png',
+          upsert: true
+        });
+
+      if (uploadError) {
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+
+      // Get public URL
+      const { data: urlData } = supabaseAdmin.storage
+        .from('workflow-results')
+        .getPublicUrl(storagePath);
+
+      const resultUrl = urlData.publicUrl;
+      const processingTimeMs = Date.now() - startTime;
+
+      return {
+        formatName: formatKey,
+        platform,
+        width,
+        height,
+        resultUrl,
+        storagePath,
+        processingMethod: method,
+        status: 'completed',
+        processingTimeMs
+      };
+    } catch (error: any) {
+      logger.error('❌ SmartResizer.processFormatForWorkflow: Failed', {
+        formatKey,
+        error: error.message
+      });
+
+      return {
+        formatName: formatKey,
+        platform,
+        width,
+        height,
+        resultUrl: null,
+        storagePath: null,
+        processingMethod: 'ai_regenerate',
+        status: 'failed',
+        errorMessage: error.message,
+        processingTimeMs: Date.now() - startTime
+      };
+    }
+  }
+
+  /**
    * Process a single format
    */
   private async processFormat(params: {
@@ -162,10 +399,10 @@ class SmartResizerService {
     clientId: string;
     formatKey: FormatPresetKey;
     masterImageBuffer: Buffer;
+    masterImageBase64: string;
     masterMetadata: any;
-    detectedContent: DetectedContent;
   }): Promise<FormatResult> {
-    const { jobId, clientId, formatKey, masterImageBuffer, masterMetadata, detectedContent } = params;
+    const { jobId, clientId, formatKey, masterImageBuffer, masterImageBase64, masterMetadata } = params;
     const startTime = Date.now();
 
     const formatPreset = getFormatPreset(formatKey);
@@ -186,7 +423,7 @@ class SmartResizerService {
       .single();
 
     if (createError || !resultRecord) {
-      console.error('❌ SmartResizer: Failed to create result record', {
+      logger.error('❌ SmartResizer: Failed to create result record', {
         formatKey,
         error: createError?.message,
       });
@@ -214,7 +451,7 @@ class SmartResizerService {
       );
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('🔍 SmartResizer: Processing format', {
+        logger.debug('🔍 SmartResizer: Processing format', {
           formatKey,
           method,
           dimensions: `${width}x${height}`,
@@ -245,14 +482,10 @@ class SmartResizerService {
         );
         processedBuffer = result.buffer;
       } else {
-        // AI regeneration with Gemini
+        // AI regeneration with Gemini (Nano Banana Pro)
         processedBuffer = await this.generateWithAI(
-          masterImageBuffer,
-          detectedContent,
-          formatKey,
-          width,
-          height,
-          safeZone
+          masterImageBase64,
+          formatKey
         );
       }
 
@@ -304,7 +537,7 @@ class SmartResizerService {
         processingTimeMs,
       };
     } catch (error: any) {
-      console.error('❌ SmartResizer.processFormat: Failed', {
+      logger.error('❌ SmartResizer.processFormat: Failed', {
         formatKey,
         error: error.message,
       });
@@ -335,59 +568,52 @@ class SmartResizerService {
   }
 
   /**
-   * Generate format using Gemini AI
+   * Generate format using Gemini AI (Nano Banana Pro)
+   * Simple approach: Send image + aspect ratio, let AI handle the rest
    */
   private async generateWithAI(
-    masterImageBuffer: Buffer,
-    detectedContent: DetectedContent,
-    formatKey: FormatPresetKey,
-    width: number,
-    height: number,
-    safeZone: any
+    masterImageBase64: string,
+    formatKey: FormatPresetKey
   ): Promise<Buffer> {
+    const formatPreset = getFormatPreset(formatKey);
+    const { ratio, width, height } = formatPreset;
+
     if (process.env.NODE_ENV === 'development') {
-      console.log('🎨 SmartResizer: Generating with AI', { formatKey, width, height });
+      logger.debug('🎨 SmartResizer: Generating with AI', {
+        formatKey,
+        ratio,
+        dimensions: `${width}x${height}`
+      });
     }
 
     const startTime = Date.now();
 
     try {
-      // Calculate safe zone in pixels
-      const safeZonePixels = calculateSafeZonePixels(width, height, safeZone);
-
-      // Build comprehensive prompt
-      const prompt = ocrService.buildGenerationPrompt(
-        detectedContent,
-        formatKey,
-        width,
-        height,
-        safeZonePixels
-      );
-
-      // Convert master image to base64
-      const masterImageBase64 = imageProcessing.bufferToBase64(masterImageBuffer);
+      // Simple prompt - let Nano Banana Pro handle text preservation natively
+      const prompt = `Adapt this image to ${ratio} aspect ratio. Keep all text, logos, and visual elements exactly as they are. Only reorganize the layout to fit the new format.`;
 
       // Call Gemini Image Service (Nano Banana Pro)
       const result = await geminiService.generateImageWithReference({
         prompt,
         referenceImage: masterImageBase64,
-        aspectRatio: `${width}:${height}`,
+        aspectRatio: ratio,
       });
 
       const processingTime = Date.now() - startTime;
 
       if (process.env.NODE_ENV === 'development') {
-        console.log('✅ SmartResizer: AI generation complete', {
+        logger.debug('✅ SmartResizer: AI generation complete', {
           formatKey,
+          ratio,
           processingTime: `${processingTime}ms`,
         });
       }
 
-      // Result is already a Buffer from geminiService
       return result;
     } catch (error: any) {
-      console.error('❌ SmartResizer.generateWithAI: Failed', {
+      logger.error('❌ SmartResizer.generateWithAI: Failed', {
         formatKey,
+        ratio,
         error: error.message,
       });
       throw error;

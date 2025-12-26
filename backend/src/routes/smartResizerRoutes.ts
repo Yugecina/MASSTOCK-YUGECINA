@@ -17,6 +17,8 @@ import {
 } from '../controllers/smartResizerController';
 import { authenticate } from '../middleware/auth';
 import { uploadSingle } from '../middleware/upload';
+import { uploadLimiter } from '../middleware/rateLimit';
+import { logger } from '../config/logger';
 
 const router = express.Router();
 
@@ -46,7 +48,7 @@ const router = express.Router();
  *   }
  * }
  */
-router.post('/jobs', authenticate, uploadSingle('masterImage'), createJob);
+router.post('/jobs', authenticate, uploadLimiter, uploadSingle('masterImage'), createJob);
 
 /**
  * GET /api/v1/smart-resizer/jobs/:id
@@ -69,6 +71,70 @@ router.post('/jobs', authenticate, uploadSingle('masterImage'), createJob);
  * }
  */
 router.get('/jobs/:id', authenticate, getJobById);
+
+/**
+ * GET /api/v1/smart-resizer/debug
+ * Debug endpoint to test authentication and client_members query
+ */
+router.get('/debug', authenticate, async (req, res) => {
+  try {
+    const user = (req as any).user;
+
+    logger.debug('🔍 SmartResizer Debug: User from request', {
+      userId: user?.id,
+      userEmail: user?.email,
+      clientId: user?.client_id,
+    });
+
+    const { createClient } = await import('@supabase/supabase-js');
+    const testAdmin = createClient(
+      process.env.SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    );
+
+    const { data: memberData, error: memberError } = await testAdmin
+      .from('client_members')
+      .select('client_id')
+      .eq('user_id', user.id)
+      .limit(1)
+      .single();
+
+    logger.debug('🔍 SmartResizer Debug: Query result', {
+      memberData,
+      memberError,
+    });
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          email: user.email,
+          client_id: user.client_id,
+        },
+        query: {
+          memberData,
+          memberError: memberError ? {
+            message: memberError.message,
+            code: memberError.code,
+          } : null,
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('❌ SmartResizer Debug: Error', { error });
+    res.status(500).json({
+      success: false,
+      error: (error as Error).message,
+    });
+  }
+});
 
 /**
  * GET /api/v1/smart-resizer/formats
