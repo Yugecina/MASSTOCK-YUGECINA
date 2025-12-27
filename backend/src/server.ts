@@ -80,7 +80,8 @@ app.use('/api/v1/support-tickets', supportTicketRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/assets', assetsRoutes);
 app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/smart-resizer', smartResizerRoutes);
+// TODO: Remove smart-resizer standalone routes - now integrated into workflows
+// app.use('/api/v1/smart-resizer', smartResizerRoutes);
 
 // Global error handler (must be last middleware)
 app.use(errorHandler);

@@ -12,9 +12,19 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-4);
-  max-width: 1200px;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  padding: 0 var(--spacing-4);
+}
+
+/* Augmenter la largeur pour Grid 4 et 5 */
+.br-container:has(.br-grid--4) {
+  max-width: 1600px;
+}
+
+.br-container:has(.br-grid--5) {
+  max-width: 1800px;
 }
 
 /* ========================================
@@ -298,20 +308,18 @@
 }
 
 /* ========================================
-   RESULTS GRID
+   RESULTS GRID - MASONRY LAYOUT
    ======================================== */
 
 .br-grid {
-  display: grid;
-  gap: var(--spacing-4);
-  grid-auto-rows: auto; /* Allow cards to define their own height */
+  column-gap: var(--spacing-4);
 }
 
-.br-grid--1 { grid-template-columns: 1fr; }
-.br-grid--2 { grid-template-columns: repeat(2, 1fr); }
-.br-grid--3 { grid-template-columns: repeat(3, 1fr); }
-.br-grid--4 { grid-template-columns: repeat(4, 1fr); }
-.br-grid--5 { grid-template-columns: repeat(5, 1fr); }
+.br-grid--1 { column-count: 1; }
+.br-grid--2 { column-count: 2; }
+.br-grid--3 { column-count: 3; }
+.br-grid--4 { column-count: 4; }
+.br-grid--5 { column-count: 5; }
 
 /* ========================================
    RESULT CARD
@@ -324,6 +332,10 @@
   overflow: hidden;
   position: relative;
   transition: all 200ms ease-out;
+  break-inside: avoid;
+  margin-bottom: var(--spacing-4);
+  display: inline-block;
+  width: 100%;
 }
 
 .br-card:hover {
@@ -383,7 +395,6 @@
   background: var(--muted);
   width: 100%;
   cursor: pointer;
-  min-height: 200px; /* Minimum height pour éviter des cartes trop petites */
 }
 
 .br-card-image img,
@@ -964,10 +975,11 @@
     justify-content: center;
   }
 
+  /* Réduire à 2 colonnes max sur tablette */
   .br-grid--3,
   .br-grid--4,
   .br-grid--5 {
-    grid-template-columns: repeat(2, 1fr);
+    column-count: 2 !important;
   }
 
   /* Preview responsive */
@@ -1006,11 +1018,12 @@
 }
 
 @media (max-width: 480px) {
+  /* 1 colonne sur mobile */
   .br-grid--2,
   .br-grid--3,
   .br-grid--4,
   .br-grid--5 {
-    grid-template-columns: 1fr;
+    column-count: 1 !important;
   }
 
   /* Preview mobile */

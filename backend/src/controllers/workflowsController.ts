@@ -289,7 +289,7 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
       // Use provided values or fall back to defaults only after validation
       const prompts_text = prompts_text_input || process.env.DEFAULT_NANO_BANANA_PROMPT;
       const api_key = validatedData?.api_key || req.body.api_key || process.env.DEFAULT_GEMINI_API_KEY;
-      const files = (req as any).files || [];
+      const files = (req as any).files?.['reference_images'] || (req as any).files || [];
 
       // DEBUG: Log received files from Multer
       logger.debug('🔍 MULTER FILES RECEIVED:', {
@@ -432,6 +432,77 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
         model: model,
         aspect_ratio: aspect_ratio,
         resolution: resolution,
+        pricing_details: pricing
+      };
+    } else if (workflow.config.workflow_type === 'smart_resizer') {
+      // Smart Resizer workflow: multipart form with images and formats
+      const filesObj = (req as any).files || {};
+      const imageFiles = filesObj['images'] || [];
+      const batch_count = parseInt(req.body.batch_count || '0');
+      const ai_regeneration = req.body.ai_regeneration === 'true';
+
+      // Validate required fields
+      if (imageFiles.length === 0) {
+        throw new ApiError(400, 'At least one image is required', 'MISSING_IMAGES');
+      }
+
+      // Validate workflow config
+      if (!workflow.config.available_formats || !Array.isArray(workflow.config.available_formats)) {
+        throw new ApiError(500, 'Workflow configuration missing available_formats', 'INVALID_WORKFLOW_CONFIG');
+      }
+
+
+      // Build batch with per-image formats
+      const batch = imageFiles.map((file: any, index: number) => {
+        const formatsKey = `formats_${index}`;
+        let formats: string[];
+        try {
+          formats = req.body[formatsKey] ? JSON.parse(req.body[formatsKey]) : [];
+        } catch (parseError: any) {
+          throw new ApiError(400, `Invalid JSON for ${formatsKey}: ${parseError.message}`, 'INVALID_FORMATS_JSON');
+        }
+
+        if (formats.length === 0) {
+          throw new ApiError(400, `Image ${index} has no formats selected`, 'MISSING_FORMATS');
+        }
+
+        // Validate formats against available_formats
+        const validFormats = workflow.config.available_formats.map((f: any) => f.id);
+        const invalidFormats = formats.filter((f: string) => !validFormats.includes(f));
+        if (invalidFormats.length > 0) {
+          throw new ApiError(400, `Invalid formats for image ${index}: ${invalidFormats.join(', ')}`, 'INVALID_FORMATS');
+        }
+
+        return {
+          image_base64: file.buffer.toString('base64'),
+          image_mime: file.mimetype,
+          image_name: file.originalname,
+          formats
+        };
+      });
+
+      // Calculate pricing (total formats across all images)
+      const totalFormats = batch.reduce((sum, item) => sum + item.formats.length, 0);
+      const pricingConfig = workflow.config.pricing?.per_format || { cost_per_format: 0.001, revenue_per_format: 0.01 };
+      const pricing = {
+        cost_per_format: pricingConfig.cost_per_format,
+        total_cost: totalFormats * pricingConfig.cost_per_format,
+        total_revenue: totalFormats * pricingConfig.revenue_per_format,
+        format_count: totalFormats,
+        image_count: batch.length
+      };
+
+      logger.info('💰 Smart Resizer pricing calculated:', pricing);
+
+      // Prepare input data
+      input_data = {
+        batch,
+        ai_regeneration,
+        pricing_details: pricing
+      };
+
+      updatedConfig = {
+        ...workflow.config,
         pricing_details: pricing
       };
     } else {

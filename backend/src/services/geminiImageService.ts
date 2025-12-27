@@ -16,7 +16,7 @@ import { logApiCall, logApiResponse, logError, logRetry } from '../utils/workflo
 
 // API Configuration
 const GEMINI_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
-const GEMINI_MODEL = 'gemini-2.5-flash-image';
+const GEMINI_MODEL = 'gemini-3-pro-image-preview'; // Nano Banana Pro (professional quality, up to 4K)
 const API_TIMEOUT = 120000; // 120 seconds (increased from 60s due to observed 84s processing times)
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 2000; // 2 seconds
@@ -463,7 +463,10 @@ class GeminiImageService {
         // Don't retry on certain errors
         if (this._shouldNotRetry(lastError)) {
           logger.debug(`   ⛔ Error is not retriable, throwing immediately`);
-          throw lastError;
+          // Throw a clean error without circular references (for Bull/Redis serialization)
+          const responseData = lastError.response?.data as any;
+          const errorMessage = responseData?.error?.message || lastError.message;
+          throw new Error(errorMessage);
         }
 
         // Log retry attempt
@@ -496,7 +499,10 @@ class GeminiImageService {
     // All retries failed
     logger.debug(`\n❌ All ${MAX_RETRIES} retry attempts failed`);
     logger.debug(`   Final error: ${lastError?.message}`);
-    throw lastError;
+    // Throw a clean error without circular references (for Bull/Redis serialization)
+    const responseData = lastError?.response?.data as any;
+    const errorMessage = responseData?.error?.message || lastError?.message || 'Unknown error';
+    throw new Error(errorMessage);
   }
 
   /**

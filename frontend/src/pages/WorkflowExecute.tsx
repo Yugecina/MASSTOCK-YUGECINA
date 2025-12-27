@@ -4,6 +4,7 @@ import { ClientLayout } from '../components/layout/ClientLayout'
 import { Spinner } from '../components/ui/Spinner'
 import { workflowService } from '../services/workflows'
 import { NanoBananaForm } from '../components/workflows/NanoBananaForm'
+import { SmartResizerForm } from '../components/workflows/SmartResizerForm'
 import { BatchResultsView } from '../components/workflows/BatchResultsView'
 import logger from '@/utils/logger'
 import { Workflow } from '../types'
@@ -150,8 +151,9 @@ export function WorkflowExecute(): JSX.Element {
   }, [step, startTime])
 
   const isNanoBanana = workflow?.config?.workflow_type === 'nano_banana'
+  const isSmartResizer = workflow?.config?.workflow_type === 'smart_resizer'
 
-  const handleExecute = async (data: Record<string, any>): Promise<void> => {
+  const handleExecute = async (data: Record<string, any> | FormData): Promise<void> => {
     setLoading(true)
     setError(null)
     setStartTime(Date.now())
@@ -437,6 +439,15 @@ export function WorkflowExecute(): JSX.Element {
                   initialData={prefillData}
                 />
               </>
+            ) : isSmartResizer ? (
+              <>
+                <h2 className="workflow-form-title">Configure Smart Resizer</h2>
+                <SmartResizerForm
+                  onSubmit={handleExecute}
+                  loading={loading}
+                  workflow={workflow}
+                />
+              </>
             ) : (
               <>
                 <h2 className="workflow-form-title">Configure Workflow</h2>
@@ -588,6 +599,11 @@ export function WorkflowExecute(): JSX.Element {
                 {isNanoBanana ? (
                   <>
                     {logger.debug('🎨 WorkflowExecute: Rendering BatchResultsView for execution:', execution.id)}
+                    <BatchResultsView executionId={execution.id} />
+                  </>
+                ) : isSmartResizer ? (
+                  <>
+                    {logger.debug('🎨 WorkflowExecute: Rendering BatchResultsView for Smart Resizer execution:', execution.id)}
                     <BatchResultsView executionId={execution.id} />
                   </>
                 ) : (

@@ -75,13 +75,17 @@ router.get('/:workflow_id',
 /**
  * POST /api/workflows/:workflow_id/execute
  * Execute workflow
- * Supports both JSON and multipart/form-data (for workflows with file uploads like nano_banana)
+ * Supports both JSON and multipart/form-data (for workflows with file uploads like nano_banana and smart_resizer)
  */
 router.post('/:workflow_id/execute',
   authenticate,
   requireClient,
   executionLimiter,
-  upload.array('reference_images', 3), // Optional file upload for workflows that need it
+  upload.fields([
+    { name: 'reference_images', maxCount: 14 }, // For nano_banana workflow
+    { name: 'master_image', maxCount: 1 }, // For smart_resizer workflow (single)
+    { name: 'images', maxCount: 20 } // For smart_resizer workflow (batch)
+  ]),
   handleUploadError,
   param('workflow_id').isUUID(),
   // Note: input_data validation removed to support both JSON and FormData

@@ -144,10 +144,45 @@ const contactLimiter: RateLimitRequestHandler = rateLimit({
   }
 });
 
+/**
+ * Strict rate limiter for file upload endpoints (Smart Resizer, etc.)
+ * Prevents DoS attacks via large file uploads
+ */
+const uploadLimiter: RateLimitRequestHandler = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 uploads per 15 minutes per user
+  keyGenerator: (req: AuthRequest): string => {
+    // Rate limit per authenticated user (or IP for unauthenticated)
+    return req.user?.id || req.ip || 'unknown';
+  },
+  message: {
+    success: false,
+    error: 'Too many uploads, please try again later',
+    code: 'UPLOAD_RATE_LIMIT_EXCEEDED'
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req: AuthRequest, res: Response) => {
+    logError(new Error('Upload rate limit exceeded'), {
+      ip: req.ip,
+      user_id: req.user?.id,
+      endpoint: req.originalUrl
+    });
+
+    res.status(429).json({
+      success: false,
+      error: 'Too many uploads. Please try again after 15 minutes.',
+      code: 'UPLOAD_RATE_LIMIT_EXCEEDED',
+      retry_after: req.rateLimit?.resetTime
+    });
+  }
+});
+
 export {
   apiLimiter,
   authLimiter,
   executionLimiter,
   adminLimiter,
-  contactLimiter
+  contactLimiter,
+  uploadLimiter
 };

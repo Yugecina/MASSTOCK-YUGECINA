@@ -7,6 +7,7 @@ interface OptimizedImageProps {
   thumbnailSize?: number;
   aspectRatio?: string | null;
   onClick?: () => void;
+  onLoad?: (img: HTMLImageElement) => void;
 }
 
 /**
@@ -22,7 +23,8 @@ export function OptimizedImage({
   className = '',
   thumbnailSize = 400,
   aspectRatio = '4 / 3',
-  onClick
+  onClick,
+  onLoad
 }: OptimizedImageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -99,9 +101,14 @@ export function OptimizedImage({
     };
   }, [src, thumbnailSize, imageSrc]);
 
-  const handleLoad = () => {
+  const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     setIsLoading(false);
     setHasError(false);
+
+    // Call parent onLoad callback with image element
+    if (onLoad && e.currentTarget) {
+      onLoad(e.currentTarget);
+    }
   };
 
   const handleError = () => {

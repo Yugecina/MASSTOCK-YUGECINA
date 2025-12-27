@@ -584,20 +584,32 @@
   border-radius: var(--radius-full);
 }
 
-/* Assets Container - Masonry */
+/* Assets Container - Grid Masonry Layout */
 .assets-container {
   display: grid;
   gap: var(--spacing-5);
 }
 
+/* Grid-based masonry: fills row by row, adapts to content */
 .assets-container.masonry {
+  display: grid;
+  column-gap: var(--spacing-5); /* Only horizontal gap */
+  row-gap: 0; /* No gap between 10px rows - we manage vertical spacing manually */
   /* Grid columns set dynamically via inline style */
-  grid-auto-flow: dense;
+  grid-auto-flow: dense; /* Fill gaps intelligently */
+  grid-auto-rows: 10px; /* Small row unit for precise height control */
+  align-items: start; /* Align items to top */
+}
+
+/* Asset items span multiple rows based on their aspect ratio */
+.assets-container.masonry .asset-item {
+  /* Grid row span set dynamically via inline style based on image dimensions */
+  margin-bottom: var(--spacing-5); /* Manual vertical spacing between items */
 }
 
 @media (max-width: 768px) {
   .assets-container.masonry {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
 }
 

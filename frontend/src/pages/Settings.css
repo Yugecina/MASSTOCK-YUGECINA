@@ -274,3 +274,8 @@
   font-size: 13px;
   color: var(--muted-foreground);
 }
+
+.settings-dark-mode-wrapper {
+  display: flex;
+  align-items: center;
+}

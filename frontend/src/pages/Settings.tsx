@@ -3,6 +3,7 @@ import { ClientLayout } from '../components/layout/ClientLayout'
 import { useAuth } from '../hooks/useAuth'
 import { settingsService } from '../services/settings'
 import { Spinner } from '../components/ui/Spinner'
+import DarkModeToggle from '../components/ui/DarkModeToggle'
 import toast from 'react-hot-toast'
 import logger from '@/utils/logger'
 import './Settings.css'
@@ -304,6 +305,21 @@ export function Settings(): JSX.Element {
                 </div>
               </section>
             )}
+
+            {/* Appearance */}
+            <section className="settings-card">
+              <h2 className="settings-card-title">Appearance</h2>
+
+              <div className="settings-security-row">
+                <div className="settings-security-info">
+                  <p className="settings-security-title">Dark Mode</p>
+                  <p className="settings-security-desc">Toggle between dark and light theme</p>
+                </div>
+                <div className="settings-dark-mode-wrapper">
+                  <DarkModeToggle />
+                </div>
+              </div>
+            </section>
 
             {/* Security */}
             <section className="settings-card">

@@ -135,14 +135,6 @@ export default function App(_props: AppProps): React.ReactElement {
             }
           />
           <Route
-            path="/smart-resizer"
-            element={
-              <ProtectedRoute>
-                <SmartResizer />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/requests"
             element={
               <ProtectedRoute>

@@ -17,7 +17,7 @@ export interface FormatPreset {
   width: number;
   height: number;
   ratio: string;
-  platform: 'meta' | 'google' | 'dooh' | 'programmatic';
+  platform: 'meta' | 'google' | 'dooh' | 'programmatic' | 'standard';
   safeZone: SafeZone;
   description: string;
   usage: string;
@@ -26,240 +26,111 @@ export interface FormatPreset {
 export type FormatPresetKey = keyof typeof FORMAT_PRESETS;
 
 /**
- * Complete format presets catalog
- * Based on official advertising specs (2025)
+ * Simple photo aspect ratios
+ * Based on standard photography formats
  */
 export const FORMAT_PRESETS = {
-  // ========================================
-  // META (Facebook/Instagram)
-  // ========================================
-  meta_feed_square: {
+  // Square
+  square: {
     width: 1080,
     height: 1080,
     ratio: '1:1',
-    platform: 'meta',
+    platform: 'standard',
     safeZone: { all: 0 },
-    description: 'Meta Feed Square',
-    usage: 'Facebook & Instagram Feed posts',
+    description: '1:1 Square',
+    usage: 'Instagram, Facebook posts',
   },
 
-  meta_feed_vertical: {
+  // Portrait formats
+  portrait_2_3: {
+    width: 1080,
+    height: 1620,
+    ratio: '2:3',
+    platform: 'standard',
+    safeZone: { all: 0 },
+    description: '2:3 Portrait',
+    usage: 'Classic portrait photography',
+  },
+
+  portrait_3_4: {
+    width: 1080,
+    height: 1440,
+    ratio: '3:4',
+    platform: 'standard',
+    safeZone: { all: 0 },
+    description: '3:4 Traditional',
+    usage: 'Traditional portrait format',
+  },
+
+  social_story: {
+    width: 1080,
+    height: 1920,
+    ratio: '9:16',
+    platform: 'standard',
+    safeZone: { all: 0 },
+    description: '9:16 Social Story',
+    usage: 'Instagram Stories, TikTok, Reels',
+  },
+
+  social_post: {
     width: 1080,
     height: 1350,
     ratio: '4:5',
-    platform: 'meta',
+    platform: 'standard',
     safeZone: { all: 0 },
-    description: 'Meta Feed Vertical',
-    usage: 'Facebook & Instagram Feed (recommended)',
+    description: '4:5 Social Post',
+    usage: 'Instagram/Facebook optimal',
   },
 
-  meta_stories: {
-    width: 1080,
-    height: 1920,
-    ratio: '9:16',
-    platform: 'meta',
-    safeZone: { top: 0.14, bottom: 0.35, left: 0.06, right: 0.06 },
-    description: 'Meta Stories',
-    usage: 'Instagram Stories ads',
-  },
-
-  meta_reels: {
-    width: 1080,
-    height: 1920,
-    ratio: '9:16',
-    platform: 'meta',
-    safeZone: { top: 0.14, bottom: 0.35, left: 0.06, right: 0.06 },
-    description: 'Meta Reels',
-    usage: 'Instagram & Facebook Reels',
-  },
-
-  meta_carousel: {
-    width: 1080,
+  // Landscape formats
+  standard_3_2: {
+    width: 1620,
     height: 1080,
-    ratio: '1:1',
-    platform: 'meta',
+    ratio: '3:2',
+    platform: 'standard',
     safeZone: { all: 0 },
-    description: 'Meta Carousel',
-    usage: 'Carousel ads (multi-image)',
+    description: '3:2 Standard',
+    usage: 'Standard photography (35mm)',
   },
 
-  // ========================================
-  // GOOGLE DISPLAY NETWORK
-  // ========================================
-  google_medium_rectangle: {
-    width: 300,
-    height: 250,
-    ratio: '6:5',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Medium Rectangle',
-    usage: 'Google Display - Top performer',
+  classic_4_3: {
+    width: 1440,
+    height: 1080,
+    ratio: '4:3',
+    platform: 'standard',
+    safeZone: { all: 0 },
+    description: '4:3 Classic',
+    usage: 'Classic TV/monitor format',
   },
 
-  google_leaderboard: {
-    width: 728,
-    height: 90,
-    ratio: '8:1',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Leaderboard',
-    usage: 'Google Display - Desktop banner',
-  },
-
-  google_half_page: {
-    width: 300,
-    height: 600,
-    ratio: '1:2',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Half Page',
-    usage: 'Google Display - High impact',
-  },
-
-  google_large_rectangle: {
-    width: 336,
-    height: 280,
-    ratio: '6:5',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Large Rectangle',
-    usage: 'Google Display - Popular format',
-  },
-
-  google_mobile_leaderboard: {
-    width: 320,
-    height: 50,
-    ratio: '32:5',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Mobile Leaderboard',
-    usage: 'Google Display - Mobile banner',
-  },
-
-  google_large_mobile: {
-    width: 320,
-    height: 100,
-    ratio: '16:5',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Large Mobile Banner',
-    usage: 'Google Display - Mobile',
-  },
-
-  google_billboard: {
-    width: 970,
-    height: 250,
-    ratio: '4:1',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Billboard',
-    usage: 'Google Display - Premium desktop',
-  },
-
-  google_skyscraper: {
-    width: 160,
-    height: 600,
-    ratio: '4:15',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Wide Skyscraper',
-    usage: 'Google Display - Sidebar',
-  },
-
-  google_responsive_landscape: {
-    width: 1200,
-    height: 628,
-    ratio: '1.91:1',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Responsive Display Landscape',
-    usage: 'Google Responsive Display Ads',
-  },
-
-  google_responsive_square: {
-    width: 1200,
-    height: 1200,
-    ratio: '1:1',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Responsive Display Square',
-    usage: 'Google Responsive Display Ads',
-  },
-
-  google_responsive_vertical: {
-    width: 1200,
-    height: 1500,
-    ratio: '4:5',
-    platform: 'google',
-    safeZone: { all: 0.05 },
-    description: 'Responsive Display Vertical',
-    usage: 'Google Responsive Display Ads',
-  },
-
-  // ========================================
-  // DOOH (Digital Out-of-Home)
-  // ========================================
-  dooh_landscape_hd: {
+  widescreen: {
     width: 1920,
     height: 1080,
     ratio: '16:9',
-    platform: 'dooh',
-    safeZone: { all: 0.15 },
-    description: 'Landscape HD',
-    usage: 'Digital billboards, outdoor screens',
+    platform: 'standard',
+    safeZone: { all: 0 },
+    description: '16:9 Widescreen',
+    usage: 'YouTube, modern displays',
   },
 
-  dooh_landscape_4k: {
-    width: 3840,
-    height: 2160,
-    ratio: '16:9',
-    platform: 'dooh',
-    safeZone: { all: 0.15 },
-    description: 'Landscape 4K',
-    usage: 'Premium digital billboards',
+  medium_5_4: {
+    width: 1350,
+    height: 1080,
+    ratio: '5:4',
+    platform: 'standard',
+    safeZone: { all: 0 },
+    description: '5:4 Medium',
+    usage: 'Large format photography',
   },
 
-  dooh_portrait_hd: {
-    width: 1080,
-    height: 1920,
-    ratio: '9:16',
-    platform: 'dooh',
-    safeZone: { all: 0.15 },
-    description: 'Portrait HD',
-    usage: 'Digital totems, mall screens',
-  },
-
-  dooh_portrait_4k: {
-    width: 2160,
-    height: 3840,
-    ratio: '9:16',
-    platform: 'dooh',
-    safeZone: { all: 0.15 },
-    description: 'Portrait 4K',
-    usage: 'Premium digital totems',
-  },
-
-  // ========================================
-  // PROGRAMMATIC / NATIVE
-  // ========================================
-  programmatic_interstitial: {
-    width: 320,
-    height: 480,
-    ratio: '2:3',
-    platform: 'programmatic',
-    safeZone: { all: 0.10 },
-    description: 'Mobile Interstitial',
-    usage: 'In-app full-screen ads',
-  },
-
-  programmatic_native: {
-    width: 1200,
-    height: 627,
-    ratio: '1.91:1',
-    platform: 'programmatic',
-    safeZone: { all: 0.05 },
-    description: 'Native Ad',
-    usage: 'Programmatic native advertising',
+  ultrawide: {
+    width: 2520,
+    height: 1080,
+    ratio: '21:9',
+    platform: 'standard',
+    safeZone: { all: 0 },
+    description: '21:9 Widescreen',
+    usage: 'Cinematic ultra-wide',
   },
 } as const;
 
@@ -280,7 +151,7 @@ export function getAllFormatKeys(): FormatPresetKey[] {
 /**
  * Get formats by platform
  */
-export function getFormatsByPlatform(platform: 'meta' | 'google' | 'dooh' | 'programmatic'): FormatPresetKey[] {
+export function getFormatsByPlatform(platform: 'meta' | 'google' | 'dooh' | 'programmatic' | 'standard'): FormatPresetKey[] {
   return getAllFormatKeys().filter(key => FORMAT_PRESETS[key].platform === platform);
 }
 
@@ -313,10 +184,10 @@ export function calculateSafeZonePixels(
  * Get format pack presets (quick selections)
  */
 export const FORMAT_PACKS = {
-  meta: ['meta_feed_square', 'meta_feed_vertical', 'meta_stories', 'meta_reels'] as FormatPresetKey[],
-  google: ['google_medium_rectangle', 'google_leaderboard', 'google_half_page', 'google_responsive_landscape'] as FormatPresetKey[],
-  dooh: ['dooh_landscape_hd', 'dooh_portrait_hd'] as FormatPresetKey[],
-  full: getAllFormatKeys(),
+  social: ['square', 'social_post', 'social_story'] as FormatPresetKey[],
+  portrait: ['portrait_2_3', 'portrait_3_4', 'social_story'] as FormatPresetKey[],
+  landscape: ['standard_3_2', 'classic_4_3', 'widescreen'] as FormatPresetKey[],
+  all: getAllFormatKeys(),
 } as const;
 
 /**

@@ -22,6 +22,9 @@ interface BatchResult {
   error_message?: string;
   processing_time_ms?: number;
   created_at: string;
+  width?: number;
+  height?: number;
+  format_name?: string;
 }
 
 // Batch statistics
@@ -127,6 +130,26 @@ export function BatchResultsView({ executionId }: BatchResultsViewProps) {
     }
     loadResults();
   }, [executionId]);
+
+  // Helper function to calculate and format ratio
+  const formatPromptText = (result: BatchResult): string => {
+    if (!result.width || !result.height) {
+      return result.prompt_text;
+    }
+
+    // Calculate GCD to get simplified ratio
+    const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+    const divisor = gcd(result.width, result.height);
+    const ratioW = result.width / divisor;
+    const ratioH = result.height / divisor;
+    const ratio = `${ratioW}:${ratioH}`;
+
+    // Extract filename from prompt_text (format: "filename → format_name")
+    const parts = result.prompt_text.split(' → ');
+    const filename = parts[0] || result.prompt_text;
+
+    return `${filename} → ${ratio}`;
+  };
 
   const handleCopyUrl = async (url: string, index: number): Promise<void> => {
     try {
@@ -646,11 +669,6 @@ export function BatchResultsView({ executionId }: BatchResultsViewProps) {
             {/* Index Badge */}
             <div className="br-card-index">#{result.batch_index}</div>
 
-            {/* Status Badge */}
-            <div className={`br-card-status br-card-status--${result.status}`}>
-              {result.status}
-            </div>
-
             {/* Image or Placeholder */}
             {result.status === 'completed' && result.result_url ? (
               <div
@@ -725,7 +743,7 @@ export function BatchResultsView({ executionId }: BatchResultsViewProps) {
 
             {/* Details Panel */}
             <div className="br-card-details">
-              <div className="br-card-prompt">{result.prompt_text}</div>
+              <div className="br-card-prompt">{formatPromptText(result)}</div>
 
               {result.processing_time_ms && result.status === 'completed' && (
                 <div className="br-card-time">
