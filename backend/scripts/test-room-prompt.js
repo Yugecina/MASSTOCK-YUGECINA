@@ -10,27 +10,49 @@ const buildPrompt = (options) => {
   let prompt = `You are a professional virtual staging AI for real estate photography. `;
   prompt += `Using the provided room photograph, add furniture and decorations in a ${design_style} style.`;
 
-  // SECTION 2: Absolute Preservation Rules
+  // SECTION 2: Absolute Preservation Rules (RENFORCÉ v2)
   prompt += `
 
-CRITICAL PRESERVATION RULES - DO NOT MODIFY:
-- All windows: keep exact position, size, and shape
-- All doors: keep exact position, size, and style
-- All architectural features: walls, ceilings, floors, columns, beams, arches
-- All fixed installations: electrical outlets, light switches, built-in fixtures, radiators, air vents
-- All structural elements: baseboards, crown moldings, door frames, window frames
-- Room dimensions and perspective: maintain exact spatial proportions
-- Natural lighting: preserve light sources and shadows from windows
-- Floor plan layout: do not add or remove any architectural openings`;
+ABSOLUTE PRESERVATION - NEVER MODIFY THESE ELEMENTS:
 
-  // SECTION 3: Staging scope
+GLAZING & OPENINGS (most critical):
+- Sliding glass doors / bay windows: preserve EXACT number of panels, frame color, dimensions
+- All windows: keep exact position, size, shape, and frame style
+- All doors: keep exact position, size, style, and handle placement
+- Balcony/terrace access: preserve exact glass panel configuration
+
+SURFACES (do not change material or color):
+- Floor: keep the EXACT flooring material (tile, wood, carpet, concrete) and color
+- Walls: preserve wall color, texture, and any architectural details
+- Ceiling: keep exact ceiling type, height, beams, coffers, or architectural features
+
+FIXED ELEMENTS:
+- Built-in lighting: preserve track lights, recessed lights, ceiling fixtures positions
+- Electrical: keep outlets, switches, thermostats in exact positions
+- HVAC: preserve vents, radiators, air conditioning units
+- Built-in furniture: keep any built-in shelves, closets, kitchen cabinets
+
+ARCHITECTURAL FEATURES:
+- Columns, beams, arches: preserve all structural elements
+- Ceiling details: keep any drops, trays, or architectural ceiling features
+- Wall niches, alcoves: preserve all wall configurations`;
+
+  // SECTION 3: Staging scope (RENFORCÉ v2)
   prompt += `
 
-YOUR STAGING TASK - ADD ONLY:
-- Furniture appropriate for the room type (sofas, tables, chairs, beds, etc.)
-- Decorative items (plants, artwork, rugs, cushions, lamps)
-- Window treatments (curtains, blinds) that frame but do not hide windows
-- Accessories that enhance the ${design_style} aesthetic`;
+YOUR STAGING TASK - YOU MAY ONLY ADD:
+- Freestanding furniture (sofas, chairs, tables, beds - NOT built-in)
+- Decorative objects (plants, artwork, vases, books, cushions)
+- Rugs and carpets (placed ON existing floor, not replacing it)
+- Table lamps and floor lamps (NOT ceiling fixtures)
+- Window treatments (curtains/blinds that FRAME windows, never hide them)
+- Soft furnishings that match ${design_style} aesthetic
+
+YOU MUST NOT:
+- Change any flooring material or color
+- Modify ceiling structure or lighting fixtures
+- Alter window/door configurations or frame colors
+- Add or remove any architectural elements`;
 
   // SECTION 4: Style-specific guidance
   if (seasonal_preference) {
