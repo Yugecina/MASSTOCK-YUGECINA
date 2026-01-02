@@ -8,16 +8,16 @@
 import axios, { AxiosError } from 'axios';
 import { logger } from '../config/logger';
 
-// Design styles supported
+// Design styles supported (synchronized with validation schema)
 export type DesignStyle =
   | 'modern'
   | 'minimalist'
   | 'industrial'
   | 'scandinavian'
-  | 'bohemian'
-  | 'traditional'
   | 'contemporary'
-  | 'rustic';
+  | 'coastal'
+  | 'farmhouse'
+  | 'midcentury';
 
 export type BudgetLevel = 'low' | 'medium' | 'high' | 'luxury';
 
@@ -94,7 +94,15 @@ FIXED ELEMENTS:
 ARCHITECTURAL FEATURES:
 - Columns, beams, arches: preserve all structural elements
 - Ceiling details: keep any drops, trays, or architectural ceiling features
-- Wall niches, alcoves: preserve all wall configurations`;
+- Wall niches, alcoves: preserve all wall configurations
+
+EMPTY ROOM WARNING:
+If this room appears empty or sparsely furnished, be EXTRA CAREFUL to preserve:
+- Exact room dimensions and proportions (do not expand or shrink the space)
+- All wall positions and angles (preserve exact room shape)
+- Window and door placements EXACTLY as shown in the photograph
+- Floor material, pattern, and color WITHOUT ANY CHANGES
+ONLY add furniture and decorations - do NOT recreate or modify the room structure.`;
 
     // SECTION 3: Staging scope (RENFORCÉ v2)
     prompt += `
