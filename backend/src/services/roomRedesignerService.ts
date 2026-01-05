@@ -17,15 +17,18 @@ export type DesignStyle =
   | 'contemporary'
   | 'coastal'
   | 'farmhouse'
-  | 'midcentury';
+  | 'midcentury'
+  | 'traditional';
 
 export type BudgetLevel = 'low' | 'medium' | 'high' | 'luxury';
+
+export type SeasonType = 'spring' | 'summer' | 'autumn' | 'winter' | 'noel';
 
 export interface RoomRedesignerInput {
   image_base64: string;
   image_mime: string;
   design_style: DesignStyle;
-  seasonal_preference?: string;
+  season?: SeasonType;
   budget_level?: BudgetLevel;
   api_key: string;
 }
@@ -40,7 +43,7 @@ export interface RoomRedesignerResult {
 
 interface PromptOptions {
   design_style: DesignStyle;
-  seasonal_preference?: string;
+  season?: SeasonType;
   budget_level?: BudgetLevel;
 }
 
@@ -57,98 +60,177 @@ class RoomRedesignerService {
   /**
    * Build a detailed prompt for room redesign based on user preferences
    * Optimized for real estate virtual staging with strict architectural preservation
+   * v4: Enhanced to handle FURNISHED rooms - restyle with flexible layout while preserving architecture
    */
   buildPrompt(options: PromptOptions): string {
-    const {
-      design_style,
-      seasonal_preference,
-      budget_level,
-    } = options;
+    const { design_style, season, budget_level } = options;
 
-    // SECTION 1: Task Definition
-    let prompt = `You are a professional virtual staging AI for real estate photography. `;
-    prompt += `Using the provided room photograph, add furniture and decorations in a ${design_style} style.`;
+    // SECTION 1: Role and Task Definition
+    let prompt = `You are a professional virtual staging AI for real estate photography.
+Your task: RESTYLE this room photograph using a ${design_style.toUpperCase()} interior design style.
 
-    // SECTION 2: Absolute Preservation Rules (RENFORCÉ v2)
+=== MISSION CRITIQUE ===
+- If the room is EMPTY: Stage it with ${design_style} furniture
+- If the room is ALREADY FURNISHED: Replace ALL existing furniture with ${design_style} style furniture
+- You may reorganize furniture layout to best fit the ${design_style} style
+- ABSOLUTE RULE: The ARCHITECTURE must remain IDENTICAL (walls, windows, floor, ceiling, fixed lighting)
+- The output must be THE SAME ROOM with DIFFERENT furniture - NOT a reimagined room
+
+=== RÈGLES DE PRÉSERVATION ABSOLUE (CRITICAL) ===
+
+ANALYSE PRÉALABLE : Avant TOUTE modification, identifiez et verrouillez ces éléments :
+
+VITRAGES & OUVERTURES (PRIORITÉ MAXIMALE):
+- Comptez le nombre EXACT de panneaux de fenêtres, baies vitrées
+- Notez la couleur EXACTE des cadres (blanc, noir, bois, alu)
+- Préservez TOUTES les positions, tailles et styles des fenêtres/portes
+- Portes balcon/terrasse : maintenez la configuration EXACTE des panneaux
+- NE PAS ajouter, supprimer ou modifier les vitrages
+
+SURFACES (AUCUNE MODIFICATION):
+- Sol : GARDER le matériau EXACT (carrelage, parquet, moquette) et sa couleur
+- Murs : PRÉSERVER couleur, texture, moulures et détails architecturaux
+- Plafond : MAINTENIR type, hauteur et éléments (poutres, caissons)
+
+INSTALLATIONS FIXES (VERROUILLÉES):
+- Éclairage encastré, spots, plafonniers : NE PAS DÉPLACER NI AJOUTER
+- Lustres : PRÉSERVER position et style EXACTS
+- HVAC : ventilations, radiateurs - GARDER en position exacte
+- Meubles encastrés : placards, cuisine équipée - AUCUNE MODIFICATION
+- Électrique : prises, interrupteurs - PRÉSERVER les positions
+
+ÉLÉMENTS ARCHITECTURAUX (INTOUCHABLES):
+- Colonnes, poutres, arches - AUCUN CHANGEMENT
+- Détails architecturaux du plafond - PRÉSERVER exactement
+- Niches murales, alcôves - MAINTENIR la configuration
+
+=== INSTRUCTIONS PIÈCE VIDE ===
+
+Si cette pièce apparaît VIDE ou peu meublée :
+- La pièce EXISTE DÉJÀ - ne la recréez pas
+- PRÉSERVEZ les dimensions et proportions exactes
+- MAINTENEZ tous les angles et positions des murs
+- GARDEZ le matériau, motif et couleur du sol INCHANGÉS
+- Fenêtres et portes doivent rester IDENTIQUES à la photo
+- UNIQUEMENT AJOUTER meubles autonomes et décorations
+- NE PAS altérer la structure de la pièce
+
+=== INSTRUCTIONS PIÈCE MEUBLÉE (SI MEUBLES EXISTANTS) ===
+
+Si cette pièce contient DÉJÀ des meubles ou décorations :
+- REMPLACEZ TOUS les meubles existants par des meubles style ${design_style}
+- Vous POUVEZ réorganiser le layout des meubles pour mieux correspondre au style
+- Mais l'ARCHITECTURE reste INTOUCHABLE (murs, fenêtres, sol, plafond)
+- Le résultat doit être LA MÊME PIÈCE avec un NOUVEAU STYLE DE DÉCORATION
+- PAS une pièce complètement réimaginée ou recréée de zéro
+- L'angle de vue et la perspective : IDENTIQUES à l'original
+- Les proportions de la pièce : EXACTEMENT comme l'original
+
+=== PORTÉE DU STAGING - CE QUE VOUS POUVEZ AJOUTER ===
+
+MEUBLES AUTONOMES (style ${design_style}):
+- Canapés, fauteuils, chaises d'appoint
+- Tables basses, consoles, tables d'appoint
+- Lits, tables de nuit, commodes
+- Tables et chaises de salle à manger
+- Bibliothèques (non encastrées), vitrines
+
+ÉLÉMENTS DÉCORATIFS:
+- Plantes d'intérieur et cache-pots
+- Œuvres d'art (cadres muraux)
+- Vases, sculptures, objets décoratifs
+- Livres, magazines, plateaux décoratifs
+- Coussins, plaids, couvertures
+
+REVÊTEMENTS DE SOL:
+- Tapis (posés SUR le sol existant, jamais en remplacement)
+
+ÉCLAIRAGE (AUTONOME UNIQUEMENT):
+- Lampadaires
+- Lampes de table
+- NE PAS ajouter de plafonniers
+
+HABILLAGE FENÊTRES (ENCADREMENT UNIQUEMENT):
+- Rideaux qui ENCADRENT les fenêtres (ne les cachent jamais)
+- Voilages laissant passer la lumière
+- Stores montrés OUVERTS`;
+
+    // SECTION 2: Style-Specific Guidance
+    const styleGuides: Record<DesignStyle, string> = {
+      modern: 'Meubles aux lignes géométriques épurées, couleurs neutres (blanc, gris, noir), accents chrome/acier, ornementation minimale.',
+      minimalist: 'Uniquement pièces essentielles, maximum d\'espace négatif, palette monochrome, zéro encombrement.',
+      industrial: 'Meubles avec cadres métalliques, cuir, bois sombre, esthétique matériaux bruts exposés.',
+      scandinavian: 'Meubles en bois clair (chêne, bouleau), tissus neutres doux, textiles cosy, accessoires hygge.',
+      contemporary: 'Tendances actuelles, matériaux mixtes, pièces statement audacieuses, palettes sophistiquées.',
+      coastal: 'Meubles légers et aérés, textures naturelles (rotin, osier), palette bleu et blanc, décor balnéaire.',
+      farmhouse: 'Meubles en bois rustique, pièces vintage, tons neutres chauds, charme campagnard.',
+      midcentury: 'Formes iconiques 1950s-60s, courbes organiques, bois chaud, design ère atomique.',
+      traditional: 'Meubles classiques élégants, bois riches (acajou, noyer), symétrie, tissus luxueux (velours, soie), moulures décoratives, pièces intemporelles.'
+    };
+
     prompt += `
 
-ABSOLUTE PRESERVATION - NEVER MODIFY THESE ELEMENTS:
+=== APPLICATION DU STYLE ===
+GUIDE ${design_style.toUpperCase()}:
+${styleGuides[design_style]}`;
 
-GLAZING & OPENINGS (most critical):
-- Sliding glass doors / bay windows: preserve EXACT number of panels, frame color, dimensions
-- All windows: keep exact position, size, shape, and frame style
-- All doors: keep exact position, size, style, and handle placement
-- Balcony/terrace access: preserve exact glass panel configuration
-
-SURFACES (do not change material or color):
-- Floor: keep the EXACT flooring material (tile, wood, carpet, concrete) and color
-- Walls: preserve wall color, texture, and any architectural details
-- Ceiling: keep exact ceiling type, height, beams, coffers, or architectural features
-
-FIXED ELEMENTS:
-- Built-in lighting: preserve track lights, recessed lights, ceiling fixtures positions
-- Electrical: keep outlets, switches, thermostats in exact positions
-- HVAC: preserve vents, radiators, air conditioning units
-- Built-in furniture: keep any built-in shelves, closets, kitchen cabinets
-
-ARCHITECTURAL FEATURES:
-- Columns, beams, arches: preserve all structural elements
-- Ceiling details: keep any drops, trays, or architectural ceiling features
-- Wall niches, alcoves: preserve all wall configurations
-
-EMPTY ROOM WARNING:
-If this room appears empty or sparsely furnished, be EXTRA CAREFUL to preserve:
-- Exact room dimensions and proportions (do not expand or shrink the space)
-- All wall positions and angles (preserve exact room shape)
-- Window and door placements EXACTLY as shown in the photograph
-- Floor material, pattern, and color WITHOUT ANY CHANGES
-ONLY add furniture and decorations - do NOT recreate or modify the room structure.`;
-
-    // SECTION 3: Staging scope (RENFORCÉ v2)
-    prompt += `
-
-YOUR STAGING TASK - YOU MAY ONLY ADD:
-- Freestanding furniture (sofas, chairs, tables, beds - NOT built-in)
-- Decorative objects (plants, artwork, vases, books, cushions)
-- Rugs and carpets (placed ON existing floor, not replacing it)
-- Table lamps and floor lamps (NOT ceiling fixtures)
-- Window treatments (curtains/blinds that FRAME windows, never hide them)
-- Soft furnishings that match ${design_style} aesthetic
-
-YOU MUST NOT:
-- Change any flooring material or color
-- Modify ceiling structure or lighting fixtures
-- Alter window/door configurations or frame colors
-- Add or remove any architectural elements`;
-
-    // SECTION 4: Style-specific guidance
-    if (seasonal_preference) {
-      prompt += `
-
-Incorporate subtle ${seasonal_preference} seasonal touches in decor colors and accessories.`;
-    }
-
+    // SECTION 3: Budget Level Guidance
     if (budget_level) {
-      const budgetGuidance: Record<BudgetLevel, string> = {
-        low: 'Use accessible, functional furniture with clean lines. IKEA-style practicality.',
-        medium: 'Use quality mid-range furniture. West Elm or Crate & Barrel aesthetic.',
-        high: 'Use premium designer furniture. Restoration Hardware or Design Within Reach quality.',
-        luxury: 'Use high-end bespoke pieces. Custom designer furniture and statement art pieces.',
+      const budgetGuides: Record<BudgetLevel, string> = {
+        low: 'BUDGET: Meubles fonctionnels et accessibles, style IKEA. Pièces pratiques au design simple.',
+        medium: 'STANDARD: Meubles milieu de gamme qualité, style West Elm / Crate & Barrel. Bonne facture, designs intemporels.',
+        high: 'PREMIUM: Meubles haut de gamme, style Restoration Hardware. Matériaux supérieurs, pièces design.',
+        luxury: 'LUXE: Pièces sur mesure et art de collection. Matériaux exclusifs, pièces de designer iconiques.'
       };
       prompt += `
 
-Budget aesthetic: ${budgetGuidance[budget_level]}`;
+${budgetGuides[budget_level]}`;
     }
 
-    // SECTION 5: Output requirements
+    // SECTION 4: Seasonal Touches (Optional)
+    if (season) {
+      const seasonGuides: Record<SeasonType, string> = {
+        spring: 'PRINTEMPS: Fleurs fraîches en vases, couleurs pastel en accent, textiles légers et aérés.',
+        summer: 'ÉTÉ: Lumière naturelle vive, plantes tropicales, couleurs inspirées agrumes, tissus légers.',
+        autumn: 'AUTOMNE: Tons terre chauds, plaids et couvertures cosy, arrangements de fleurs séchées, accents ambre/rouille.',
+        winter: 'HIVER: Textiles superposés cosy, éclairage chaleureux, éléments végétaux persistants, palette froide élégante.',
+        noel: 'NOËL: Décor festif élégant - sapin décoré (si espace), couronnes saisonnières, touches festives mais raffinées, éclairage chaleureux.'
+      };
+      prompt += `
+
+=== TOUCHES SAISONNIÈRES ===
+${seasonGuides[season]}
+Gardez les éléments saisonniers subtils et élégants - c'est pour du staging immobilier, pas un catalogue de fêtes.`;
+    }
+
+    // SECTION 5: Output Requirements
     prompt += `
 
-OUTPUT REQUIREMENTS FOR REAL ESTATE:
-- Photorealistic quality suitable for MLS listings
-- Furniture must be realistically proportioned (no distorted perspectives)
-- Staging must enhance the space without overcrowding
-- Maintain professional, neutral appeal for broad buyer attraction
-- The result must accurately represent the actual room dimensions and features`;
+=== EXIGENCES DE SORTIE POUR L'IMMOBILIER ===
+
+PHOTORÉALISME:
+- Résultat indiscernable d'une vraie photo
+- Meubles aux proportions et perspectives correctes
+- Ombres et éclairage cohérents avec la photo originale
+- Aucun objet flottant, aucun clipping
+
+STAGING PROFESSIONNEL:
+- Maintenir équilibre visuel et fluidité
+- Ne pas surcharger l'espace
+- Laisser passages clairs et zones fonctionnelles
+- Attrait large pour acheteurs potentiels
+
+PRÉCISION:
+- Représenter fidèlement les dimensions RÉELLES
+- Éléments architecturaux IDENTIQUES à l'original
+- Sol EXACTEMENT comme en entrée
+- Fenêtres et portes aux positions EXACTES
+
+IDENTITÉ DE LA PIÈCE (RÈGLE ABSOLUE):
+- Le résultat DOIT être reconnaissable comme LA MÊME PIÈCE
+- C'est un RELOOKING, pas une RECONSTRUCTION
+- Un observateur comparant avant/après doit pouvoir dire : "C'est la même pièce, mais redécorée"
+- Si vous n'êtes pas sûr, préservez PLUS d'éléments architecturaux, pas moins`;
 
     return prompt;
   }
@@ -163,7 +245,7 @@ OUTPUT REQUIREMENTS FOR REAL ESTATE:
     try {
       logger.info('🎨 RoomRedesignerService.redesignRoom: Starting room redesign', {
         design_style: input.design_style,
-        seasonal_preference: input.seasonal_preference,
+        season: input.season,
         budget_level: input.budget_level,
         image_mime: input.image_mime,
         image_size_kb: Math.round(imageSize / 1024),
@@ -187,7 +269,7 @@ OUTPUT REQUIREMENTS FOR REAL ESTATE:
       // Build the redesign prompt
       const prompt = this.buildPrompt({
         design_style: input.design_style,
-        seasonal_preference: input.seasonal_preference,
+        season: input.season,
         budget_level: input.budget_level,
       });
 
