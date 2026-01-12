@@ -2,7 +2,7 @@
 
 ## Overview
 - **Type:** Standard monorepo (Backend + Frontend + Landing)
-- **Stack:** React 19 + Node.js/Express + Supabase + Redis + Gemini AI
+- **Stack:** React 19 + TypeScript + Node.js/Express + Supabase + Redis + Vertex AI
 - **Architecture:** 3-tier (Frontend → API → Database + Workers)
 - **Deployment:** Docker Compose, Nginx, SSL, CI/CD (GitHub Actions)
 - **Landing Page:** React 19 + TypeScript + Vite + Tailwind CSS (masstock.fr)
@@ -122,7 +122,7 @@ npm install <package-name>
 - Routes: `src/routes/` - API endpoints with auth middleware
 - Middleware: `src/middleware/` - Auth (JWT), rate limiting, error handling
 - Workers: `src/workers/` - Bull job queues for async workflows
-- Services: `src/services/` - Business logic (Gemini API integration)
+- Services: `src/services/` - Business logic (Vertex AI integration)
 - Database: `src/database/` - Migration runner
 - Tests: `src/__tests__/` - Jest unit/integration tests
 - Scripts: `scripts/` - Utility scripts (seed data, fix users, debug)
@@ -457,7 +457,7 @@ When working in specific directories, refer to their CLAUDE.md for detailed guid
 - Middleware (auth, rate limiting, error handling)
 - Bull workers and job queues
 - Redis integration
-- Gemini API service
+- Vertex AI service
 - Jest testing patterns
 - Database migrations
 - Common backend patterns
@@ -522,8 +522,20 @@ REFRESH_TOKEN_EXPIRES_IN=7d
 # CORS
 CORS_ORIGIN=http://localhost:5173
 
-# Gemini API
+# Gemini API (legacy - replaced by Vertex AI)
 GEMINI_API_KEY=xxx
+
+# Vertex AI
+USE_VERTEX_AI=true
+GOOGLE_CLOUD_PROJECT=xxx
+VERTEX_RATE_LIMIT_FLASH=1000
+VERTEX_RATE_LIMIT_PRO=500
+VERTEX_PROMPT_CONCURRENCY_FLASH=30
+VERTEX_PROMPT_CONCURRENCY_PRO=20
+
+# Workers
+WORKER_CONCURRENCY=5
+SMART_RESIZER_CONCURRENCY=3
 
 # Rate Limiting
 RATE_LIMIT_WINDOW_MS=900000
@@ -541,6 +553,77 @@ VITE_SUPABASE_ANON_KEY=xxx
 VITE_ENV=development
 VITE_LOG_LEVEL=debug
 ```
+
+---
+
+## Workers & Vertex AI Configuration
+
+### API d'Images: Vertex AI
+MasStock utilise **Vertex AI** (pas Google AI Studio) pour la génération d'images.
+
+| Paramètre | Valeur |
+|-----------|--------|
+| Location | `us-central1` |
+| Modèle par défaut | `gemini-3-pro-image-preview` |
+| Timeout | 120s |
+| Max retries | 3 |
+| Max images référence | 14 |
+
+### Rate Limits (Vertex AI)
+| Modèle | RPM (requêtes/min) |
+|--------|-------------------|
+| Flash | 1000 |
+| Pro | 500 |
+
+### Infrastructure: VPS Hostinger KVM 2
+| Ressource | Valeur |
+|-----------|--------|
+| CPU | 2 cores |
+| RAM | 8 GB |
+| Disque | 100 GB |
+| OS | Ubuntu 24.04 |
+| Location | Paris, France |
+
+### Concurrency Workers (optimisé pour KVM 2)
+| Worker | Valeur | Variable Env | Justification |
+|--------|--------|--------------|---------------|
+| Principal | **5** | `WORKER_CONCURRENCY` | 2 cores = max 5 jobs CPU-bound |
+| Smart Resizer | **3** | `SMART_RESIZER_CONCURRENCY` | Gourmand en mémoire |
+| Room Redesigner | **5** | (fixe dans code) | Équilibre CPU/RAM |
+| Prompt Flash | **30** | `VERTEX_PROMPT_CONCURRENCY_FLASH` | I/O bound (attente API) |
+| Prompt Pro | **20** | `VERTEX_PROMPT_CONCURRENCY_PRO` | I/O bound (attente API) |
+
+### Estimation Utilisation Mémoire
+| Service | RAM estimée |
+|---------|-------------|
+| OS + système | ~1 GB |
+| Backend Express | ~200 MB |
+| Worker (5 jobs) | ~1.5 GB |
+| Redis | ~200 MB |
+| Nginx + Frontend | ~100 MB |
+| **Disponible** | ~5 GB marge |
+
+### Capacité Maximale Estimée (KVM 2)
+- **Nano Banana (Flash):** ~500-600 images/minute
+- **Room Redesigner (Pro):** ~200-300 transformations/minute
+- **Utilisateurs simultanés:** 50-80
+
+### Variables d'Environnement Vertex AI (recommandées)
+```env
+# Vertex AI
+USE_VERTEX_AI=true
+GOOGLE_CLOUD_PROJECT=your-project-id
+VERTEX_RATE_LIMIT_FLASH=1000
+VERTEX_RATE_LIMIT_PRO=500
+
+# Concurrency optimisée KVM 2 (2 cores, 8GB RAM)
+VERTEX_PROMPT_CONCURRENCY_FLASH=30
+VERTEX_PROMPT_CONCURRENCY_PRO=20
+WORKER_CONCURRENCY=5
+SMART_RESIZER_CONCURRENCY=3
+```
+
+**Note:** Le Room Redesigner a une concurrency fixe dans le code (`roomRedesignerService.ts:344`). La valeur actuelle de 5 est déjà optimale pour KVM 2.
 
 ---
 
@@ -672,5 +755,5 @@ See `.claude/commands/` for implementation details.
 
 ---
 
-**Last Updated:** 2025-11-30
-**Version:** 3.0 (Claude Code optimized)
+**Last Updated:** 2026-01-12
+**Version:** 3.1 (Vertex AI + KVM 2 optimized)
