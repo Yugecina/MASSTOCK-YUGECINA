@@ -50,9 +50,18 @@ async function testGeminiAPI() {
 
       if (result.imageData) {
         const fs = require('fs');
-        const testImagePath = '/tmp/gemini-test-image.png';
-        fs.writeFileSync(testImagePath, Buffer.from(result.imageData, 'base64'));
+        const os = require('os');
+        const path = require('path');
+
+        // SECURITY: Use secure temporary directory with restrictive permissions (CodeQL fix)
+        // Create unique temp directory to prevent race conditions
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gemini-test-'));
+        const testImagePath = path.join(tmpDir, 'test-image.png');
+
+        // Write file with restrictive permissions (0600 = owner read/write only)
+        fs.writeFileSync(testImagePath, Buffer.from(result.imageData, 'base64'), { mode: 0o600 });
         console.log(`\n💾 Test image saved to: ${testImagePath}`);
+        console.log(`⚠️  Remember to delete the temp directory: rm -rf ${tmpDir}`);
       }
     } else {
       console.error('❌ Image generation failed:\n');

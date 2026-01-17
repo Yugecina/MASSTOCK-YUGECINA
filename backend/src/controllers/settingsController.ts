@@ -6,10 +6,27 @@
 import { Request, Response } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
+import { randomBytes } from 'crypto';
 import { supabaseAdmin } from '../config/database';
 import { ApiError } from '../middleware/errorHandler';
 import { logger } from '../config/logger';
 import { inviteCollaboratorSchema, updatePreferencesSchema, changePasswordSchema } from '../validation/schemas';
+
+// ============================================
+// SECURITY: Log Injection Prevention
+// ============================================
+
+/**
+ * Sanitize user input before logging to prevent log injection attacks
+ *
+ * @param input - User-controlled string to sanitize
+ * @returns Sanitized string safe for logging
+ */
+const sanitizeForLog = (input: unknown): string => {
+  if (input === null || input === undefined) return '[null]';
+  const str = String(input);
+  return str.replace(/[\n\r\t]/g, ' ').substring(0, 200);
+};
 
 /**
  * GET /api/v1/settings/profile
@@ -176,8 +193,9 @@ export async function inviteCollaborator(req: Request, res: Response): Promise<v
       }
     }
 
-    // Generate temporary password
-    const tempPassword = Math.random().toString(36).slice(-12) + 'Temp!123';
+    // SECURITY: Generate cryptographically secure temporary password (CodeQL fix)
+    // Replace Math.random() with crypto.randomBytes() for security-sensitive operations
+    const tempPassword = randomBytes(16).toString('base64').slice(0, 12) + 'Temp!123';
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     // Create user in Supabase Auth
@@ -295,7 +313,7 @@ export async function removeCollaborator(req: Request, res: Response): Promise<v
   }
 
   try {
-    logger.debug('🗑️ removeCollaborator: Removing collaborator', collaborator_id);
+    logger.debug('🗑️ removeCollaborator: Removing collaborator', sanitizeForLog(collaborator_id));
 
     // Verify collaborator belongs to same client
     const { data: collaborator } = await supabaseAdmin

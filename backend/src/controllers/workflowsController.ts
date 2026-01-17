@@ -16,6 +16,34 @@ import { encryptApiKey } from '../utils/encryption';
 import { z, ZodError } from 'zod';
 import { executeWorkflowSchema, executionsQuerySchema } from '../validation/schemas';
 
+// ============================================
+// SECURITY: Log Injection Prevention
+// ============================================
+
+/**
+ * Sanitize user input before logging to prevent log injection attacks
+ *
+ * Log injection occurs when user-controlled data containing newlines
+ * or special characters is written to logs, allowing attackers to:
+ * - Forge fake log entries
+ * - Hide malicious activity
+ * - Poison log analysis tools
+ *
+ * @param input - User-controlled string to sanitize
+ * @returns Sanitized string safe for logging
+ */
+const sanitizeForLog = (input: unknown): string => {
+  if (input === null || input === undefined) return '[null]';
+
+  const str = String(input);
+
+  // Remove newlines, carriage returns, tabs (log injection vectors)
+  // Limit length to prevent log flooding
+  return str
+    .replace(/[\n\r\t]/g, ' ')
+    .substring(0, 200);
+};
+
 // Create a fresh admin client for each query to avoid auth context contamination
 function getCleanAdmin() {
   return createClient(
@@ -145,7 +173,7 @@ export async function getWorkflow(req: Request, res: Response): Promise<void> {
   }
 
   if (!access) {
-    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+    logger.warn(`⚠️ No access found for client ${sanitizeForLog(clientId)} to workflow ${sanitizeForLog(workflow_id)}`);
     throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
   }
 
@@ -240,7 +268,7 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
     }
 
     if (!access) {
-      logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+      logger.warn(`⚠️ No access found for client ${sanitizeForLog(clientId)} to workflow ${sanitizeForLog(workflow_id)}`);
       throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
     }
 
@@ -782,7 +810,7 @@ export async function getWorkflowExecutions(req: Request, res: Response): Promis
     }
 
     if (!access) {
-      logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+      logger.warn(`⚠️ No access found for client ${sanitizeForLog(clientId)} to workflow ${sanitizeForLog(workflow_id)}`);
       throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
     }
 
@@ -868,7 +896,7 @@ export async function getWorkflowStats(req: Request, res: Response): Promise<voi
   }
 
   if (!access) {
-    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+    logger.warn(`⚠️ No access found for client ${sanitizeForLog(clientId)} to workflow ${sanitizeForLog(workflow_id)}`);
     throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
   }
 

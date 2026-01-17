@@ -50,14 +50,31 @@ function getCleanAdminClient(): SupabaseClient {
  */
 async function authenticate(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
   try {
-    // Extract token from httpOnly cookie or fallback to Authorization header
+    // SECURITY: Extract token from httpOnly cookie (preferred) or Authorization header
     let token = req.cookies?.access_token;
 
     if (!token) {
       // Fallback to Authorization header for backward compatibility
       const authHeader = req.headers.authorization;
-      if (authHeader && authHeader.startsWith('Bearer ')) {
-        token = authHeader.substring(7); // Remove 'Bearer ' prefix
+      if (authHeader && typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {
+        const extractedToken = authHeader.substring(7).trim();
+
+        // SECURITY: Validate JWT format (CodeQL fix - prevent user-controlled bypass)
+        // JWT tokens have 3 parts separated by dots (header.payload.signature)
+        // Each part is base64url-encoded (alphanumeric + - _ characters)
+        const jwtPattern = /^[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$/;
+
+        if (extractedToken && jwtPattern.test(extractedToken)) {
+          token = extractedToken;
+        } else {
+          // Invalid JWT format - reject immediately
+          res.status(401).json({
+            success: false,
+            error: 'Invalid token format',
+            code: 'INVALID_TOKEN_FORMAT'
+          });
+          return;
+        }
       }
     }
 

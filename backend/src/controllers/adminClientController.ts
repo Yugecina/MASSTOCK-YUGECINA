@@ -15,6 +15,28 @@ const {
 } = require('../validation/schemas');
 
 // ============================================
+// SECURITY: Type Confusion Prevention
+// ============================================
+
+/**
+ * Helper: Ensure parameter is a string (prevent type confusion attacks)
+ *
+ * Query parameters can be manipulated to be arrays (e.g., ?q[]=value)
+ * This can bypass validation and cause unexpected behavior.
+ *
+ * Example attack: ?q[]=short bypasses q.length >= 2 check
+ * because [].length returns array length, not string length
+ *
+ * @param value - Unknown value from request (query/body)
+ * @returns String value or undefined
+ */
+const ensureString = (value: unknown): string | undefined => {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value) && value.length > 0) return String(value[0]);
+  return undefined;
+};
+
+// ============================================
 // CLIENT MEMBERS ENDPOINTS
 // ============================================
 
@@ -931,7 +953,9 @@ export async function getClientActivity(req: Request, res: Response): Promise<vo
  * Search users for adding to clients
  */
 export async function searchUsersForMember(req: Request, res: Response): Promise<void> {
-  const { q, exclude_client_id } = req.query;
+  // SECURITY: Prevent type confusion attacks (CodeQL fix)
+  const q = ensureString(req.query.q);
+  const exclude_client_id = ensureString(req.query.exclude_client_id);
 
   logger.debug('🔍 AdminClientController.searchUsersForMember: Request received', {
     q,
@@ -940,7 +964,7 @@ export async function searchUsersForMember(req: Request, res: Response): Promise
     qType: typeof q
   });
 
-  if (!q || String(q).length < 2) {
+  if (!q || q.length < 2) {
     logger.debug('⚠️  AdminClientController.searchUsersForMember: Query too short, returning empty', { q });
     res.json({
       success: true,
