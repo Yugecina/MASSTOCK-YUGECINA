@@ -1,0 +1,203 @@
+name: Workflow Tests
+
+on:
+  pull_request:
+    branches: [main, dev-*]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_e2e:
+        description: 'Run E2E tests with real API'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # ============================================================================
+  # JOB 1: Tests Mockés (Rapides - sur chaque PR)
+  # ============================================================================
+  unit-integration-tests:
+    name: Unit & Integration Tests (Mocked)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run unit tests
+        working-directory: backend
+        run: npm run test:unit -- --coverage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+          SKIP_E2E_TESTS: true
+
+      - name: Run integration tests
+        working-directory: backend
+        run: npm run test:integration -- --coverage
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+          SKIP_E2E_TESTS: true
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Check coverage thresholds
+        working-directory: backend
+        run: |
+          npm run test:coverage -- \
+            --coverageThreshold='{"global":{"branches":70,"functions":70,"lines":70,"statements":70}}'
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v4
+        with:
+          files: ./backend/coverage/coverage-final.json
+          flags: workflows
+          name: workflow-tests
+          fail_ci_if_error: false
+
+      - name: Comment PR with coverage
+        if: github.event_name == 'pull_request'
+        uses: romeovs/lcov-reporter-action@v0.3.1
+        with:
+          lcov-file: ./backend/coverage/lcov.info
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          delete-old-comments: true
+
+  # ============================================================================
+  # JOB 2: Tests E2E (Réels - sur merge to main ou manuel)
+  # ============================================================================
+  e2e-tests:
+    name: E2E Tests (Real Gemini API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Only run on push to main or manual workflow dispatch
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event.inputs.run_e2e == 'true'
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run E2E tests
+        working-directory: backend
+        run: npm run test:e2e
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NANO_BANANA_WORKFLOW_ID: ${{ secrets.NANO_BANANA_WORKFLOW_ID }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          REDIS_URL: redis://localhost:6379
+          NODE_ENV: test
+          SKIP_E2E_TESTS: false
+          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload E2E test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: backend/test-results/
+          retention-days: 7
+
+      - name: Notify on E2E failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '🚨 E2E Workflow Tests Failed on Main',
+              body: `E2E tests failed on main branch.\n\n**Workflow run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}\n\n**Branch:** ${context.ref}\n**Commit:** ${context.sha.substring(0, 7)}\n\nPlease investigate and fix immediately.`,
+              labels: ['bug', 'workflows', 'e2e-failure', 'priority-high']
+            })
+
+  # ============================================================================
+  # JOB 3: Blocage PR si tests échouent
+  # ============================================================================
+  gate-check:
+    name: PR Gate Check
+    runs-on: ubuntu-latest
+    needs: [unit-integration-tests]
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - name: Check test results
+        run: |
+          if [ "${{ needs.unit-integration-tests.result }}" != "success" ]; then
+            echo "::error::Tests mockés ont échoué. PR bloquée."
+            echo "::error::Les tests unitaires et d'intégration doivent passer avant de merger."
+            exit 1
+          fi
+          echo "✅ Tous les tests mockés ont passé."
+          echo "✅ Coverage ≥70% atteint."
+          echo "✅ PR peut être mergée."
+
+      - name: Add success comment to PR
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ **Workflow Tests Passed**\n\nAll mocked tests (unit + integration) passed successfully. PR ready for review.'
+            })

@@ -1,0 +1,152 @@
+/* ========================================
+   ACTIVE EXECUTIONS INDICATOR - Sidebar Progress
+   ======================================== */
+
+.active-executions-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  margin: 0 12px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  transition: all 150ms ease-out;
+  background: var(--accent-bg-dark);
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  cursor: pointer;
+  position: relative;
+}
+
+.dark .active-executions-indicator {
+  background: var(--accent-bg-light);
+}
+
+.sidebar--collapsed .active-executions-indicator {
+  justify-content: center;
+  padding: 8px;
+  margin: 0 12px 8px;
+}
+
+/* Hover state */
+.active-executions-indicator:hover {
+  background: var(--muted);
+  border-color: var(--primary);
+}
+
+/* Processing state (pulse animation) */
+.active-executions-indicator--processing {
+  animation: subtle-pulse 2s ease-in-out infinite;
+}
+
+/* Icon container */
+.active-executions-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--primary);
+}
+
+/* Spinner animation */
+.active-executions-spinner {
+  animation: spin 1.5s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Badge count (for multiple executions) */
+.active-executions-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  background: var(--primary);
+  color: var(--primary-foreground);
+  font-size: 10px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: 1.5px solid var(--background);
+}
+
+/* Content (hidden when collapsed) */
+.active-executions-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0; /* Allow text truncation */
+}
+
+.sidebar--collapsed .active-executions-content {
+  display: none;
+}
+
+/* Info row (name + percentage) */
+.active-executions-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* Workflow name */
+.active-executions-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Percentage */
+.active-executions-percentage {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary);
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+}
+
+/* Progress bar container */
+.active-executions-progress {
+  width: 100%;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+/* Progress bar fill */
+.active-executions-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary), var(--accent));
+  border-radius: 2px;
+  transition: width 300ms ease-out;
+}
+
+/* Status text */
+.active-executions-status {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+
+/* Pulse animation */
+@keyframes subtle-pulse {
+  0% { opacity: 0.85; }
+  50% { opacity: 1; }
+  100% { opacity: 0.85; }
+}

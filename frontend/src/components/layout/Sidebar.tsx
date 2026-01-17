@@ -1,6 +1,8 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useSidebarStore } from '../../store/sidebarStore';
+import { useActiveExecutionsPolling } from '../../hooks/useActiveExecutionsPolling';
+import { ActiveExecutionsIndicator } from './ActiveExecutionsIndicator';
 import type { ReactNode } from 'react';
 
 /**
@@ -24,6 +26,9 @@ interface NavItem {
 export function Sidebar() {
   const { user, logout } = useAuth();
   const { isCollapsed, toggleSidebar } = useSidebarStore();
+
+  // Enable global polling for active executions
+  useActiveExecutionsPolling({ enabled: true });
 
   const navItems: NavItem[] = [
     {
@@ -131,6 +136,9 @@ export function Sidebar() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Active Executions Indicator */}
+      <ActiveExecutionsIndicator isCollapsed={isCollapsed} />
 
       {/* User Section */}
       <div className="sidebar-footer">

@@ -78,7 +78,7 @@ const authLimiter: RateLimitRequestHandler = rateLimit({
  */
 const executionLimiter: RateLimitRequestHandler = rateLimit({
   windowMs: 60 * 1000, // 1 minute
-  max: 10, // 10 executions per minute per client
+  max: process.env.NODE_ENV === 'test' ? 1000 : 10, // Higher limit for tests (1000), normal limit in production (10)
   keyGenerator: (req: AuthRequest): string => {
     // Rate limit per client
     return req.client?.id || req.ip || 'unknown';

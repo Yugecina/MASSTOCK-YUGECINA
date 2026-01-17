@@ -15,7 +15,7 @@ export const analyticsService = {
    * @returns {Promise<Object>} Overview metrics
    */
   getOverview: (period: Period): Promise<any> =>
-    api.get('/v1/admin/analytics/overview', { params: { period } }),
+    api.get('/admin/analytics/overview', { params: { period } }),
 
   /**
    * Get executions trend over time
@@ -23,7 +23,7 @@ export const analyticsService = {
    * @returns {Promise<Array>} Trend data
    */
   getExecutionsTrend: (period: Period): Promise<any> =>
-    api.get('/v1/admin/analytics/executions-trend', { params: { period } }),
+    api.get('/admin/analytics/executions-trend', { params: { period } }),
 
   /**
    * Get workflow performance metrics
@@ -32,7 +32,7 @@ export const analyticsService = {
    */
   async getWorkflowPerformance(period: Period = '30d'): Promise<any> {
     // Note: api.get already returns response.data due to interceptor
-    return api.get('/v1/admin/analytics/workflow-performance', {
+    return api.get('/admin/analytics/workflow-performance', {
       params: { period }
     });
   },
@@ -45,7 +45,7 @@ export const analyticsService = {
    */
   async getRevenueBreakdown(type: BreakdownType = 'client', period: Period = '30d'): Promise<any> {
     // Note: api.get already returns response.data due to interceptor
-    return api.get('/v1/admin/analytics/revenue-breakdown', {
+    return api.get('/admin/analytics/revenue-breakdown', {
       params: { type, period }
     });
   },
@@ -58,7 +58,7 @@ export const analyticsService = {
    */
   async getFailures(period: Period = '30d', limit: number = 100): Promise<any> {
     // Note: api.get already returns response.data due to interceptor
-    return api.get('/v1/admin/analytics/failures', {
+    return api.get('/admin/analytics/failures', {
       params: { period, limit }
     });
   }

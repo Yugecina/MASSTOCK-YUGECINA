@@ -1,12 +1,26 @@
-import { useState, useEffect, useMemo, useCallback, FC, ReactElement } from 'react'
-import { useNavigate } from 'react-router-dom'
-import toast from 'react-hot-toast'
-import { AdminLayout } from '../../components/layout/AdminLayout'
-import { AddClientModal } from '../../components/admin/AddClientModal'
-import { EditClientModal } from '../../components/admin/EditClientModal'
-import { ConfirmDialog } from '../../components/admin/ConfirmDialog'
-import { adminUserService } from '../../services/adminUserService'
-import '../AdminClients.css'
+import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { AdminLayout } from '../../components/layout/AdminLayout';
+import { AddClientModal } from '../../components/admin/AddClientModal';
+import { EditClientModal } from '../../components/admin/EditClientModal';
+import { ConfirmDialog } from '../../components/admin/ConfirmDialog';
+import { adminResourceService } from '../../services/adminResourceService';
+import {
+  BuildingIcon,
+  CheckCircleIcon,
+  XCircleIcon,
+  ClockIcon,
+  DollarSignIcon,
+  SearchIcon,
+  PlusIcon,
+  RefreshCwIcon,
+  EyeIcon,
+  EditIcon,
+  CrownIcon
+} from '../../components/icons/AdminIcons';
+import { getUserInitials } from '../../utils/adminHelpers';
+import '../AdminClients.css';
 
 /**
  * Client Data Types
@@ -38,323 +52,185 @@ interface ClientStats {
   totalRevenue: number;
 }
 
-/**
- * Icon Components
- */
-const Icons = {
-  Building: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
-      <path d="M9 22v-4h6v4" />
-      <path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01" />
-    </svg>
-  ),
-  Users: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  ),
-  CheckCircle: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <path d="m9 11 3 3L22 4" />
-    </svg>
-  ),
-  XCircle: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <path d="m15 9-6 6" />
-      <path d="m9 9 6 6" />
-    </svg>
-  ),
-  Clock: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  ),
-  Crown: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" />
-    </svg>
-  ),
-  Search: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="8" />
-      <path d="m21 21-4.3-4.3" />
-    </svg>
-  ),
-  Plus: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 12h14" />
-      <path d="M12 5v14" />
-    </svg>
-  ),
-  RefreshCw: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-      <path d="M21 3v5h-5" />
-      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-      <path d="M3 21v-5h5" />
-    </svg>
-  ),
-  Eye: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-      <circle cx="12" cy="12" r="3" />
-    </svg>
-  ),
-  Edit: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M17 3a2.85 2.85 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-      <path d="m15 5 4 4" />
-    </svg>
-  ),
-  Trash: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 6h18" />
-      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-      <line x1="10" y1="11" x2="10" y2="17" />
-      <line x1="14" y1="11" x2="14" y2="17" />
-    </svg>
-  ),
-  Workflow: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <rect width="8" height="8" x="3" y="3" rx="2" />
-      <path d="M7 11v4a2 2 0 0 0 2 2h4" />
-      <rect width="8" height="8" x="13" y="13" rx="2" />
-    </svg>
-  ),
-  Play: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <polygon points="5 3 19 12 5 21 5 3" />
-    </svg>
-  ),
-  DollarSign: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="2" x2="12" y2="22" />
-      <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-    </svg>
-  ),
-  User: (): ReactElement => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  )
+// Plan configuration
+const PLAN_CONFIG: Record<string, { label: string; badgeClass: string }> = {
+  starter: { label: 'Starter', badgeClass: 'admin-client-card-badge--starter' },
+  pro: { label: 'Pro', badgeClass: 'admin-client-card-badge--pro' },
+  premium_custom: { label: 'Premium', badgeClass: 'admin-client-card-badge--premium' }
+};
+
+// Status configuration
+const STATUS_CONFIG: Record<string, { label: string; badgeClass: string }> = {
+  active: { label: 'Actif', badgeClass: 'admin-client-card-badge--active' },
+  suspended: { label: 'Suspendu', badgeClass: 'admin-client-card-badge--suspended' },
+  pending: { label: 'En attente', badgeClass: 'admin-client-card-badge--pending' }
+};
+
+function getPlanLabel(plan: string): string {
+  return PLAN_CONFIG[plan]?.label || plan || '-';
 }
 
-// Loading Spinner
-const LoadingSpinner: FC = () => {
+function getPlanBadgeClass(plan: string): string {
+  return PLAN_CONFIG[plan]?.badgeClass || '';
+}
+
+function getStatusLabel(status: string): string {
+  return STATUS_CONFIG[status]?.label || status;
+}
+
+function getStatusBadgeClass(status: string): string {
+  return STATUS_CONFIG[status]?.badgeClass || '';
+}
+
+/**
+ * Loading Spinner Component
+ */
+function LoadingSpinner(): JSX.Element {
   return (
     <div className="admin-users-loading">
       <div className="admin-users-loading-spinner" />
       <p>Chargement des clients...</p>
     </div>
-  )
+  );
 }
 
 /**
  * AdminClients - Premium Client Management Page
- * Dark Premium Design with Bleu Pétrole accent
  */
-export function AdminClients() {
-  const navigate = useNavigate()
+export function AdminClients(): JSX.Element {
+  const navigate = useNavigate();
 
   // State
-  const [clients, setClients] = useState<ClientData[]>([])
-  const [loading, setLoading] = useState<boolean>(true)
-  const [searchQuery, setSearchQuery] = useState<string>('')
-  const [statusFilter, setStatusFilter] = useState<string>('')
-  const [planFilter, setPlanFilter] = useState<string>('')
-  const [activeStatFilter, setActiveStatFilter] = useState<string | null>(null)
+  const [clients, setClients] = useState<ClientData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
+  const [activeStatFilter, setActiveStatFilter] = useState<string | null>(null);
 
   // Modals
-  const [showAddModal, setShowAddModal] = useState<boolean>(false)
-  const [editingClient, setEditingClient] = useState<ClientData | null>(null)
-  const [suspendingClient, setSuspendingClient] = useState<ClientData | null>(null)
-  const [deletingClient, setDeletingClient] = useState<ClientData | null>(null)
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editingClient, setEditingClient] = useState<ClientData | null>(null);
+  const [suspendingClient, setSuspendingClient] = useState<ClientData | null>(null);
+  const [deletingClient, setDeletingClient] = useState<ClientData | null>(null);
 
   // Load clients
   const loadClients = useCallback(async () => {
-    console.log('🏢 AdminClients: Loading clients...')
+    console.log('AdminClients: Loading clients...');
     try {
-      const response = await adminUserService.getClients()
-      console.log('✅ AdminClients: Response received', {
-        data: response.data,
-        count: response.data?.clients?.length
-      })
-      setClients(response.data?.clients || [])
+      const response = await adminResourceService.getClients();
+      console.log('AdminClients: Response received', { count: response.data?.clients?.length });
+      setClients(response.data?.clients || []);
     } catch (err) {
-      const error = err as Error
-      console.error('❌ AdminClients: Failed to fetch clients', {
-        error: error,
-        message: error.message,
-        response: (error as any).response,
-        status: (error as any).response?.status,
-        data: (error as any).response?.data
-      })
-      toast.error('Échec du chargement des clients')
+      const error = err as Error;
+      console.error('AdminClients: Failed to fetch clients', { error: error.message });
+      toast.error('Echec du chargement des clients');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
-    loadClients()
-  }, [loadClients])
+    loadClients();
+  }, [loadClients]);
 
   // Stats calculation
   const stats = useMemo<ClientStats>(() => {
-    const total = clients.length
-    const active = clients.filter(c => c.status === 'active').length
-    const suspended = clients.filter(c => c.status === 'suspended').length
-    const pending = clients.filter(c => c.status === 'pending').length
-    const totalRevenue = clients.reduce((sum, c) => sum + (c.subscription_amount || 0), 0)
-    return { total, active, suspended, pending, totalRevenue }
-  }, [clients])
+    const total = clients.length;
+    const active = clients.filter(c => c.status === 'active').length;
+    const suspended = clients.filter(c => c.status === 'suspended').length;
+    const pending = clients.filter(c => c.status === 'pending').length;
+    const totalRevenue = clients.reduce((sum, c) => sum + (c.subscription_amount || 0), 0);
+    return { total, active, suspended, pending, totalRevenue };
+  }, [clients]);
 
   // Filtered clients
   const filteredClients = useMemo(() => {
-    let result = [...clients]
+    let result = [...clients];
 
     // Apply stat filter
-    if (activeStatFilter === 'active') {
-      result = result.filter(c => c.status === 'active')
-    } else if (activeStatFilter === 'suspended') {
-      result = result.filter(c => c.status === 'suspended')
-    } else if (activeStatFilter === 'pending') {
-      result = result.filter(c => c.status === 'pending')
+    if (activeStatFilter) {
+      result = result.filter(c => c.status === activeStatFilter);
     }
 
     // Apply search
     if (searchQuery) {
-      const q = searchQuery.toLowerCase()
+      const q = searchQuery.toLowerCase();
       result = result.filter(c =>
         c.company_name?.toLowerCase().includes(q) ||
         c.name?.toLowerCase().includes(q) ||
         c.email?.toLowerCase().includes(q)
-      )
+      );
     }
 
     // Apply status filter
     if (statusFilter) {
-      result = result.filter(c => c.status === statusFilter)
+      result = result.filter(c => c.status === statusFilter);
     }
 
     // Apply plan filter
     if (planFilter) {
-      result = result.filter(c => c.plan === planFilter)
+      result = result.filter(c => c.plan === planFilter);
     }
 
-    return result
-  }, [clients, searchQuery, statusFilter, planFilter, activeStatFilter])
+    return result;
+  }, [clients, searchQuery, statusFilter, planFilter, activeStatFilter]);
 
   // Handlers
-  const handleStatClick = (stat: string | null) => {
-    if (activeStatFilter === stat) {
-      setActiveStatFilter(null)
-    } else {
-      setActiveStatFilter(stat)
-    }
+  function handleStatClick(stat: string | null): void {
+    setActiveStatFilter(activeStatFilter === stat ? null : stat);
   }
 
-  const handleClearFilters = () => {
-    setSearchQuery('')
-    setStatusFilter('')
-    setPlanFilter('')
-    setActiveStatFilter(null)
+  function handleClearFilters(): void {
+    setSearchQuery('');
+    setStatusFilter('');
+    setPlanFilter('');
+    setActiveStatFilter(null);
   }
 
-  const handleSuspendConfirm = async () => {
-    if (!suspendingClient) return
+  async function handleSuspendConfirm(): Promise<void> {
+    if (!suspendingClient) return;
 
-    console.log('🚫 AdminClients: Suspending client', { clientId: suspendingClient.id })
+    console.log('AdminClients: Suspending client', { clientId: suspendingClient.id });
     try {
-      await adminUserService.updateUser(suspendingClient.id, { status: 'suspended' })
-      toast.success(`${suspendingClient.company_name || suspendingClient.name} a été suspendu`)
-      loadClients()
+      await adminResourceService.updateUser(suspendingClient.id, { status: 'suspended' });
+      toast.success(`${suspendingClient.company_name || suspendingClient.name} a ete suspendu`);
+      loadClients();
     } catch (err) {
-      console.error('❌ AdminClients: Suspend failed', err)
-      toast.error('Échec de la suspension du client')
+      console.error('AdminClients: Suspend failed', err);
+      toast.error('Echec de la suspension du client');
     } finally {
-      setSuspendingClient(null)
+      setSuspendingClient(null);
     }
   }
 
-  const handleDeleteConfirm = async () => {
-    if (!deletingClient) return
+  async function handleDeleteConfirm(): Promise<void> {
+    if (!deletingClient) return;
 
-    console.log('🗑️ AdminClients: Deleting client', { clientId: deletingClient.id })
+    console.log('AdminClients: Deleting client', { clientId: deletingClient.id });
     try {
-      await adminUserService.deleteUser(deletingClient.id)
-      toast.success(`${deletingClient.company_name || deletingClient.name} a été supprimé`)
-      loadClients()
+      await adminResourceService.deleteUser(deletingClient.id);
+      toast.success(`${deletingClient.company_name || deletingClient.name} a ete supprime`);
+      loadClients();
     } catch (err) {
-      console.error('❌ AdminClients: Delete failed', err)
-      toast.error('Échec de la suppression du client')
+      console.error('AdminClients: Delete failed', err);
+      toast.error('Echec de la suppression du client');
     } finally {
-      setDeletingClient(null)
+      setDeletingClient(null);
     }
   }
 
-  const handleAddSuccess = () => {
-    console.log('✅ AdminClients: Client added, refreshing')
-    loadClients()
+  function handleAddSuccess(): void {
+    console.log('AdminClients: Client added, refreshing');
+    loadClients();
   }
 
-  const handleEditSuccess = () => {
-    console.log('✅ AdminClients: Client updated, refreshing')
-    loadClients()
+  function handleEditSuccess(): void {
+    console.log('AdminClients: Client updated, refreshing');
+    loadClients();
   }
 
-  // Helper functions
-  const getPlanLabel = (plan: string): string => {
-    switch (plan) {
-      case 'starter': return 'Starter'
-      case 'pro': return 'Pro'
-      case 'premium_custom': return 'Premium'
-      default: return plan || '-'
-    }
-  }
-
-  const getPlanBadgeClass = (plan: string): string => {
-    switch (plan) {
-      case 'starter': return 'admin-client-card-badge--starter'
-      case 'pro': return 'admin-client-card-badge--pro'
-      case 'premium_custom': return 'admin-client-card-badge--premium'
-      default: return ''
-    }
-  }
-
-  const getStatusBadgeClass = (status: string): string => {
-    switch (status) {
-      case 'active': return 'admin-client-card-badge--active'
-      case 'suspended': return 'admin-client-card-badge--suspended'
-      case 'pending': return 'admin-client-card-badge--pending'
-      default: return ''
-    }
-  }
-
-  const getStatusLabel = (status: string): string => {
-    switch (status) {
-      case 'active': return 'Actif'
-      case 'suspended': return 'Suspendu'
-      case 'pending': return 'En attente'
-      default: return status
-    }
-  }
-
-  const getInitials = (name?: string, company?: string): string => {
-    const str = company || name || 'C'
-    return str.substring(0, 2).toUpperCase()
-  }
-
-  const hasActiveFilters = searchQuery || statusFilter || planFilter || activeStatFilter
+  const hasActiveFilters = searchQuery || statusFilter || planFilter || activeStatFilter;
 
   return (
     <AdminLayout>
@@ -364,7 +240,7 @@ export function AdminClients() {
           <div className="admin-clients-header-content">
             <h1 className="admin-clients-title">Gestion des Clients</h1>
             <p className="admin-clients-subtitle">
-              Gérez les comptes clients, leurs abonnements et accès
+              Gerez les comptes clients, leurs abonnements et acces
             </p>
           </div>
           <div className="admin-clients-actions">
@@ -372,15 +248,15 @@ export function AdminClients() {
               className="btn btn-secondary"
               onClick={loadClients}
               disabled={loading}
-              title="Rafraîchir"
+              title="Rafraichir"
             >
-              <Icons.RefreshCw />
+              <RefreshCwIcon />
             </button>
             <button
               className="btn btn-primary"
               onClick={() => setShowAddModal(true)}
             >
-              <Icons.Plus />
+              <PlusIcon />
               Nouveau Client
             </button>
           </div>
@@ -392,9 +268,7 @@ export function AdminClients() {
             className={`admin-clients-stat ${activeStatFilter === null ? 'active' : ''}`}
             onClick={() => handleStatClick(null)}
           >
-            <div className="admin-clients-stat-icon">
-              <Icons.Building />
-            </div>
+            <div className="admin-clients-stat-icon"><BuildingIcon /></div>
             <div className="admin-clients-stat-content">
               <span className="admin-clients-stat-value">{stats.total}</span>
               <span className="admin-clients-stat-label">Total</span>
@@ -405,9 +279,7 @@ export function AdminClients() {
             className={`admin-clients-stat ${activeStatFilter === 'active' ? 'active' : ''}`}
             onClick={() => handleStatClick('active')}
           >
-            <div className="admin-clients-stat-icon">
-              <Icons.CheckCircle />
-            </div>
+            <div className="admin-clients-stat-icon"><CheckCircleIcon /></div>
             <div className="admin-clients-stat-content">
               <span className="admin-clients-stat-value">{stats.active}</span>
               <span className="admin-clients-stat-label">Actifs</span>
@@ -418,9 +290,7 @@ export function AdminClients() {
             className={`admin-clients-stat ${activeStatFilter === 'suspended' ? 'active' : ''}`}
             onClick={() => handleStatClick('suspended')}
           >
-            <div className="admin-clients-stat-icon">
-              <Icons.XCircle />
-            </div>
+            <div className="admin-clients-stat-icon"><XCircleIcon /></div>
             <div className="admin-clients-stat-content">
               <span className="admin-clients-stat-value">{stats.suspended}</span>
               <span className="admin-clients-stat-label">Suspendus</span>
@@ -431,9 +301,7 @@ export function AdminClients() {
             className={`admin-clients-stat ${activeStatFilter === 'pending' ? 'active' : ''}`}
             onClick={() => handleStatClick('pending')}
           >
-            <div className="admin-clients-stat-icon">
-              <Icons.Clock />
-            </div>
+            <div className="admin-clients-stat-icon"><ClockIcon /></div>
             <div className="admin-clients-stat-content">
               <span className="admin-clients-stat-value">{stats.pending}</span>
               <span className="admin-clients-stat-label">En attente</span>
@@ -441,9 +309,7 @@ export function AdminClients() {
           </button>
 
           <div className="admin-clients-stat">
-            <div className="admin-clients-stat-icon">
-              <Icons.DollarSign />
-            </div>
+            <div className="admin-clients-stat-icon"><DollarSignIcon /></div>
             <div className="admin-clients-stat-content">
               <span className="admin-clients-stat-value">${stats.totalRevenue.toLocaleString()}</span>
               <span className="admin-clients-stat-label">Revenu mensuel</span>
@@ -455,9 +321,7 @@ export function AdminClients() {
         <div className="admin-clients-filters">
           <div className="admin-clients-filters-row">
             <div className="admin-clients-search">
-              <span className="admin-clients-search-icon">
-                <Icons.Search />
-              </span>
+              <span className="admin-clients-search-icon"><SearchIcon /></span>
               <input
                 type="text"
                 placeholder="Rechercher un client..."
@@ -495,10 +359,7 @@ export function AdminClients() {
             </div>
 
             {hasActiveFilters && (
-              <button
-                className="admin-clients-filter-clear"
-                onClick={handleClearFilters}
-              >
+              <button className="admin-clients-filter-clear" onClick={handleClearFilters}>
                 Effacer les filtres
               </button>
             )}
@@ -510,23 +371,18 @@ export function AdminClients() {
           <LoadingSpinner />
         ) : filteredClients.length === 0 ? (
           <div className="admin-clients-empty">
-            <div className="admin-clients-empty-icon">
-              <Icons.Building />
-            </div>
+            <div className="admin-clients-empty-icon"><BuildingIcon /></div>
             <h3 className="admin-clients-empty-title">
-              {hasActiveFilters ? 'Aucun résultat' : 'Aucun client'}
+              {hasActiveFilters ? 'Aucun resultat' : 'Aucun client'}
             </h3>
             <p className="admin-clients-empty-text">
               {hasActiveFilters
-                ? 'Aucun client ne correspond à vos filtres. Essayez de modifier vos critères de recherche.'
-                : 'Ajoutez votre premier client pour commencer à gérer vos comptes.'}
+                ? 'Aucun client ne correspond a vos filtres. Essayez de modifier vos criteres de recherche.'
+                : 'Ajoutez votre premier client pour commencer a gerer vos comptes.'}
             </p>
             {!hasActiveFilters && (
-              <button
-                className="admin-clients-empty-btn"
-                onClick={() => setShowAddModal(true)}
-              >
-                <Icons.Plus />
+              <button className="admin-clients-empty-btn" onClick={() => setShowAddModal(true)}>
+                <PlusIcon />
                 Ajouter un client
               </button>
             )}
@@ -548,7 +404,7 @@ export function AdminClients() {
                       {getStatusLabel(client.status)}
                     </span>
                     <span className={`admin-client-card-badge ${getPlanBadgeClass(client.plan)}`}>
-                      <Icons.Crown />
+                      <CrownIcon />
                       {getPlanLabel(client.plan)}
                     </span>
                   </div>
@@ -557,9 +413,7 @@ export function AdminClients() {
                 {/* Plan & Subscription */}
                 {client.subscription_amount && client.subscription_amount > 0 && (
                   <div className="admin-client-card-plan">
-                    <div className="admin-client-card-plan-icon">
-                      <Icons.DollarSign />
-                    </div>
+                    <div className="admin-client-card-plan-icon"><DollarSignIcon /></div>
                     <div className="admin-client-card-plan-info">
                       <p className="admin-client-card-plan-name">Abonnement mensuel</p>
                       <p className="admin-client-card-plan-price">
@@ -572,22 +426,16 @@ export function AdminClients() {
                 {/* Stats */}
                 <div className="admin-client-card-stats">
                   <div className="admin-client-card-stat">
-                    <span className="admin-client-card-stat-value">
-                      {client.users_count || 0}
-                    </span>
+                    <span className="admin-client-card-stat-value">{client.users_count || 0}</span>
                     <span className="admin-client-card-stat-label">Membres</span>
                   </div>
                   <div className="admin-client-card-stat">
-                    <span className="admin-client-card-stat-value">
-                      {client.workflows_count || 0}
-                    </span>
+                    <span className="admin-client-card-stat-value">{client.workflows_count || 0}</span>
                     <span className="admin-client-card-stat-label">Workflows</span>
                   </div>
                   <div className="admin-client-card-stat">
-                    <span className="admin-client-card-stat-value">
-                      {client.executions_count || 0}
-                    </span>
-                    <span className="admin-client-card-stat-label">Exécutions</span>
+                    <span className="admin-client-card-stat-value">{client.executions_count || 0}</span>
+                    <span className="admin-client-card-stat-label">Executions</span>
                   </div>
                 </div>
 
@@ -595,10 +443,10 @@ export function AdminClients() {
                 {client.owner && (
                   <div className="admin-client-card-owner">
                     <div className="admin-client-card-owner-avatar">
-                      {getInitials(client.owner.name, undefined)}
+                      {getUserInitials(client.owner.name, client.owner.email)}
                     </div>
                     <div className="admin-client-card-owner-info">
-                      <p className="admin-client-card-owner-label">Propriétaire</p>
+                      <p className="admin-client-card-owner-label">Proprietaire</p>
                       <p className="admin-client-card-owner-email">{client.owner.email}</p>
                     </div>
                   </div>
@@ -610,14 +458,14 @@ export function AdminClients() {
                     className="admin-client-card-btn admin-client-card-btn--primary"
                     onClick={() => navigate(`/admin/clients/${client.id}`)}
                   >
-                    <Icons.Eye />
-                    Détails
+                    <EyeIcon />
+                    Details
                   </button>
                   <button
                     className="admin-client-card-btn admin-client-card-btn--secondary"
                     onClick={() => setEditingClient(client)}
                   >
-                    <Icons.Edit />
+                    <EditIcon />
                     Modifier
                   </button>
                 </div>
@@ -649,7 +497,7 @@ export function AdminClients() {
         <ConfirmDialog
           type="warning"
           title="Suspendre ce client ?"
-          message={`Êtes-vous sûr de vouloir suspendre "${suspendingClient.company_name || suspendingClient.name}" ? Cette action désactivera temporairement leur accès.`}
+          message={`Etes-vous sur de vouloir suspendre "${suspendingClient.company_name || suspendingClient.name}" ? Cette action desactivera temporairement leur acces.`}
           confirmLabel="Suspendre"
           cancelLabel="Annuler"
           onConfirm={handleSuspendConfirm}
@@ -662,7 +510,7 @@ export function AdminClients() {
         <ConfirmDialog
           type="danger"
           title="Supprimer ce client ?"
-          message={`Êtes-vous sûr de vouloir supprimer "${deletingClient.company_name || deletingClient.name}" ? Cette action est irréversible.`}
+          message={`Etes-vous sur de vouloir supprimer "${deletingClient.company_name || deletingClient.name}" ? Cette action est irreversible.`}
           confirmLabel="Supprimer"
           cancelLabel="Annuler"
           onConfirm={handleDeleteConfirm}
@@ -670,5 +518,5 @@ export function AdminClients() {
         />
       )}
     </AdminLayout>
-  )
+  );
 }

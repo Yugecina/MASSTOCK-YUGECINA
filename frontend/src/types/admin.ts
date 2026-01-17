@@ -264,6 +264,41 @@ export interface ConfirmDialogProps {
   onCancel: () => void;
 }
 
+// Extended User Filters for AdminUsers page
+export interface ExtendedUserFilters {
+  status?: string;
+  plan?: string;
+  search?: string;
+  clientId?: string;
+  createdFrom?: string | null;
+  createdTo?: string | null;
+  lastLoginFrom?: string | null;
+  lastLoginTo?: string | null;
+}
+
+// User Stats for AdminUsers dashboard
+export interface UserStats {
+  total: number;
+  active: number;
+  suspended: number;
+  pending: number;
+  byPlan: {
+    starter: number;
+    pro: number;
+    enterprise: number;
+  };
+}
+
+// UserDetailPanel props
+export interface UserDetailPanelProps {
+  user: AdminUser | null;
+  isOpen: boolean;
+  onClose: () => void;
+  onEdit: (user: AdminUser) => void;
+  onBlock: (user: AdminUser) => void;
+  onDelete: (userId: string) => void;
+}
+
 // Tab props
 export interface ClientTabProps {
   clientId: string;

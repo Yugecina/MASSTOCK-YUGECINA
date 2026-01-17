@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import { adminClientService } from '../services/adminClientService';
+import { adminResourceService } from '../services/adminResourceService';
 import { Client, User, Workflow, Execution } from '../types/index';
 
 interface ClientStats {
@@ -162,7 +162,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
     console.log('🏪 Store.fetchClientDetail: Starting', { clientId });
     set({ clientLoading: true, clientError: null });
     try {
-      const response = await adminClientService.getClientDetail(clientId);
+      const response = await adminResourceService.getClientDetail(clientId);
       console.log('✅ Store.fetchClientDetail: Response received', {
         response,
         responseKeys: response ? Object.keys(response) : [],
@@ -196,7 +196,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
     console.log('🏪 Store.fetchMembers: Starting', { clientId });
     set({ membersLoading: true, membersError: null });
     try {
-      const data = await adminClientService.getClientMembers(clientId);
+      const data = await adminResourceService.getClientMembers(clientId);
       console.log('✅ Store.fetchMembers: Response received', {
         data,
         members: data?.members,
@@ -222,7 +222,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
   addMember: async (clientId: string, userId: string, role: string) => {
     console.log('🏪 Store.addMember: Starting', { clientId, userId, role });
     try {
-      await adminClientService.addClientMember(clientId, userId, role);
+      await adminResourceService.addClientMember(clientId, userId, role);
       console.log('✅ Store.addMember: Success');
       await get().fetchMembers(clientId);
       return { success: true };
@@ -242,7 +242,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
   updateMemberRole: async (clientId: string, memberId: string, role: string) => {
     console.log('🏪 Store.updateMemberRole: Starting', { clientId, memberId, role });
     try {
-      await adminClientService.updateMemberRole(clientId, memberId, role);
+      await adminResourceService.updateMemberRole(clientId, memberId, role);
       console.log('✅ Store.updateMemberRole: Success');
       await get().fetchMembers(clientId);
       return { success: true };
@@ -262,7 +262,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
   removeMember: async (clientId: string, memberId: string) => {
     console.log('🏪 Store.removeMember: Starting', { clientId, memberId });
     try {
-      await adminClientService.removeMember(clientId, memberId);
+      await adminResourceService.removeMember(clientId, memberId);
       console.log('✅ Store.removeMember: Success');
       await get().fetchMembers(clientId);
       return { success: true };
@@ -287,7 +287,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
     console.log('🏪 Store.searchUsers: Starting', { query, excludeClientId });
     set({ searchLoading: true });
     try {
-      const data = await adminClientService.searchUsers(query, excludeClientId);
+      const data = await adminResourceService.searchUsers(query, excludeClientId);
       const users = data?.users || [];
       console.log('✅ Store.searchUsers: Response', {
         data,
@@ -317,7 +317,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
     console.log('🏪 Store.fetchWorkflows: Starting', { clientId });
     set({ workflowsLoading: true, workflowsError: null });
     try {
-      const data = await adminClientService.getClientWorkflows(clientId);
+      const data = await adminResourceService.getClientWorkflows(clientId);
       console.log('✅ Store.fetchWorkflows: Response received', {
         data,
         workflows: data?.workflows,
@@ -343,7 +343,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
   assignWorkflow: async (clientId: string, templateId: string, customName?: string) => {
     console.log('🏪 Store.assignWorkflow: Starting', { clientId, templateId, customName });
     try {
-      await adminClientService.assignWorkflow(clientId, templateId, customName);
+      await adminResourceService.assignWorkflow(clientId, templateId, customName);
       console.log('✅ Store.assignWorkflow: Success');
       await get().fetchWorkflows(clientId);
       return { success: true };
@@ -363,7 +363,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
   removeWorkflow: async (clientId: string, workflowId: string) => {
     console.log('🏪 Store.removeWorkflow: Starting', { clientId, workflowId });
     try {
-      await adminClientService.removeWorkflow(clientId, workflowId);
+      await adminResourceService.removeWorkflow(clientId, workflowId);
       console.log('✅ Store.removeWorkflow: Success');
       await get().fetchWorkflows(clientId);
       return { success: true };
@@ -385,7 +385,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
     console.log('🏪 Store.fetchTemplates: Starting');
     set({ templatesLoading: true, templatesError: null });
     try {
-      const data = await adminClientService.getWorkflowTemplates();
+      const data = await adminResourceService.getWorkflowTemplates();
       console.log('✅ Store.fetchTemplates: Response received', {
         data,
         templates: data?.templates,
@@ -413,7 +413,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
     console.log('🏪 Store.fetchExecutions: Starting', { clientId, filters });
     set({ executionsLoading: true, executionsError: null, executionsFilters: filters });
     try {
-      const data = await adminClientService.getClientExecutions(clientId, filters);
+      const data = await adminResourceService.getClientExecutions(clientId, filters);
       console.log('✅ Store.fetchExecutions: Response received', {
         data,
         executions: data?.executions,
@@ -449,7 +449,7 @@ const useAdminClientStore = create<AdminClientStore>((set, get) => ({
     console.log('🏪 Store.fetchActivity: Starting', { clientId, params });
     set({ activityLoading: true, activityError: null });
     try {
-      const data = await adminClientService.getClientActivity(clientId, params);
+      const data = await adminResourceService.getClientActivity(clientId, params);
       console.log('✅ Store.fetchActivity: Response received', {
         data,
         activity: data?.activity,

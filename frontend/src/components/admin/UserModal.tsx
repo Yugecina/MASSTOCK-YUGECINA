@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Spinner } from '../ui/Spinner';
-import { adminUserService } from '../../services/adminUserService';
+import { adminResourceService } from '../../services/adminResourceService';
 import logger from '@/utils/logger';
 import type { UserModalProps, CreateUserFormData, EditUserFormData, AdminUser } from '../../types/admin';
 import type { Client } from '../../types';
@@ -89,7 +89,7 @@ export function UserModal({ mode = 'create', user = null, onClose, onSubmit }: U
     async function loadClients() {
       try {
         setLoadingClients(true);
-        const response = await adminUserService.getClients(1, { limit: 100 });
+        const response = await adminResourceService.getClients(1, { limit: 100 });
         const data = response.data?.data || response.data || {};
         setClients(data.clients || []);
       } catch (error) {

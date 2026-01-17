@@ -6,9 +6,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { AdminWorkflows } from '../../pages/AdminWorkflows';
-import { adminWorkflowService } from '../../services/adminWorkflowService';
+import { adminResourceService } from '../../services/adminResourceService';
 
-vi.mock('../../services/adminWorkflowService');
+vi.mock('../../services/adminResourceService');
 
 describe('AdminWorkflows', () => {
   const mockWorkflows = {
@@ -55,10 +55,10 @@ describe('AdminWorkflows', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    adminWorkflowService.getWorkflows.mockResolvedValue(mockWorkflows);
-    adminWorkflowService.getWorkflowRequests.mockResolvedValue(mockRequests);
-    adminWorkflowService.deleteWorkflow.mockResolvedValue({ success: true });
-    adminWorkflowService.updateWorkflowRequestStage.mockResolvedValue({ success: true });
+    adminResourceService.getWorkflows.mockResolvedValue(mockWorkflows);
+    adminResourceService.getWorkflowRequests.mockResolvedValue(mockRequests);
+    adminResourceService.deleteWorkflow.mockResolvedValue({ success: true });
+    adminResourceService.updateWorkflowRequestStage.mockResolvedValue({ success: true });
   });
 
   it('should render page with two tabs', async () => {
@@ -82,7 +82,7 @@ describe('AdminWorkflows', () => {
     render(<AdminWorkflows />);
 
     await waitFor(() => {
-      expect(adminWorkflowService.getWorkflows).toHaveBeenCalledWith(1, {});
+      expect(adminResourceService.getWorkflows).toHaveBeenCalledWith(1, {});
     });
   });
 
@@ -93,7 +93,7 @@ describe('AdminWorkflows', () => {
     fireEvent.click(requestsTab);
 
     await waitFor(() => {
-      expect(adminWorkflowService.getWorkflowRequests).toHaveBeenCalled();
+      expect(adminResourceService.getWorkflowRequests).toHaveBeenCalled();
       expect(screen.getByText('New Request')).toBeInTheDocument();
     });
   });
@@ -125,7 +125,7 @@ describe('AdminWorkflows', () => {
     });
 
     await waitFor(() => {
-      expect(adminWorkflowService.getWorkflows).toHaveBeenCalledWith(1, {
+      expect(adminResourceService.getWorkflows).toHaveBeenCalledWith(1, {
         status: 'deployed',
       });
     });
@@ -144,7 +144,7 @@ describe('AdminWorkflows', () => {
     });
 
     await waitFor(() => {
-      expect(adminWorkflowService.getWorkflowRequests).toHaveBeenCalledWith(1, {
+      expect(adminResourceService.getWorkflowRequests).toHaveBeenCalledWith(1, {
         status: 'submitted',
       });
     });
@@ -155,7 +155,7 @@ describe('AdminWorkflows', () => {
       ...mockWorkflows,
       data: { ...mockWorkflows.data, total: 20, totalPages: 2 },
     };
-    adminWorkflowService.getWorkflows.mockResolvedValue(multiPageWorkflows);
+    adminResourceService.getWorkflows.mockResolvedValue(multiPageWorkflows);
 
     render(<AdminWorkflows />);
 
@@ -169,7 +169,7 @@ describe('AdminWorkflows', () => {
       ...mockWorkflows,
       data: { ...mockWorkflows.data, total: 20, totalPages: 2 },
     };
-    adminWorkflowService.getWorkflows.mockResolvedValue(multiPageWorkflows);
+    adminResourceService.getWorkflows.mockResolvedValue(multiPageWorkflows);
 
     render(<AdminWorkflows />);
 
@@ -179,7 +179,7 @@ describe('AdminWorkflows', () => {
     });
 
     await waitFor(() => {
-      expect(adminWorkflowService.getWorkflows).toHaveBeenCalledWith(2, {});
+      expect(adminResourceService.getWorkflows).toHaveBeenCalledWith(2, {});
     });
   });
 
@@ -188,7 +188,7 @@ describe('AdminWorkflows', () => {
       ...mockWorkflows,
       data: { ...mockWorkflows.data, total: 20, totalPages: 2, page: 2 },
     };
-    adminWorkflowService.getWorkflows.mockResolvedValue(multiPageWorkflows);
+    adminResourceService.getWorkflows.mockResolvedValue(multiPageWorkflows);
 
     render(<AdminWorkflows />);
 
@@ -207,14 +207,14 @@ describe('AdminWorkflows', () => {
     });
 
     await waitFor(() => {
-      expect(adminWorkflowService.deleteWorkflow).toHaveBeenCalledWith('wf-1');
+      expect(adminResourceService.deleteWorkflow).toHaveBeenCalledWith('wf-1');
     });
   });
 
   it('should reload workflows after archiving', async () => {
     render(<AdminWorkflows />);
 
-    const initialCallCount = adminWorkflowService.getWorkflows.mock.calls.length;
+    const initialCallCount = adminResourceService.getWorkflows.mock.calls.length;
 
     await waitFor(() => {
       const archiveButton = screen.getByText('Archive');
@@ -222,7 +222,7 @@ describe('AdminWorkflows', () => {
     });
 
     await waitFor(() => {
-      expect(adminWorkflowService.getWorkflows.mock.calls.length).toBeGreaterThan(
+      expect(adminResourceService.getWorkflows.mock.calls.length).toBeGreaterThan(
         initialCallCount
       );
     });
@@ -235,7 +235,7 @@ describe('AdminWorkflows', () => {
   });
 
   it('should show error message on fetch failure', async () => {
-    adminWorkflowService.getWorkflows.mockRejectedValue(new Error('Network error'));
+    adminResourceService.getWorkflows.mockRejectedValue(new Error('Network error'));
 
     render(<AdminWorkflows />);
 
@@ -245,7 +245,7 @@ describe('AdminWorkflows', () => {
   });
 
   it('should handle empty workflows list', async () => {
-    adminWorkflowService.getWorkflows.mockResolvedValue({
+    adminResourceService.getWorkflows.mockResolvedValue({
       success: true,
       data: { workflows: [], total: 0, page: 1, limit: 10, totalPages: 0 },
     });
@@ -258,7 +258,7 @@ describe('AdminWorkflows', () => {
   });
 
   it('should handle empty requests list', async () => {
-    adminWorkflowService.getWorkflowRequests.mockResolvedValue({
+    adminResourceService.getWorkflowRequests.mockResolvedValue({
       success: true,
       data: { requests: [], total: 0, page: 1, limit: 10, totalPages: 0 },
     });
@@ -290,7 +290,7 @@ describe('AdminWorkflows', () => {
     await new Promise((resolve) => setTimeout(resolve, 400));
 
     await waitFor(() => {
-      expect(adminWorkflowService.getWorkflows).toHaveBeenCalledWith(1, {
+      expect(adminResourceService.getWorkflows).toHaveBeenCalledWith(1, {
         search: 'test',
         status: 'deployed',
       });

@@ -1,0 +1,9 @@
+# Ignore all image files in fixtures directory
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+
+# Keep README
+!README.md

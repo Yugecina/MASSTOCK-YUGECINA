@@ -5,7 +5,7 @@
  * with AI-powered interior design transformations.
  */
 
-import axios, { AxiosError } from 'axios';
+import vertexAIService from './vertexAIImageService';
 import { logger } from '../config/logger';
 
 // Design styles supported (synchronized with validation schema)
@@ -30,7 +30,6 @@ export interface RoomRedesignerInput {
   design_style: DesignStyle;
   season?: SeasonType;
   budget_level?: BudgetLevel;
-  api_key: string;
 }
 
 export interface RoomRedesignerResult {
@@ -48,189 +47,143 @@ interface PromptOptions {
 }
 
 class RoomRedesignerService {
-  private apiUrl: string;
   private model: string;
 
   constructor() {
     // Nano Banana Pro = Gemini 3 Pro Image Preview (advanced AI image generation)
-    this.apiUrl = process.env.GEMINI_API_URL || 'https://generativelanguage.googleapis.com/v1beta/models';
-    this.model = process.env.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image-preview'; // Nano Banana Pro
+    this.model = process.env.GEMINI_IMAGE_MODEL || 'gemini-3-pro-image-preview';
   }
 
   /**
    * Build a detailed prompt for room redesign based on user preferences
    * Optimized for real estate virtual staging with strict architectural preservation
-   * v4: Enhanced to handle FURNISHED rooms - restyle with flexible layout while preserving architecture
+   * v5: Google best practices - camera/doors priority, budget details, checklist validation
    */
   buildPrompt(options: PromptOptions): string {
     const { design_style, season, budget_level } = options;
 
-    // SECTION 1: Role and Task Definition
-    let prompt = `You are a professional virtual staging AI for real estate photography.
-Your task: RESTYLE this room photograph using a ${design_style.toUpperCase()} interior design style.
-
-=== MISSION CRITIQUE ===
-- If the room is EMPTY: Stage it with ${design_style} furniture
-- If the room is ALREADY FURNISHED: Replace ALL existing furniture with ${design_style} style furniture
-- You may reorganize furniture layout to best fit the ${design_style} style
-- ABSOLUTE RULE: The ARCHITECTURE must remain IDENTICAL (walls, windows, floor, ceiling, fixed lighting)
-- The output must be THE SAME ROOM with DIFFERENT furniture - NOT a reimagined room
-
-=== RÈGLES DE PRÉSERVATION ABSOLUE (CRITICAL) ===
-
-ANALYSE PRÉALABLE : Avant TOUTE modification, identifiez et verrouillez ces éléments :
-
-VITRAGES & OUVERTURES (PRIORITÉ MAXIMALE):
-- Comptez le nombre EXACT de panneaux de fenêtres, baies vitrées
-- Notez la couleur EXACTE des cadres (blanc, noir, bois, alu)
-- Préservez TOUTES les positions, tailles et styles des fenêtres/portes
-- Portes balcon/terrasse : maintenez la configuration EXACTE des panneaux
-- NE PAS ajouter, supprimer ou modifier les vitrages
-
-SURFACES (AUCUNE MODIFICATION):
-- Sol : GARDER le matériau EXACT (carrelage, parquet, moquette) et sa couleur
-- Murs : PRÉSERVER couleur, texture, moulures et détails architecturaux
-- Plafond : MAINTENIR type, hauteur et éléments (poutres, caissons)
-
-INSTALLATIONS FIXES (VERROUILLÉES):
-- Éclairage encastré, spots, plafonniers : NE PAS DÉPLACER NI AJOUTER
-- Lustres : PRÉSERVER position et style EXACTS
-- HVAC : ventilations, radiateurs - GARDER en position exacte
-- Meubles encastrés : placards, cuisine équipée - AUCUNE MODIFICATION
-- Électrique : prises, interrupteurs - PRÉSERVER les positions
-
-ÉLÉMENTS ARCHITECTURAUX (INTOUCHABLES):
-- Colonnes, poutres, arches - AUCUN CHANGEMENT
-- Détails architecturaux du plafond - PRÉSERVER exactement
-- Niches murales, alcôves - MAINTENIR la configuration
-
-=== INSTRUCTIONS PIÈCE VIDE ===
-
-Si cette pièce apparaît VIDE ou peu meublée :
-- La pièce EXISTE DÉJÀ - ne la recréez pas
-- PRÉSERVEZ les dimensions et proportions exactes
-- MAINTENEZ tous les angles et positions des murs
-- GARDEZ le matériau, motif et couleur du sol INCHANGÉS
-- Fenêtres et portes doivent rester IDENTIQUES à la photo
-- UNIQUEMENT AJOUTER meubles autonomes et décorations
-- NE PAS altérer la structure de la pièce
-
-=== INSTRUCTIONS PIÈCE MEUBLÉE (SI MEUBLES EXISTANTS) ===
-
-Si cette pièce contient DÉJÀ des meubles ou décorations :
-- REMPLACEZ TOUS les meubles existants par des meubles style ${design_style}
-- Vous POUVEZ réorganiser le layout des meubles pour mieux correspondre au style
-- Mais l'ARCHITECTURE reste INTOUCHABLE (murs, fenêtres, sol, plafond)
-- Le résultat doit être LA MÊME PIÈCE avec un NOUVEAU STYLE DE DÉCORATION
-- PAS une pièce complètement réimaginée ou recréée de zéro
-- L'angle de vue et la perspective : IDENTIQUES à l'original
-- Les proportions de la pièce : EXACTEMENT comme l'original
-
-=== PORTÉE DU STAGING - CE QUE VOUS POUVEZ AJOUTER ===
-
-MEUBLES AUTONOMES (style ${design_style}):
-- Canapés, fauteuils, chaises d'appoint
-- Tables basses, consoles, tables d'appoint
-- Lits, tables de nuit, commodes
-- Tables et chaises de salle à manger
-- Bibliothèques (non encastrées), vitrines
-
-ÉLÉMENTS DÉCORATIFS:
-- Plantes d'intérieur et cache-pots
-- Œuvres d'art (cadres muraux)
-- Vases, sculptures, objets décoratifs
-- Livres, magazines, plateaux décoratifs
-- Coussins, plaids, couvertures
-
-REVÊTEMENTS DE SOL:
-- Tapis (posés SUR le sol existant, jamais en remplacement)
-
-ÉCLAIRAGE (AUTONOME UNIQUEMENT):
-- Lampadaires
-- Lampes de table
-- NE PAS ajouter de plafonniers
-
-HABILLAGE FENÊTRES (ENCADREMENT UNIQUEMENT):
-- Rideaux qui ENCADRENT les fenêtres (ne les cachent jamais)
-- Voilages laissant passer la lumière
-- Stores montrés OUVERTS`;
-
-    // SECTION 2: Style-Specific Guidance
-    const styleGuides: Record<DesignStyle, string> = {
-      modern: 'Meubles aux lignes géométriques épurées, couleurs neutres (blanc, gris, noir), accents chrome/acier, ornementation minimale.',
-      minimalist: 'Uniquement pièces essentielles, maximum d\'espace négatif, palette monochrome, zéro encombrement.',
-      industrial: 'Meubles avec cadres métalliques, cuir, bois sombre, esthétique matériaux bruts exposés.',
-      scandinavian: 'Meubles en bois clair (chêne, bouleau), tissus neutres doux, textiles cosy, accessoires hygge.',
-      contemporary: 'Tendances actuelles, matériaux mixtes, pièces statement audacieuses, palettes sophistiquées.',
-      coastal: 'Meubles légers et aérés, textures naturelles (rotin, osier), palette bleu et blanc, décor balnéaire.',
-      farmhouse: 'Meubles en bois rustique, pièces vintage, tons neutres chauds, charme campagnard.',
-      midcentury: 'Formes iconiques 1950s-60s, courbes organiques, bois chaud, design ère atomique.',
-      traditional: 'Meubles classiques élégants, bois riches (acajou, noyer), symétrie, tissus luxueux (velours, soie), moulures décoratives, pièces intemporelles.'
+    // Budget-specific furniture descriptions with concrete examples
+    const budgetFurniture: Record<BudgetLevel, string> = {
+      low: 'IKEA-style functional furniture, simple clean designs, affordable materials (laminate, basic fabrics)',
+      medium: 'West Elm / Crate & Barrel quality, solid wood, quality upholstery, timeless mid-range pieces',
+      high: 'Restoration Hardware level, premium materials (genuine leather, marble, brass), designer-inspired pieces',
+      luxury: 'Bespoke designer furniture, iconic pieces (Eames, B&B Italia, Roche Bobois), exotic materials (walnut burl, mohair, travertine), museum-quality art'
     };
 
-    prompt += `
+    // Style descriptions (concise, action-oriented)
+    const styleDescriptions: Record<DesignStyle, string> = {
+      modern: 'clean geometric lines, neutral palette (white, gray, black), chrome/steel accents, minimal ornamentation',
+      minimalist: 'essential pieces only, maximum negative space, monochrome palette, zero clutter',
+      industrial: 'metal frames, leather, dark wood, exposed raw material aesthetic',
+      scandinavian: 'light wood (oak, birch), soft neutral fabrics, cozy textiles, hygge accessories',
+      contemporary: 'current trends, mixed materials, bold statement pieces, sophisticated palettes',
+      coastal: 'light airy furniture, natural textures (rattan, wicker), blue and white palette, beach-inspired decor',
+      farmhouse: 'rustic wood furniture, vintage pieces, warm neutral tones, countryside charm',
+      midcentury: 'iconic 1950s-60s shapes, organic curves, warm wood, atomic-era design',
+      traditional: 'classic elegant furniture, rich woods (mahogany, walnut), symmetry, luxurious fabrics (velvet, silk), decorative moldings'
+    };
 
-=== APPLICATION DU STYLE ===
-GUIDE ${design_style.toUpperCase()}:
-${styleGuides[design_style]}`;
+    // Season descriptions (optional, subtle)
+    const seasonDescriptions: Record<SeasonType, string> = {
+      spring: 'fresh flowers in vases, pastel accent colors, light airy textiles',
+      summer: 'bright natural light, tropical plants, citrus-inspired colors, lightweight fabrics',
+      autumn: 'warm earth tones, cozy throws and blankets, dried flower arrangements, amber/rust accents',
+      winter: 'layered cozy textiles, warm lighting, evergreen elements, elegant cool palette',
+      noel: 'elegant holiday decor - decorated tree (if space allows), seasonal wreaths, refined festive touches, warm lighting'
+    };
 
-    // SECTION 3: Budget Level Guidance
-    if (budget_level) {
-      const budgetGuides: Record<BudgetLevel, string> = {
-        low: 'BUDGET: Meubles fonctionnels et accessibles, style IKEA. Pièces pratiques au design simple.',
-        medium: 'STANDARD: Meubles milieu de gamme qualité, style West Elm / Crate & Barrel. Bonne facture, designs intemporels.',
-        high: 'PREMIUM: Meubles haut de gamme, style Restoration Hardware. Matériaux supérieurs, pièces design.',
-        luxury: 'LUXE: Pièces sur mesure et art de collection. Matériaux exclusifs, pièces de designer iconiques.'
-      };
-      prompt += `
+    const budgetDesc = budget_level ? budgetFurniture[budget_level] : budgetFurniture.medium;
+    const styleDesc = styleDescriptions[design_style];
 
-${budgetGuides[budget_level]}`;
-    }
+    // BUILD PROMPT: Start with Google's recommended pattern "A photo of..."
+    let prompt = `A photo of this exact same room, virtually staged with ${design_style.toUpperCase()} style furniture.
 
-    // SECTION 4: Seasonal Touches (Optional)
+=== CRITICAL: CAMERA & PERSPECTIVE (DO NOT MODIFY) ===
+- SAME exact camera position, angle, and field of view as input image
+- SAME perspective, focal length, and depth of field
+- SAME viewpoint - do not rotate, pan, tilt, or zoom
+- Output must look like a photo taken from the IDENTICAL tripod position
+
+=== CRITICAL: ARCHITECTURAL ELEMENTS (PIXEL-PERFECT PRESERVATION) ===
+
+DOORS (count and lock each one):
+- Preserve EVERY door: interior doors, closet doors, bathroom doors, entry doors, balcony doors
+- SAME position, size, color, handle style, and frame
+- Do NOT add, remove, move, or modify ANY door
+
+WINDOWS (count and lock each one):
+- Preserve EVERY window: exact panel count, frame color, size, position
+- SAME muntins, mullions, and glazing configuration
+- Do NOT add, remove, or modify ANY window
+
+WALLS:
+- SAME position, angles, color, texture, moldings, baseboards
+- Preserve ALL architectural details (niches, alcoves, arches, columns)
+
+FLOOR:
+- SAME material (hardwood/tile/carpet), color, pattern, grain direction
+- Do NOT replace or modify the flooring
+
+CEILING:
+- SAME height, type, beams, coffers, crown molding
+- Preserve ALL ceiling details exactly
+
+FIXED ELEMENTS (locked in place):
+- Built-in furniture: closets, kitchen cabinets, shelving units
+- Fixed lighting: recessed lights, ceiling fixtures, chandelier POSITIONS
+- HVAC: vents, radiators, thermostats
+- Electrical: outlets, switches, panels
+
+=== STAGING TASK ===
+
+FURNITURE BUDGET: ${budgetDesc}
+
+STYLE TO APPLY: ${styleDesc}
+
+ACTION:
+- If room is EMPTY: Add ${design_style} furniture appropriate for the room type
+- If room is FURNISHED: Replace ALL existing furniture with ${design_style} style pieces
+
+ALLOWED TO ADD (freestanding only):
+- Sofas, armchairs, accent chairs
+- Coffee tables, side tables, consoles
+- Beds, nightstands, dressers
+- Dining tables and chairs
+- Freestanding bookshelves, display cabinets
+- Area rugs (placed ON existing floor)
+- Floor lamps, table lamps
+- Curtains/drapes (framing windows, never blocking)
+- Decorative items: plants, artwork, vases, cushions, throws`;
+
+    // Add seasonal touches if specified
     if (season) {
-      const seasonGuides: Record<SeasonType, string> = {
-        spring: 'PRINTEMPS: Fleurs fraîches en vases, couleurs pastel en accent, textiles légers et aérés.',
-        summer: 'ÉTÉ: Lumière naturelle vive, plantes tropicales, couleurs inspirées agrumes, tissus légers.',
-        autumn: 'AUTOMNE: Tons terre chauds, plaids et couvertures cosy, arrangements de fleurs séchées, accents ambre/rouille.',
-        winter: 'HIVER: Textiles superposés cosy, éclairage chaleureux, éléments végétaux persistants, palette froide élégante.',
-        noel: 'NOËL: Décor festif élégant - sapin décoré (si espace), couronnes saisonnières, touches festives mais raffinées, éclairage chaleureux.'
-      };
       prompt += `
 
-=== TOUCHES SAISONNIÈRES ===
-${seasonGuides[season]}
-Gardez les éléments saisonniers subtils et élégants - c'est pour du staging immobilier, pas un catalogue de fêtes.`;
+SEASONAL STYLING: ${seasonDescriptions[season]}
+Keep seasonal elements subtle and elegant - this is real estate staging, not a holiday catalog.`;
     }
 
-    // SECTION 5: Output Requirements
+    // Final reinforcement (sandwich technique - repeat critical constraints)
     prompt += `
 
-=== EXIGENCES DE SORTIE POUR L'IMMOBILIER ===
+=== OUTPUT REQUIREMENTS ===
 
-PHOTORÉALISME:
-- Résultat indiscernable d'une vraie photo
-- Meubles aux proportions et perspectives correctes
-- Ombres et éclairage cohérents avec la photo originale
-- Aucun objet flottant, aucun clipping
+PHOTOREALISM:
+- Indistinguishable from a real photograph
+- Correct proportions, perspective, shadows matching original lighting
+- No floating objects, no clipping, no artifacts
 
-STAGING PROFESSIONNEL:
-- Maintenir équilibre visuel et fluidité
-- Ne pas surcharger l'espace
-- Laisser passages clairs et zones fonctionnelles
-- Attrait large pour acheteurs potentiels
+VERIFICATION CHECKLIST (before output):
+[ ] Camera angle: IDENTICAL to input
+[ ] Door count: SAME as input (verify each door)
+[ ] Window count: SAME as input (verify each window)
+[ ] Floor material: UNCHANGED
+[ ] Wall colors: UNCHANGED
+[ ] Ceiling: UNCHANGED
+[ ] Furniture style: ${design_style.toUpperCase()}
+[ ] Furniture quality: ${budget_level ? budget_level.toUpperCase() : 'MEDIUM'} budget level
 
-PRÉCISION:
-- Représenter fidèlement les dimensions RÉELLES
-- Éléments architecturaux IDENTIQUES à l'original
-- Sol EXACTEMENT comme en entrée
-- Fenêtres et portes aux positions EXACTES
-
-IDENTITÉ DE LA PIÈCE (RÈGLE ABSOLUE):
-- Le résultat DOIT être reconnaissable comme LA MÊME PIÈCE
-- C'est un RELOOKING, pas une RECONSTRUCTION
-- Un observateur comparant avant/après doit pouvoir dire : "C'est la même pièce, mais redécorée"
-- Si vous n'êtes pas sûr, préservez PLUS d'éléments architecturaux, pas moins`;
+ABSOLUTE RULE: The output must be THIS SAME ROOM with different furniture - NOT a reimagined or recreated room. A viewer comparing before/after must instantly recognize it as the same space.`;
 
     return prompt;
   }
@@ -260,12 +213,6 @@ IDENTITÉ DE LA PIÈCE (RÈGLE ABSOLUE):
         throw new Error('Invalid image format');
       }
 
-      // Validate API key
-      if (!input.api_key) {
-        logger.error('❌ RoomRedesignerService.redesignRoom: Missing API key');
-        throw new Error('Invalid API key');
-      }
-
       // Build the redesign prompt
       const prompt = this.buildPrompt({
         design_style: input.design_style,
@@ -274,128 +221,68 @@ IDENTITÉ DE LA PIÈCE (RÈGLE ABSOLUE):
       });
 
       logger.info('📝 RoomRedesignerService.redesignRoom: Prompt generated', {
-        prompt,
         prompt_length: prompt.length,
       });
 
-      // Call Nano Banana Pro API (Gemini 3 Pro Image Preview)
-      const endpoint = `${this.apiUrl}/${this.model}:generateContent`;
-      logger.info('🚀 RoomRedesignerService.redesignRoom: Calling Nano Banana Pro API', {
-        endpoint,
+      // Set model for this request
+      vertexAIService.setModel(this.model);
+
+      // Call Vertex AI service
+      // NOTE: aspectRatio is NOT specified for Room Redesigner to preserve original image dimensions
+      logger.info('🚀 RoomRedesignerService.redesignRoom: Calling Vertex AI service', {
         model: this.model,
         has_input_image: !!input.image_base64,
         prompt_length: prompt.length,
       });
 
-      // Google Gemini API format for image editing
-      const requestBody = {
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              },
-              {
-                inline_data: {
-                  mime_type: input.image_mime || 'image/jpeg',
-                  data: input.image_base64
-                }
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          responseModalities: ['Image']
-        }
-      };
-
-      const response = await axios.post(
-        endpoint,
-        requestBody,
-        {
-          headers: {
-            'x-goog-api-key': input.api_key,
-            'Content-Type': 'application/json',
-          },
-          timeout: 300000, // 5 minutes timeout (increased for complex images)
-        }
-      );
+      const result = await vertexAIService.generateImage(prompt, {
+        referenceImages: [{
+          data: input.image_base64,
+          mimeType: input.image_mime || 'image/jpeg'
+        }],
+        // No aspectRatio specified → model preserves reference image dimensions
+        timeout: 300000 // 5 minutes timeout (increased for complex images)
+      });
 
       const processingTime = Date.now() - startTime;
 
-      // Extract image from Google Gemini response format
-      // Response structure: { candidates: [{ content: { parts: [{ inlineData: { data: "base64..." } }] } }] }
-      // Support both snake_case (inline_data) and camelCase (inlineData) for API compatibility
-      const candidate = response.data?.candidates?.[0];
-      const imagePart = candidate?.content?.parts?.find((part: any) => part.inlineData || part.inline_data);
-      const inlineData = imagePart?.inlineData || imagePart?.inline_data;
-      const imageBase64 = inlineData?.data;
-
-      if (!imageBase64) {
-        logger.error('❌ RoomRedesignerService.redesignRoom: No image in response', {
+      if (!result.success || !result.imageData) {
+        logger.error('❌ RoomRedesignerService.redesignRoom: Image generation failed', {
           processing_time_ms: processingTime,
-          has_candidates: !!response.data?.candidates,
-          has_candidate: !!candidate,
-          has_content: !!candidate?.content,
-          has_parts: !!candidate?.content?.parts,
-          parts_count: candidate?.content?.parts?.length,
-          has_imagePart: !!imagePart,
-          has_inlineData: !!inlineData,
-          response_structure: JSON.stringify(response.data).substring(0, 500),
+          error: result.error
         });
-        throw new Error('No image returned by API');
+        throw new Error(result.error?.message || 'Image generation failed');
       }
 
       logger.info('✅ RoomRedesignerService.redesignRoom: Redesign successful', {
         processing_time_ms: processingTime,
         processing_time_sec: (processingTime / 1000).toFixed(2),
         has_result: true,
-        result_size_kb: Math.round(Buffer.from(imageBase64, 'base64').length / 1024),
+        result_size_kb: Math.round(Buffer.from(result.imageData, 'base64').length / 1024),
       });
 
       return {
         success: true,
-        image_base64: imageBase64,
+        image_base64: result.imageData,
         processing_time: processingTime,
         prompt_used: prompt,
       };
     } catch (error) {
-      const axiosError = error as AxiosError;
+      const err = error as Error;
       const processingTime = Date.now() - startTime;
 
-      // Handle specific error cases
-      if (axiosError.response?.status === 401) {
-        logger.error('❌ RoomRedesignerService.redesignRoom: Invalid API key', {
-          status: 401,
-          processing_time_ms: processingTime,
-          processing_time_sec: (processingTime / 1000).toFixed(2),
-          response_data: axiosError.response?.data,
-        });
-        throw new Error('Invalid API key');
-      }
-
-      if (axiosError.code === 'ECONNABORTED' || axiosError.message.includes('timeout')) {
-        logger.error('❌ RoomRedesignerService.redesignRoom: Request timeout', {
-          timeout_ms: 300000,
-          processing_time_ms: processingTime,
-          processing_time_sec: (processingTime / 1000).toFixed(2),
-          error_code: axiosError.code,
-        });
-        throw new Error('Request timeout - the redesign process took too long');
-      }
-
       logger.error('❌ RoomRedesignerService.redesignRoom: Redesign failed', {
-        error_message: axiosError.message,
-        error_code: axiosError.code,
-        response_data: axiosError.response?.data,
-        response_status: axiosError.response?.status,
+        error_message: err.message,
         processing_time_ms: processingTime,
         processing_time_sec: (processingTime / 1000).toFixed(2),
         design_style: input.design_style,
-        has_api_key: !!input.api_key,
       });
 
-      throw error;
+      return {
+        success: false,
+        error: err.message || 'Unknown error',
+        processing_time: processingTime,
+      };
     }
   }
 

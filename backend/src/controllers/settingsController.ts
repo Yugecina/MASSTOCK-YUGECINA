@@ -9,7 +9,7 @@ import bcrypt from 'bcryptjs';
 import { supabaseAdmin } from '../config/database';
 import { ApiError } from '../middleware/errorHandler';
 import { logger } from '../config/logger';
-import { inviteCollaboratorSchema } from '../validation/schemas';
+import { inviteCollaboratorSchema, updatePreferencesSchema, changePasswordSchema } from '../validation/schemas';
 
 /**
  * GET /api/v1/settings/profile
@@ -408,5 +408,229 @@ export async function updateProfile(req: Request, res: Response): Promise<void> 
       throw error;
     }
     throw new ApiError(500, 'Failed to update profile', 'UPDATE_FAILED');
+  }
+}
+
+/**
+ * GET /api/v1/settings/preferences
+ * Get user preferences
+ */
+export async function getPreferences(req: Request, res: Response): Promise<void> {
+  const userId = (req as any).user.id;
+
+  try {
+    logger.debug('📋 getPreferences: Fetching preferences for user', userId);
+
+    // Get user preferences
+    const { data: preferences, error } = await supabaseAdmin
+      .from('user_preferences')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') {
+      // PGRST116 = no rows found (expected for new users)
+      logger.error('❌ getPreferences: Database error:', error);
+      throw new ApiError(500, 'Failed to fetch preferences', 'DATABASE_ERROR');
+    }
+
+    // If no preferences exist, return defaults
+    if (!preferences) {
+      logger.debug('✅ getPreferences: No preferences found, returning defaults');
+      res.json({
+        success: true,
+        data: {
+          notifications_toast: true,
+          notifications_sound: false,
+          notifications_email: false,
+          language: 'fr',
+          date_format: 'DD/MM/YYYY',
+          results_per_page: 25,
+          theme: 'dark'
+        }
+      });
+      return;
+    }
+
+    logger.debug('✅ getPreferences: Preferences fetched successfully');
+
+    res.json({
+      success: true,
+      data: {
+        notifications_toast: preferences.notifications_toast,
+        notifications_sound: preferences.notifications_sound,
+        notifications_email: preferences.notifications_email,
+        language: preferences.language,
+        date_format: preferences.date_format,
+        results_per_page: preferences.results_per_page,
+        theme: preferences.theme
+      }
+    });
+  } catch (error: any) {
+    logger.error('❌ getPreferences: Error:', error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, 'Failed to fetch preferences', 'PREFERENCES_FETCH_FAILED');
+  }
+}
+
+/**
+ * PUT /api/v1/settings/preferences
+ * Update user preferences
+ */
+export async function updatePreferences(req: Request, res: Response): Promise<void> {
+  const userId = (req as any).user.id;
+
+  try {
+    // Validate input with Zod
+    const validatedData = updatePreferencesSchema.parse(req.body);
+
+    logger.debug('✏️ updatePreferences: Updating preferences for user', userId, validatedData);
+
+    // Check if preferences exist
+    const { data: existingPrefs } = await supabaseAdmin
+      .from('user_preferences')
+      .select('id')
+      .eq('user_id', userId)
+      .single();
+
+    if (!existingPrefs) {
+      // Create new preferences
+      const { data: newPrefs, error: insertError } = await supabaseAdmin
+        .from('user_preferences')
+        .insert([{
+          user_id: userId,
+          ...validatedData
+        }])
+        .select()
+        .single();
+
+      if (insertError) {
+        logger.error('❌ updatePreferences: Insert error:', insertError);
+        throw new ApiError(500, 'Failed to create preferences', 'INSERT_FAILED');
+      }
+
+      logger.debug('✅ updatePreferences: Preferences created successfully');
+      res.json({
+        success: true,
+        message: 'Preferences created successfully',
+        data: newPrefs
+      });
+      return;
+    }
+
+    // Update existing preferences
+    const { data: updatedPrefs, error: updateError } = await supabaseAdmin
+      .from('user_preferences')
+      .update(validatedData)
+      .eq('user_id', userId)
+      .select()
+      .single();
+
+    if (updateError) {
+      logger.error('❌ updatePreferences: Update error:', updateError);
+      throw new ApiError(500, 'Failed to update preferences', 'UPDATE_FAILED');
+    }
+
+    logger.debug('✅ updatePreferences: Preferences updated successfully');
+
+    res.json({
+      success: true,
+      message: 'Preferences updated successfully',
+      data: updatedPrefs
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.issues.map((e: any) => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+      return;
+    }
+    logger.error('❌ updatePreferences: Error:', error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, 'Failed to update preferences', 'PREFERENCES_UPDATE_FAILED');
+  }
+}
+
+/**
+ * POST /api/v1/settings/change-password
+ * Change user password
+ */
+export async function changePassword(req: Request, res: Response): Promise<void> {
+  const userId = (req as any).user.id;
+  const userEmail = (req as any).user.email;
+
+  try {
+    // Validate input with Zod
+    const validatedData = changePasswordSchema.parse(req.body);
+    const { current_password, new_password } = validatedData;
+
+    logger.debug('🔐 changePassword: Changing password for user', userId);
+
+    // 1. Verify current password
+    const { error: verifyError } = await supabaseAdmin.auth.signInWithPassword({
+      email: userEmail,
+      password: current_password
+    });
+
+    if (verifyError) {
+      logger.error('❌ changePassword: Current password incorrect', { userId });
+      throw new ApiError(401, 'Current password is incorrect', 'INVALID_PASSWORD');
+    }
+
+    // 2. Update password
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
+      userId,
+      { password: new_password }
+    );
+
+    if (updateError) {
+      logger.error('❌ changePassword: Failed to update password:', updateError);
+      throw new ApiError(500, 'Failed to update password', 'PASSWORD_UPDATE_FAILED');
+    }
+
+    // 3. Create audit log
+    await supabaseAdmin.from('audit_logs').insert([{
+      user_id: userId,
+      action: 'password_changed',
+      resource_type: 'user',
+      resource_id: userId,
+      ip_address: req.ip,
+      user_agent: req.get('user-agent')
+    }]);
+
+    logger.debug('✅ changePassword: Password changed successfully');
+
+    res.json({
+      success: true,
+      message: 'Password changed successfully'
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      res.status(400).json({
+        success: false,
+        error: 'Validation failed',
+        code: 'VALIDATION_ERROR',
+        details: error.issues.map((e: any) => ({
+          field: e.path.join('.'),
+          message: e.message
+        }))
+      });
+      return;
+    }
+    logger.error('❌ changePassword: Error:', error);
+    if (error instanceof ApiError) {
+      throw error;
+    }
+    throw new ApiError(500, 'Failed to change password', 'PASSWORD_CHANGE_FAILED');
   }
 }

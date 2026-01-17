@@ -1,0 +1,695 @@
+/**
+ * RoomRedesignerForm - Interior Design Virtual Staging
+ * Dark Premium design with Bleu Pétrole accent
+ */
+
+/* ========================================
+   FORM CONTAINER
+   ======================================== */
+
+.rr-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+}
+
+/* ========================================
+   STEP CARDS
+   ======================================== */
+
+.rr-step {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: var(--spacing-6);
+}
+
+.rr-step-header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-5);
+}
+
+.rr-step-badge {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: 8px;
+  flex-shrink: 0;
+}
+
+.rr-step-title {
+  flex: 1;
+}
+
+.rr-step-title h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.rr-step-title p {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin: 4px 0 0 0;
+}
+
+/* ========================================
+   UPLOAD ZONE
+   ======================================== */
+
+.rr-upload-zone {
+  position: relative;
+}
+
+.rr-upload-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.rr-upload-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 80px;
+  padding: 12px;
+  background: var(--background);
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 200ms ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.rr-upload-label:hover {
+  border-color: var(--primary);
+  background: rgba(46, 107, 123, 0.05);
+}
+
+.rr-upload-label svg {
+  opacity: 0.4;
+  transition: all 200ms ease-out;
+}
+
+.rr-upload-label:hover svg {
+  opacity: 0.7;
+  transform: scale(1.05);
+}
+
+.rr-upload-hint {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  opacity: 0.6;
+}
+
+.rr-upload-preview {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 10px;
+}
+
+/* ========================================
+   IMAGE PREVIEWS GRID
+   ======================================== */
+
+.rr-preview-section {
+  margin-top: var(--spacing-4);
+}
+
+.rr-preview-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-3);
+}
+
+.rr-preview-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary);
+  font-family: var(--font-mono);
+}
+
+.rr-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.rr-preview-item {
+  position: relative;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 150ms ease-out;
+}
+
+.rr-preview-item:hover {
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(46, 107, 123, 0.15);
+}
+
+.rr-preview-img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  display: block;
+}
+
+.rr-preview-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  background: rgba(0, 0, 0, 0.7);
+  border: none;
+  border-radius: 4px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 150ms ease-out;
+}
+
+.rr-preview-item:hover .rr-preview-remove {
+  opacity: 1;
+}
+
+.rr-preview-remove:hover {
+  background: var(--destructive);
+  transform: scale(1.1);
+}
+
+.rr-preview-info {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--card);
+}
+
+.rr-preview-name {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rr-preview-size {
+  font-size: 10px;
+  color: var(--muted-foreground);
+  font-family: var(--font-mono);
+}
+
+/* ========================================
+   DESIGN STYLE GRID
+   ======================================== */
+
+.rr-style-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.rr-style-card {
+  padding: var(--spacing-4);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.rr-style-card:hover {
+  border-color: var(--muted-foreground);
+  transform: translateY(-2px);
+}
+
+.rr-style-card.selected {
+  border-color: var(--primary);
+  background: rgba(46, 107, 123, 0.1);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.rr-style-card input {
+  display: none;
+}
+
+.rr-card-icon {
+  opacity: 0.8;
+  transition: opacity 150ms ease-out;
+}
+
+.rr-style-card:hover .rr-card-icon {
+  opacity: 1;
+}
+
+.rr-style-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.rr-style-desc {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+/* ========================================
+   BUDGET LEVEL GRID
+   ======================================== */
+
+.rr-budget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.rr-budget-card {
+  padding: var(--spacing-4);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.rr-budget-card:hover {
+  border-color: var(--muted-foreground);
+  transform: translateY(-1px);
+}
+
+.rr-budget-card.selected {
+  border-color: var(--primary);
+  background: rgba(46, 107, 123, 0.1);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.rr-budget-card input {
+  display: none;
+}
+
+.rr-budget-card:hover .rr-card-icon {
+  opacity: 1;
+}
+
+.rr-budget-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.rr-budget-desc {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+/* ========================================
+   SEASON SELECTION GRID (NEW)
+   ======================================== */
+
+.rr-season-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.rr-season-card {
+  padding: var(--spacing-4);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.rr-season-card:hover {
+  border-color: var(--muted-foreground);
+  transform: translateY(-1px);
+}
+
+.rr-season-card.selected {
+  border-color: var(--primary);
+  background: rgba(46, 107, 123, 0.1);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.rr-season-card:hover .rr-card-icon {
+  opacity: 1;
+}
+
+.rr-season-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.rr-season-desc {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+
+/* ========================================
+   INPUT FIELD
+   ======================================== */
+
+.rr-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rr-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rr-input {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  font-size: 14px;
+  transition: all 150ms ease-out;
+}
+
+.rr-input::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.6;
+}
+
+.rr-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(46, 107, 123, 0.15);
+}
+
+/* ========================================
+   ERROR MESSAGE
+   ======================================== */
+
+.rr-error-msg {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(220, 38, 38, 0.1);
+  border: 1px solid var(--destructive);
+  border-radius: 8px;
+  color: var(--destructive);
+  font-size: 13px;
+  font-weight: 500;
+  margin-top: var(--spacing-3);
+}
+
+/* ========================================
+   SUBMIT SECTION
+   ======================================== */
+
+.rr-submit-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  align-items: center;
+}
+
+.rr-submit-btn {
+  width: 100%;
+  max-width: 500px;
+  padding: 16px 32px;
+  background: var(--muted);
+  border: 2px solid var(--border);
+  border-radius: 12px;
+  color: var(--muted-foreground);
+  font-size: 16px;
+  font-weight: 600;
+  cursor: not-allowed;
+  transition: all 200ms ease-out;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.rr-submit-btn.ready {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+  cursor: pointer;
+}
+
+.rr-submit-btn.ready:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(46, 107, 123, 0.25);
+}
+
+.rr-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+}
+
+.rr-spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid white;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.rr-submit-hint {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+/* ========================================
+   CONFIRMATION MODAL
+   ======================================== */
+
+.rr-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 24px;
+  animation: fadeIn 200ms ease-out;
+}
+
+.rr-modal {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  max-width: 600px;
+  width: 100%;
+  overflow: hidden;
+  animation: scale-in 300ms ease-out;
+}
+
+.rr-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rr-modal-header h3 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--foreground);
+  margin: 0;
+}
+
+.rr-modal-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition: all 150ms ease-out;
+}
+
+.rr-modal-close:hover {
+  background: var(--muted);
+  color: var(--foreground);
+}
+
+.rr-modal-body {
+  padding: 24px;
+}
+
+.rr-modal-preview {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 12px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  background: var(--muted);
+}
+
+.rr-modal-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rr-modal-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.rr-modal-note {
+  margin-top: 16px;
+  padding: 12px 16px;
+  background: rgba(46, 107, 123, 0.1);
+  border: 1px solid rgba(46, 107, 123, 0.2);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--foreground);
+  line-height: 1.5;
+  text-align: center;
+}
+
+.rr-modal-stat {
+  padding: 16px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rr-modal-stat-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.rr-modal-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.rr-modal-footer {
+  padding: 20px 24px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.rr-btn-secondary {
+  padding: 12px 24px;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+}
+
+.rr-btn-secondary:hover {
+  background: var(--muted);
+}
+
+.rr-btn-primary {
+  padding: 12px 24px;
+  background: var(--primary);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+}
+
+.rr-btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(46, 107, 123, 0.3);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}

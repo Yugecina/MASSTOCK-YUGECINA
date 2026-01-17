@@ -3,8 +3,10 @@ import { useNavigate } from 'react-router-dom'
 import { ClientLayout } from '../components/layout/ClientLayout'
 import { Spinner } from '../components/ui/Spinner'
 import { useExecutionsStore } from '../store/executionsStore'
+import { useActiveExecutionsPolling } from '../hooks/useActiveExecutionsPolling'
 import logger from '@/utils/logger'
 import { Workflow, User } from '../types'
+import type { ExecutionBadgeConfig } from '../utils/adminHelpers'
 import './Executions.css'
 import '../components/executions/ExecutionModal.css'
 
@@ -17,13 +19,6 @@ interface Execution {
   duration_seconds?: number
 }
 
-interface Filters {
-  status: string
-  workflow_id: string
-  user_id: string
-  sortBy: string
-}
-
 interface StatusCount {
   all: number
   completed: number
@@ -33,76 +28,92 @@ interface StatusCount {
 }
 
 /**
- * Executions Page - "The Trusted Magician" - Electric Trust
+ * Executions Page - Refactored (NO local filter state, NO cache, AbortController)
  * Premium glassmorphism, Electric Indigo + Bright Cyan, rich animations
- * Now with Zustand caching and stale-while-revalidate for instant navigation
+ * Single source of truth: all filters in Zustand store
  */
 export function Executions(): JSX.Element {
   const navigate = useNavigate()
 
-  // Get data from Zustand store (persists across navigations)
+  // Get ALL data from Zustand store (single source of truth)
   const {
     workflows,
-    workflowsMap,
     members,
     executions,
     executionsLoading,
-    executionsRefreshing,
+    executionsLoadingMore,
     executionsTotal,
     executionsHasMore,
+    executionsError,
+    statusCounts: storeStatusCounts,
     filters,
     initialize,
     loadMore: storeLoadMore,
-    setFilters: storeSetFilters,
+    setFilter,
+    resetFilters,
     refresh
   } = useExecutionsStore()
 
-  // Local UI state only (not data)
-  const [loadingMore, setLoadingMore] = useState<boolean>(false)
+  // Local UI state ONLY (not data or filters)
   const [justUpdated, setJustUpdated] = useState<boolean>(false)
-  const [statusFilter, setStatusFilter] = useState<string>(filters.status)
-  const [workflowFilter, setWorkflowFilter] = useState<string>(filters.workflow_id)
-  const [userFilter, setUserFilter] = useState<string>(filters.user_id)
-  const [sortBy, setSortBy] = useState<string>(filters.sortBy)
+  const [previousActiveCount, setPreviousActiveCount] = useState<number>(0)
+  const [loadingExecutionId, setLoadingExecutionId] = useState<string | null>(null)
+
+  // Track active executions for auto-refresh
+  const { activeCount } = useActiveExecutionsPolling()
 
   // Ref for infinite scroll
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
-  // Initialize store on mount (uses cache if available)
+  // Initialize store on mount
   useEffect(() => {
     logger.debug('🚀 Executions: Component mounted, initializing store')
     initialize()
   }, [initialize])
 
-  // Update store filters when local filters change
+  // Auto-refresh when active executions complete
   useEffect(() => {
-    const newFilters: Filters = {
-      status: statusFilter,
-      workflow_id: workflowFilter,
-      user_id: userFilter,
-      sortBy
+    // Detect when active count decreases to 0 (execution completed)
+    if (previousActiveCount > 0 && activeCount === 0) {
+      logger.debug('✅ Executions: Active workflow completed, refreshing list')
+      // Small delay to allow backend to update
+      setTimeout(() => {
+        refresh()
+      }, 500)
+    }
+    setPreviousActiveCount(activeCount)
+  }, [activeCount, previousActiveCount, refresh])
+
+  // Auto-poll when there are active executions
+  useEffect(() => {
+    const hasActiveExecutions = storeStatusCounts.pending > 0 || storeStatusCounts.processing > 0
+
+    if (!hasActiveExecutions) {
+      return
     }
 
-    // Only update store if filters actually changed
-    const filtersChanged = (
-      filters.status !== statusFilter ||
-      filters.workflow_id !== workflowFilter ||
-      filters.user_id !== userFilter ||
-      filters.sortBy !== sortBy
-    )
+    const pollInterval = setInterval(() => {
+      // Skip if page is hidden (Page Visibility API)
+      if (document.hidden) {
+        return
+      }
 
-    if (filtersChanged && !executionsLoading) {
-      logger.debug('🔍 Executions: Filters changed, updating store', newFilters)
-      storeSetFilters(newFilters)
+      logger.debug('🔄 Executions: Auto-polling refresh for active executions')
+      refresh()
+    }, 5000) // 5 seconds
+
+    return () => {
+      clearInterval(pollInterval)
     }
-  }, [statusFilter, workflowFilter, userFilter, sortBy, filters, executionsLoading, storeSetFilters])
+  }, [storeStatusCounts.pending, storeStatusCounts.processing, refresh])
 
-  // Intersection Observer for infinite scroll
+  // Infinite scroll with IntersectionObserver
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && executionsHasMore && !loadingMore && !executionsLoading) {
-          handleLoadMore()
+        if (entries[0].isIntersecting && executionsHasMore && !executionsLoadingMore && !executionsLoading) {
+          logger.debug('🔄 Executions: Intersection triggered, loading more')
+          storeLoadMore()
         }
       },
       { threshold: 0.1 }
@@ -113,25 +124,16 @@ export function Executions(): JSX.Element {
     }
 
     return () => observer.disconnect()
-  }, [executionsHasMore, loadingMore, executionsLoading])
+  }, [executionsHasMore, executionsLoadingMore, executionsLoading, storeLoadMore])
 
   // Track when data updates for smooth transition
   useEffect(() => {
-    if (!executionsRefreshing && executions.length > 0) {
+    if (!executionsLoading && !executionsLoadingMore && executions.length > 0) {
       setJustUpdated(true)
       const timer = setTimeout(() => setJustUpdated(false), 500)
       return () => clearTimeout(timer)
     }
-  }, [executions, executionsRefreshing])
-
-  const handleLoadMore = useCallback(async (): Promise<void> => {
-    if (!loadingMore && executionsHasMore) {
-      logger.debug('🔄 Executions.handleLoadMore: Loading more from store')
-      setLoadingMore(true)
-      await storeLoadMore()
-      setLoadingMore(false)
-    }
-  }, [loadingMore, executionsHasMore, storeLoadMore])
+  }, [executions, executionsLoading, executionsLoadingMore])
 
   const handleRefresh = useCallback(async (): Promise<void> => {
     logger.debug('🔄 Executions.handleRefresh: Force refresh all data')
@@ -149,8 +151,10 @@ export function Executions(): JSX.Element {
     // Clone executions deeply to avoid Zustand proxy issues with react-window
     const clonedExecutions = executions.map((ex: Execution) => ({ ...ex }))
 
+    // Sorting is now done server-side, but keep this for defensive programming
+    // In case we ever need client-side sorting as fallback
     return clonedExecutions.sort((a, b) => {
-      switch (sortBy) {
+      switch (filters.sortBy) {
         case 'newest':
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         case 'oldest':
@@ -161,41 +165,49 @@ export function Executions(): JSX.Element {
           return 0
       }
     })
-  }, [executions, sortBy])
+  }, [executions, filters.sortBy])
 
-  // Memoize status counts to avoid re-filtering on every render
-  const statusCounts: StatusCount = useMemo(() => {
-    return {
-      all: executionsTotal,
-      completed: executions.filter((e: Execution) => e.status === 'completed').length,
-      pending: executions.filter((e: Execution) => e.status === 'pending').length,
-      processing: executions.filter((e: Execution) => e.status === 'processing').length,
-      failed: executions.filter((e: Execution) => e.status === 'failed').length,
-    }
-  }, [executions, executionsTotal])
+  // Use status counts from backend (always accurate, not calculated from loaded subset)
+  const statusCounts: StatusCount = {
+    all: executionsTotal,
+    completed: storeStatusCounts.completed,
+    pending: storeStatusCounts.pending,
+    processing: storeStatusCounts.processing,
+    failed: storeStatusCounts.failed,
+  }
 
-  // Show loading state only on initial load (not on cache hit)
+  // Show loading state only on initial load
   const isInitialLoading = executionsLoading && executions.length === 0
 
   // Render execution card
   const renderExecutionCard = useCallback((execution: Execution) => {
-    const statusConfig: Record<string, any> = {
-      completed: { gradient: 'success', icon: '✓', glow: true },
-      failed: { gradient: 'error', icon: '✗', glow: true },
-      processing: { gradient: 'cyan', icon: '⚡', glow: true, pulse: true },
-      pending: { gradient: 'muted', icon: '⏱', glow: false }
+    const statusConfig: Record<string, ExecutionBadgeConfig> = {
+      completed: { class: 'execution-status-completed', label: 'Completed', gradient: 'success', icon: '✓', glow: true },
+      failed: { class: 'execution-status-failed', label: 'Failed', gradient: 'error', icon: '✗', glow: true },
+      processing: { class: 'execution-status-processing', label: 'Processing', gradient: 'cyan', icon: 'spinner', glow: true, pulse: true },
+      pending: { class: 'execution-status-pending', label: 'Pending', gradient: 'muted', icon: '⏱', glow: false }
     }
     const config = statusConfig[execution.status] || statusConfig.pending
 
     return (
       <div
         key={execution.id}
-        onClick={() => navigate(`/executions/${execution.id}`)}
-        className={`execution-item ${config.glow ? 'has-glow' : ''} ${config.pulse ? 'has-pulse' : ''}`}
+        onClick={() => {
+          setLoadingExecutionId(execution.id)
+          navigate(`/executions/${execution.id}`)
+        }}
+        className={`execution-item ${config.glow ? 'has-glow' : ''} ${config.pulse ? 'has-pulse' : ''} ${loadingExecutionId === execution.id ? 'is-loading-navigation' : ''}`}
         data-gradient={config.gradient}
       >
         <div className="execution-item-icon">
-          {config.icon}
+          {config.icon === 'spinner' ? (
+            <svg className="execution-spinner" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <circle cx="12" cy="12" r="10" strokeOpacity="0.25" />
+              <path d="M12 2a10 10 0 0 1 10 10" />
+            </svg>
+          ) : (
+            config.icon
+          )}
         </div>
 
         <div className="execution-item-content">
@@ -248,16 +260,6 @@ export function Executions(): JSX.Element {
     )
   }, [navigate])
 
-  if (isInitialLoading) {
-    return (
-      <ClientLayout>
-        <div className="flex justify-center items-center" style={{ minHeight: '60vh' }}>
-          <Spinner size="lg" />
-        </div>
-      </ClientLayout>
-    )
-  }
-
   return (
     <ClientLayout>
       {/* Main Container */}
@@ -294,10 +296,10 @@ export function Executions(): JSX.Element {
             <button
               key={index}
               onClick={() => {
-                logger.debug('🔍 Executions: Status filter set to:', stat.filter)
-                setStatusFilter(stat.filter)
+                logger.debug('🔍 Executions: Status filter clicked:', stat.filter)
+                setFilter('status', stat.filter)
               }}
-              className={`execution-stat-pill ${statusFilter === stat.filter ? 'active' : ''} ${stat.pulse ? 'has-pulse' : ''}`}
+              className={`execution-stat-pill ${filters.status === stat.filter ? 'active' : ''} ${stat.pulse ? 'has-pulse' : ''}`}
               data-gradient={stat.gradient}
             >
               <span className="stat-pill-value">{stat.value}</span>
@@ -311,10 +313,10 @@ export function Executions(): JSX.Element {
           <div className="filter-group">
             <label className="filter-compact-label">Filter by Workflow</label>
             <select
-              value={workflowFilter}
+              value={filters.workflow_id}
               onChange={(e) => {
-                setWorkflowFilter(e.target.value)
                 logger.debug('🔍 Executions: Workflow filter changed to:', e.target.value)
+                setFilter('workflow_id', e.target.value)
               }}
               className="filter-compact-select"
             >
@@ -328,10 +330,10 @@ export function Executions(): JSX.Element {
           <div className="filter-group">
             <label className="filter-compact-label">Triggered By</label>
             <select
-              value={userFilter}
+              value={filters.user_id}
               onChange={(e) => {
-                setUserFilter(e.target.value)
                 logger.debug('🔍 Executions: User filter changed to:', e.target.value)
+                setFilter('user_id', e.target.value)
               }}
               className="filter-compact-select"
             >
@@ -345,10 +347,10 @@ export function Executions(): JSX.Element {
           <div className="filter-group">
             <label className="filter-compact-label">Sort By</label>
             <select
-              value={sortBy}
+              value={filters.sortBy}
               onChange={(e) => {
-                setSortBy(e.target.value)
                 logger.debug('🔍 Executions: Sort changed to:', e.target.value)
+                setFilter('sortBy', e.target.value)
               }}
               className="filter-compact-select"
             >
@@ -358,14 +360,11 @@ export function Executions(): JSX.Element {
             </select>
           </div>
 
-          {(statusFilter !== 'all' || workflowFilter !== 'all' || userFilter !== 'all' || sortBy !== 'newest') && (
+          {(filters.status !== 'all' || filters.workflow_id !== 'all' || filters.user_id !== 'all' || filters.sortBy !== 'newest') && (
             <button
               onClick={() => {
-                setStatusFilter('all')
-                setWorkflowFilter('all')
-                setUserFilter('all')
-                setSortBy('newest')
                 logger.debug('🔄 Executions: Filters cleared')
+                resetFilters()
               }}
               className="filter-clear-compact"
             >
@@ -378,18 +377,53 @@ export function Executions(): JSX.Element {
           )}
         </div>
 
-        {/* Executions List - Premium Cards + Blur Loading */}
-        {sortedExecutions.length > 0 ? (
+        {/* Error State */}
+        {executionsError && (
+          <div className="executions-error">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+            <span>{executionsError}</span>
+            <button onClick={handleRefresh} className="btn btn-sm btn-secondary">
+              Retry
+            </button>
+          </div>
+        )}
+
+        {/* Content Area - Loading, List, or Empty State */}
+        {isInitialLoading ? (
+          <div className="executions-loading">
+            <div className="executions-loading-icon">
+              <div className="executions-loading-orbit" />
+              <div className="executions-loading-orbit-2" />
+              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                <path d="M22 12h-6l-2 3h-4l-2-3H2" />
+                <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+              </svg>
+            </div>
+            <h3 className="executions-loading-title">Loading executions</h3>
+            <p className="executions-loading-text">
+              Fetching your workflow history
+              <span className="executions-loading-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </span>
+            </p>
+          </div>
+        ) : sortedExecutions.length > 0 ? (
           <div className="executions-list-container">
-            <div className={`executions-list-wrapper ${executionsRefreshing ? 'is-refreshing' : ''} ${justUpdated ? 'just-updated' : ''}`}>
+            <div className={`executions-list-wrapper ${executionsLoading ? 'is-loading' : ''} ${justUpdated ? 'just-updated' : ''}`}>
               <div className="executions-list">
                 {sortedExecutions.map((execution: Execution) => renderExecutionCard(execution))}
               </div>
             </div>
 
-            {/* Refreshing indicator overlay */}
-            {executionsRefreshing && (
-              <div className="executions-refresh-indicator">
+            {/* Loading indicator overlay */}
+            {executionsLoading && executions.length > 0 && (
+              <div className="executions-loading-indicator">
                 <Spinner size="sm" />
                 <span>Updating...</span>
               </div>
@@ -397,14 +431,14 @@ export function Executions(): JSX.Element {
 
             {/* Load More Trigger / Infinite Scroll Sentinel */}
             <div ref={loadMoreRef} className="executions-load-more">
-              {loadingMore && (
+              {executionsLoadingMore && (
                 <div className="executions-load-more-spinner">
                   <Spinner size="md" />
                   <span>Loading more...</span>
                 </div>
               )}
-              {!loadingMore && executionsHasMore && (
-                <button onClick={handleLoadMore} className="executions-load-more-btn">
+              {!executionsLoadingMore && executionsHasMore && (
+                <button onClick={storeLoadMore} className="executions-load-more-btn">
                   Load more ({executions.length} of {executionsTotal})
                 </button>
               )}
@@ -427,17 +461,15 @@ export function Executions(): JSX.Element {
               No executions found
             </h3>
             <p className="executions-empty-text">
-              {statusFilter !== 'all' || workflowFilter !== 'all'
+              {filters.status !== 'all' || filters.workflow_id !== 'all'
                 ? 'Try adjusting your filters to see more results'
                 : 'Execute a workflow to see results here'}
             </p>
-            {(statusFilter !== 'all' || workflowFilter !== 'all' || userFilter !== 'all') && (
+            {(filters.status !== 'all' || filters.workflow_id !== 'all' || filters.user_id !== 'all') && (
               <button
                 onClick={() => {
-                  setStatusFilter('all')
-                  setWorkflowFilter('all')
-                  setUserFilter('all')
                   logger.debug('🔄 Executions: Filters cleared from empty state')
+                  resetFilters()
                 }}
                 className="executions-empty-btn"
               >

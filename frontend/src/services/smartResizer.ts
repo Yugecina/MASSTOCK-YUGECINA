@@ -90,7 +90,7 @@ export async function createJob(data: CreateJobRequest): Promise<CreateJobRespon
     formData.append('quality', data.quality);
   }
 
-  const response = await api.post<CreateJobResponse>('/v1/smart-resizer/jobs', formData, {
+  const response = await api.post<CreateJobResponse>('/smart-resizer/jobs', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
@@ -104,7 +104,7 @@ export async function createJob(data: CreateJobRequest): Promise<CreateJobRespon
  * Get job status and results
  */
 export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
-  const response = await api.get<JobStatusResponse>(`/v1/smart-resizer/jobs/${jobId}`);
+  const response = await api.get<JobStatusResponse>(`/smart-resizer/jobs/${jobId}`);
   return response; // Interceptor already unwraps
 }
 
@@ -113,7 +113,7 @@ export async function getJobStatus(jobId: string): Promise<JobStatusResponse> {
  */
 export async function getFormats(platform?: string): Promise<FormatsResponse> {
   const params = platform ? { platform } : {};
-  const response = await api.get<FormatsResponse>('/v1/smart-resizer/formats', { params });
+  const response = await api.get<FormatsResponse>('/smart-resizer/formats', { params });
   return response; // Interceptor already unwraps
 }
 
@@ -121,6 +121,6 @@ export async function getFormats(platform?: string): Promise<FormatsResponse> {
  * Retry failed formats
  */
 export async function retryJob(jobId: string): Promise<any> {
-  const response = await api.post(`/v1/smart-resizer/jobs/${jobId}/retry`);
+  const response = await api.post(`/smart-resizer/jobs/${jobId}/retry`);
   return response; // Interceptor already unwraps
 }

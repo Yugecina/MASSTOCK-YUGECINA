@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo } from 'react';
 import toast from 'react-hot-toast';
 import { Spinner } from '../../components/ui/Spinner';
 import { AdminLayout } from '../../components/layout/AdminLayout';
-import { adminService } from '../../services/admin';
+import { adminDashboardService } from '../../services/adminDashboardService';
 import logger from '@/utils/logger';
 import './AdminTickets.css';
 
@@ -50,7 +50,7 @@ export function AdminTickets() {
     async function loadTickets() {
       try {
         logger.debug('💬 AdminTickets: Loading tickets...');
-        const response: { data?: TicketsResponse } = await adminService.getTickets();
+        const response: { data?: TicketsResponse } = await adminDashboardService.getTickets();
         logger.debug('✅ AdminTickets: Response received:', response);
         setTickets(response.data?.tickets || []);
       } catch (err: any) {

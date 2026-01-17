@@ -1,0 +1,521 @@
+/**
+ * Unit tests for Gemini Image Service (MOCKED)
+ * Tests pricing calculations, batch processing logic, error handling
+ *
+ * All Gemini API calls are mocked for deterministic, fast testing
+ */
+
+import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import { setMockConfig, resetMockConfig } from '../../__mocks__/geminiImageService';
+import { nanoBananaFixtures } from '../../__helpers__/workflow-fixtures';
+
+// Mock the service to use our deterministic mock
+jest.mock('../../../services/geminiImageService');
+
+describe('Gemini Image Service - Unit Tests (Mocked)', () => {
+  beforeEach(() => {
+    // Reset to success mode before each test
+    resetMockConfig();
+  });
+
+  // ==========================================================================
+  // PRICING CALCULATIONS
+  // ==========================================================================
+
+  describe('Pricing Calculations', () => {
+    it('should calculate correct price for Flash model', () => {
+      const imageCount = 10;
+      const costPerImage = 0.0025; // Flash model cost
+      const revenuePerImage = 0.05; // Flash model revenue
+
+      const totalCost = imageCount * costPerImage;
+      const totalRevenue = imageCount * revenuePerImage;
+      const profit = totalRevenue - totalCost;
+
+      expect(totalCost).toBe(0.025);
+      expect(totalRevenue).toBe(0.5);
+      expect(profit).toBe(0.475);
+    });
+
+    it('should calculate correct price for Pro model 4K', () => {
+      const imageCount = 5;
+      const costPerImage = 0.04; // Pro 4K cost
+      const revenuePerImage = 0.8; // Pro 4K revenue
+
+      const totalCost = imageCount * costPerImage;
+      const totalRevenue = imageCount * revenuePerImage;
+      const profit = totalRevenue - totalCost;
+
+      expect(totalCost).toBe(0.2);
+      expect(totalRevenue).toBe(4.0);
+      expect(profit).toBe(3.8);
+    });
+
+    it('should calculate correct price for Pro model 2K', () => {
+      const imageCount = 3;
+      const costPerImage = 0.02; // Pro 2K cost
+      const revenuePerImage = 0.4; // Pro 2K revenue
+
+      const totalCost = imageCount * costPerImage;
+      const totalRevenue = imageCount * revenuePerImage;
+      const profit = totalRevenue - totalCost;
+
+      expect(totalCost).toBe(0.06);
+      expect(totalRevenue).toBe(1.2);
+      expect(profit).toBe(1.14);
+    });
+
+    it('should calculate correct price for Pro model 1K', () => {
+      const imageCount = 7;
+      const costPerImage = 0.01; // Pro 1K cost
+      const revenuePerImage = 0.2; // Pro 1K revenue
+
+      const totalCost = imageCount * costPerImage;
+      const totalRevenue = imageCount * revenuePerImage;
+      const profit = totalRevenue - totalCost;
+
+      expect(totalCost).toBe(0.07);
+      expect(totalRevenue).toBe(1.4);
+      expect(profit).toBe(1.33);
+    });
+
+    it('should handle zero images correctly', () => {
+      const imageCount = 0;
+      const costPerImage = 0.0025;
+      const revenuePerImage = 0.05;
+
+      const totalCost = imageCount * costPerImage;
+      const totalRevenue = imageCount * revenuePerImage;
+
+      expect(totalCost).toBe(0);
+      expect(totalRevenue).toBe(0);
+    });
+
+    it('should handle large batch pricing (100 images)', () => {
+      const imageCount = 100;
+      const costPerImage = 0.0025;
+      const revenuePerImage = 0.05;
+
+      const totalCost = imageCount * costPerImage;
+      const totalRevenue = imageCount * revenuePerImage;
+      const profit = totalRevenue - totalCost;
+
+      expect(totalCost).toBe(0.25);
+      expect(totalRevenue).toBe(5.0);
+      expect(profit).toBe(4.75);
+    });
+
+    it('should maintain precision with floating point arithmetic', () => {
+      const imageCount = 13;
+      const costPerImage = 0.0025;
+      const revenuePerImage = 0.05;
+
+      const totalCost = imageCount * costPerImage;
+      const totalRevenue = imageCount * revenuePerImage;
+      const profit = totalRevenue - totalCost;
+
+      // Use toBeCloseTo for floating point comparisons
+      expect(totalCost).toBeCloseTo(0.0325, 4);
+      expect(totalRevenue).toBeCloseTo(0.65, 4);
+      expect(profit).toBeCloseTo(0.6175, 4);
+    });
+  });
+
+  // ==========================================================================
+  // BATCH PROCESSING LOGIC
+  // ==========================================================================
+
+  describe('Batch Processing Logic', () => {
+    it('should process single prompt correctly', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'success' });
+
+      const result = await generateImage({
+        prompt: nanoBananaFixtures.singlePrompt.prompts[0],
+        model: nanoBananaFixtures.singlePrompt.model,
+        aspectRatio: nanoBananaFixtures.singlePrompt.aspect_ratio
+      });
+
+      expect(result).toHaveProperty('imageData');
+      expect(result).toHaveProperty('mimeType');
+      expect(result.mimeType).toBe('image/png');
+      expect(result.imageData).toBeTruthy();
+      expect(result.imageData.length).toBeGreaterThan(0);
+    });
+
+    it('should process multiple prompts in sequence', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'success' });
+
+      const results = [];
+      for (const prompt of nanoBananaFixtures.multiplePrompts.prompts) {
+        const result = await generateImage({
+          prompt,
+          model: nanoBananaFixtures.multiplePrompts.model,
+          aspectRatio: nanoBananaFixtures.multiplePrompts.aspect_ratio
+        });
+        results.push(result);
+      }
+
+      expect(results).toHaveLength(3);
+      results.forEach(result => {
+        expect(result).toHaveProperty('imageData');
+        expect(result.mimeType).toBe('image/png');
+      });
+    });
+
+    it('should handle long prompts', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'success' });
+
+      const result = await generateImage({
+        prompt: nanoBananaFixtures.longPrompt.prompts[0],
+        model: nanoBananaFixtures.longPrompt.model,
+        aspectRatio: nanoBananaFixtures.longPrompt.aspect_ratio
+      });
+
+      expect(result).toHaveProperty('imageData');
+      expect(result.mimeType).toBe('image/png');
+    });
+
+    it('should handle prompts with special characters', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'success' });
+
+      const result = await generateImage({
+        prompt: nanoBananaFixtures.specialCharacters.prompts[0],
+        model: nanoBananaFixtures.specialCharacters.model,
+        aspectRatio: nanoBananaFixtures.specialCharacters.aspect_ratio
+      });
+
+      expect(result).toHaveProperty('imageData');
+      expect(result.mimeType).toBe('image/png');
+    });
+
+    it('should process batch of 100 prompts', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'success' });
+
+      const results = [];
+      for (let i = 0; i < 100; i++) {
+        const result = await generateImage({
+          prompt: `Test prompt ${i}`,
+          model: 'gemini-2.5-flash-image',
+          aspectRatio: '16:9'
+        });
+        results.push(result);
+      }
+
+      expect(results).toHaveLength(100);
+      results.forEach(result => {
+        expect(result).toHaveProperty('imageData');
+      });
+    });
+  });
+
+  // ==========================================================================
+  // ERROR HANDLING
+  // ==========================================================================
+
+  describe('Error Handling', () => {
+    it('should handle rate limit errors', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'rate_limit' });
+
+      await expect(
+        generateImage({
+          prompt: 'Test prompt',
+          model: 'gemini-2.5-flash-image',
+          aspectRatio: '16:9'
+        })
+      ).rejects.toThrow('RATE_LIMIT_EXCEEDED');
+    });
+
+    it('should handle server errors', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'server_error' });
+
+      await expect(
+        generateImage({
+          prompt: 'Test prompt',
+          model: 'gemini-2.5-flash-image',
+          aspectRatio: '16:9'
+        })
+      ).rejects.toThrow('INTERNAL_SERVER_ERROR');
+    });
+
+    it('should handle partial failures gracefully', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'partial_failure', failureRate: 0.5 });
+
+      const results = [];
+      const errors = [];
+
+      for (let i = 0; i < 10; i++) {
+        try {
+          const result = await generateImage({
+            prompt: `Prompt ${i}`,
+            model: 'gemini-2.5-flash-image',
+            aspectRatio: '16:9'
+          });
+          results.push(result);
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+
+      // With 50% failure rate, we should have some successes and some failures
+      expect(results.length).toBeGreaterThan(0);
+      expect(errors.length).toBeGreaterThan(0);
+      expect(results.length + errors.length).toBe(10);
+    });
+
+    it('should handle partial failures with 30% failure rate', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'partial_failure', failureRate: 0.3 });
+
+      const results = [];
+      const errors = [];
+
+      for (let i = 0; i < 100; i++) {
+        try {
+          const result = await generateImage({
+            prompt: `Prompt ${i}`,
+            model: 'gemini-2.5-flash-image',
+            aspectRatio: '16:9'
+          });
+          results.push(result);
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+
+      // With 30% failure rate and 100 attempts, expect roughly 70 successes and 30 failures
+      // Allow 20% variance due to randomness
+      expect(results.length).toBeGreaterThan(50); // At least 50 successes
+      expect(results.length).toBeLessThan(90);    // At most 90 successes
+      expect(results.length + errors.length).toBe(100);
+    });
+
+    it('should propagate error messages correctly', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'rate_limit' });
+
+      try {
+        await generateImage({
+          prompt: 'Test prompt',
+          model: 'gemini-2.5-flash-image',
+          aspectRatio: '16:9'
+        });
+        fail('Should have thrown error');
+      } catch (error: any) {
+        expect(error.message).toContain('RATE_LIMIT_EXCEEDED');
+        expect(error.message).toContain('429');
+      }
+    });
+  });
+
+  // ==========================================================================
+  // INPUT VALIDATION
+  // ==========================================================================
+
+  describe('Input Validation', () => {
+    it('should accept valid aspect ratios', () => {
+      const validRatios = ['1:1', '16:9', '9:16', '4:3', '3:4'];
+
+      validRatios.forEach(ratio => {
+        expect(() => {
+          // Simulate validation logic
+          if (!validRatios.includes(ratio)) {
+            throw new Error('Invalid aspect ratio');
+          }
+        }).not.toThrow();
+      });
+    });
+
+    it('should reject invalid aspect ratios', () => {
+      const invalidRatios = ['99:99', '0:0', 'invalid', '16:9:1', ''];
+
+      invalidRatios.forEach(ratio => {
+        expect(() => {
+          const validRatios = ['1:1', '16:9', '9:16', '4:3', '3:4'];
+          if (!validRatios.includes(ratio)) {
+            throw new Error('Invalid aspect ratio');
+          }
+        }).toThrow('Invalid aspect ratio');
+      });
+    });
+
+    it('should accept valid models', () => {
+      const validModels = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
+
+      validModels.forEach(model => {
+        expect(() => {
+          if (!validModels.includes(model)) {
+            throw new Error('Invalid model');
+          }
+        }).not.toThrow();
+      });
+    });
+
+    it('should reject invalid models', () => {
+      const invalidModels = ['gemini-2.0', 'invalid-model', '', 'gpt-4'];
+
+      invalidModels.forEach(model => {
+        expect(() => {
+          const validModels = ['gemini-2.5-flash-image', 'gemini-3-pro-image-preview'];
+          if (!validModels.includes(model)) {
+            throw new Error('Invalid model');
+          }
+        }).toThrow('Invalid model');
+      });
+    });
+
+    it('should accept valid resolutions for Pro model', () => {
+      const validResolutions = ['1K', '2K', '4K'];
+
+      validResolutions.forEach(resolution => {
+        expect(() => {
+          if (!validResolutions.includes(resolution)) {
+            throw new Error('Invalid resolution');
+          }
+        }).not.toThrow();
+      });
+    });
+
+    it('should reject invalid resolutions for Pro model', () => {
+      const invalidResolutions = ['8K', '720p', '1080p', 'HD', ''];
+
+      invalidResolutions.forEach(resolution => {
+        expect(() => {
+          const validResolutions = ['1K', '2K', '4K'];
+          if (!validResolutions.includes(resolution)) {
+            throw new Error('Invalid resolution');
+          }
+        }).toThrow('Invalid resolution');
+      });
+    });
+  });
+
+  // ==========================================================================
+  // MOCK CONFIGURATION
+  // ==========================================================================
+
+  describe('Mock Configuration', () => {
+    it('should respect mock delay configuration', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'success', delay: 100 });
+
+      const start = Date.now();
+      await generateImage({
+        prompt: 'Test prompt',
+        model: 'gemini-2.5-flash-image',
+        aspectRatio: '16:9'
+      });
+      const duration = Date.now() - start;
+
+      // Should take at least 100ms due to delay
+      expect(duration).toBeGreaterThanOrEqual(100);
+    });
+
+    it('should allow mode switching during tests', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+
+      // Test success mode
+      setMockConfig({ mode: 'success' });
+      const result1 = await generateImage({
+        prompt: 'Test',
+        model: 'gemini-2.5-flash-image',
+        aspectRatio: '16:9'
+      });
+      expect(result1.imageData).toBeTruthy();
+
+      // Switch to error mode
+      setMockConfig({ mode: 'rate_limit' });
+      await expect(
+        generateImage({
+          prompt: 'Test',
+          model: 'gemini-2.5-flash-image',
+          aspectRatio: '16:9'
+        })
+      ).rejects.toThrow('RATE_LIMIT_EXCEEDED');
+
+      // Switch back to success mode
+      setMockConfig({ mode: 'success' });
+      const result2 = await generateImage({
+        prompt: 'Test',
+        model: 'gemini-2.5-flash-image',
+        aspectRatio: '16:9'
+      });
+      expect(result2.imageData).toBeTruthy();
+    });
+
+    it('should reset to default success mode', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+
+      // Set to error mode
+      setMockConfig({ mode: 'server_error' });
+
+      // Reset to default
+      resetMockConfig();
+
+      // Should now succeed
+      const result = await generateImage({
+        prompt: 'Test',
+        model: 'gemini-2.5-flash-image',
+        aspectRatio: '16:9'
+      });
+      expect(result.imageData).toBeTruthy();
+    });
+  });
+
+  // ==========================================================================
+  // RESPONSE FORMAT
+  // ==========================================================================
+
+  describe('Response Format', () => {
+    it('should return correct response structure', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'success' });
+
+      const result = await generateImage({
+        prompt: 'Test prompt',
+        model: 'gemini-2.5-flash-image',
+        aspectRatio: '16:9'
+      });
+
+      // Verify response structure
+      expect(result).toHaveProperty('imageData');
+      expect(result).toHaveProperty('mimeType');
+      expect(typeof result.imageData).toBe('string');
+      expect(typeof result.mimeType).toBe('string');
+    });
+
+    it('should return valid base64 image data', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'success' });
+
+      const result = await generateImage({
+        prompt: 'Test prompt',
+        model: 'gemini-2.5-flash-image',
+        aspectRatio: '16:9'
+      });
+
+      // Verify base64 format (alphanumeric + / + = allowed)
+      expect(result.imageData).toMatch(/^[A-Za-z0-9+/=]+$/);
+    });
+
+    it('should always return PNG mime type in mock', async () => {
+      const { generateImage } = await import('../../../services/geminiImageService');
+      setMockConfig({ mode: 'success' });
+
+      const result = await generateImage({
+        prompt: 'Test prompt',
+        model: 'gemini-2.5-flash-image',
+        aspectRatio: '16:9'
+      });
+
+      expect(result.mimeType).toBe('image/png');
+    });
+  });
+});

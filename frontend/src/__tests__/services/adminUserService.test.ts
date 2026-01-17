@@ -1,18 +1,18 @@
 /**
- * Tests unitaires pour adminUserService
- * @file adminUserService.test.js
+ * Tests unitaires pour adminResourceService
+ * @file adminResourceService.test.js
  *
  * Tests pour les appels API du module admin users
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import api from '../../services/api';
-import { adminUserService } from '../../services/adminUserService';
+import { adminResourceService } from '../../services/adminResourceService';
 
 // Mock du module api
 vi.mock('../../services/api');
 
-describe('adminUserService', () => {
+describe('adminResourceService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -26,10 +26,10 @@ describe('adminUserService', () => {
       api.get.mockResolvedValue(mockResponse);
 
       // Act
-      await adminUserService.getUsers();
+      await adminResourceService.getUsers();
 
       // Assert
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/users', {
+      expect(api.get).toHaveBeenCalledWith('/admin/users', {
         params: { page: 1, limit: 50 }
       });
     });
@@ -42,10 +42,10 @@ describe('adminUserService', () => {
       api.get.mockResolvedValue(mockResponse);
 
       // Act
-      await adminUserService.getUsers(2, { limit: 20 });
+      await adminResourceService.getUsers(2, { limit: 20 });
 
       // Assert
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/users', {
+      expect(api.get).toHaveBeenCalledWith('/admin/users', {
         params: { page: 2, limit: 20 }
       });
     });
@@ -59,10 +59,10 @@ describe('adminUserService', () => {
       const filters = { status: 'active', search: 'test@example.com' };
 
       // Act
-      await adminUserService.getUsers(1, filters);
+      await adminResourceService.getUsers(1, filters);
 
       // Assert
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/users', {
+      expect(api.get).toHaveBeenCalledWith('/admin/users', {
         params: { page: 1, limit: 50, status: 'active', search: 'test@example.com' }
       });
     });
@@ -78,9 +78,9 @@ describe('adminUserService', () => {
       api.get.mockResolvedValue({ data: mockData });
 
       // Act
-      const result = await adminUserService.getUsers();
+      const result = await adminResourceService.getUsers();
 
-      // Assert - adminUserService returns the full response
+      // Assert - adminResourceService returns the full response
       expect(result).toEqual({ data: mockData });
     });
 
@@ -90,7 +90,7 @@ describe('adminUserService', () => {
       api.get.mockRejectedValue(error);
 
       // Act & Assert
-      await expect(adminUserService.getUsers()).rejects.toThrow('Network error');
+      await expect(adminResourceService.getUsers()).rejects.toThrow('Network error');
     });
   });
 
@@ -103,10 +103,10 @@ describe('adminUserService', () => {
       api.get.mockResolvedValue(mockResponse);
 
       // Act
-      await adminUserService.getUserDetails('123');
+      await adminResourceService.getUserDetails('123');
 
       // Assert
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/clients/123');
+      expect(api.get).toHaveBeenCalledWith('/admin/clients/123');
     });
 
     it('devrait retourner les détails de l\'utilisateur', async () => {
@@ -117,7 +117,7 @@ describe('adminUserService', () => {
       api.get.mockResolvedValue({ data: mockData });
 
       // Act
-      const result = await adminUserService.getUserDetails('123');
+      const result = await adminResourceService.getUserDetails('123');
 
       // Assert - Returns full response
       expect(result).toEqual({ data: mockData });
@@ -140,10 +140,10 @@ describe('adminUserService', () => {
       api.post.mockResolvedValue(mockResponse);
 
       // Act
-      await adminUserService.createUser(userData);
+      await adminResourceService.createUser(userData);
 
       // Assert
-      expect(api.post).toHaveBeenCalledWith('/v1/admin/users', userData);
+      expect(api.post).toHaveBeenCalledWith('/admin/users', userData);
     });
 
     it('devrait retourner l\'utilisateur créé', async () => {
@@ -160,7 +160,7 @@ describe('adminUserService', () => {
       api.post.mockResolvedValue({ data: mockData });
 
       // Act
-      const result = await adminUserService.createUser(userData);
+      const result = await adminResourceService.createUser(userData);
 
       // Assert - Returns full response
       expect(result).toEqual({ data: mockData });
@@ -172,7 +172,7 @@ describe('adminUserService', () => {
       api.post.mockRejectedValue(error);
 
       // Act & Assert
-      await expect(adminUserService.createUser({})).rejects.toThrow('Email already exists');
+      await expect(adminResourceService.createUser({})).rejects.toThrow('Email already exists');
     });
   });
 
@@ -190,10 +190,10 @@ describe('adminUserService', () => {
       api.put.mockResolvedValue(mockResponse);
 
       // Act
-      await adminUserService.updateUser(userId, updateData);
+      await adminResourceService.updateUser(userId, updateData);
 
       // Assert
-      expect(api.put).toHaveBeenCalledWith(`/v1/admin/clients/${userId}`, updateData);
+      expect(api.put).toHaveBeenCalledWith(`/admin/clients/${userId}`, updateData);
     });
 
     it('devrait retourner l\'utilisateur mis à jour', async () => {
@@ -205,7 +205,7 @@ describe('adminUserService', () => {
       api.put.mockResolvedValue({ data: mockData });
 
       // Act
-      const result = await adminUserService.updateUser(userId, {});
+      const result = await adminResourceService.updateUser(userId, {});
 
       // Assert - Returns full response
       expect(result).toEqual({ data: mockData });
@@ -222,10 +222,10 @@ describe('adminUserService', () => {
       api.delete.mockResolvedValue(mockResponse);
 
       // Act
-      await adminUserService.deleteUser(userId);
+      await adminResourceService.deleteUser(userId);
 
       // Assert
-      expect(api.delete).toHaveBeenCalledWith(`/v1/admin/clients/${userId}`);
+      expect(api.delete).toHaveBeenCalledWith(`/admin/clients/${userId}`);
     });
 
     it('devrait retourner la réponse de suppression', async () => {
@@ -235,7 +235,7 @@ describe('adminUserService', () => {
       api.delete.mockResolvedValue({ data: mockData });
 
       // Act
-      const result = await adminUserService.deleteUser(userId);
+      const result = await adminResourceService.deleteUser(userId);
 
       // Assert - Returns full response
       expect(result).toEqual({ data: mockData });
@@ -252,10 +252,10 @@ describe('adminUserService', () => {
       api.put.mockResolvedValue(mockResponse);
 
       // Act
-      await adminUserService.blockUser(userId);
+      await adminResourceService.blockUser(userId);
 
       // Assert
-      expect(api.put).toHaveBeenCalledWith(`/v1/admin/clients/${userId}`, {
+      expect(api.put).toHaveBeenCalledWith(`/admin/clients/${userId}`, {
         status: 'suspended'
       });
     });
@@ -271,10 +271,10 @@ describe('adminUserService', () => {
       api.put.mockResolvedValue(mockResponse);
 
       // Act
-      await adminUserService.unblockUser(userId);
+      await adminResourceService.unblockUser(userId);
 
       // Assert
-      expect(api.put).toHaveBeenCalledWith(`/v1/admin/clients/${userId}`, {
+      expect(api.put).toHaveBeenCalledWith(`/admin/clients/${userId}`, {
         status: 'active'
       });
     });

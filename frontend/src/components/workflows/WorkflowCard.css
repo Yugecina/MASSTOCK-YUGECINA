@@ -1,0 +1,133 @@
+/* Workflow Card Component - Consolidated Styles */
+
+.workflow-card {
+  position: relative;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  cursor: pointer;
+  overflow: hidden;
+  transition: all 200ms ease-out;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  animation: fade-in-up 0.4s ease-out both;
+}
+
+.workflow-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: var(--primary);
+}
+
+.workflow-card:active {
+  transform: translateY(0);
+}
+
+/* Card Header */
+.workflow-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+/* Icon */
+.workflow-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary);
+  transition: all 200ms ease-out;
+}
+
+.workflow-card:hover .workflow-card-icon {
+  background: var(--primary);
+  color: white;
+  transform: scale(1.05);
+}
+
+/* Badge */
+.workflow-card-badge {
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.workflow-card-badge--active {
+  background: var(--success-light);
+  color: var(--success);
+}
+
+/* Content */
+.workflow-card-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workflow-card-description {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-bottom: 20px;
+  min-height: 42px;
+}
+
+/* Footer */
+.workflow-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.workflow-card-runs {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+/* Arrow Icon */
+.workflow-card-arrow {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  transition: all 200ms ease-out;
+}
+
+.workflow-card:hover .workflow-card-arrow {
+  background: var(--primary);
+  color: white;
+  transform: translateX(2px);
+}
+
+/* Animation */
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

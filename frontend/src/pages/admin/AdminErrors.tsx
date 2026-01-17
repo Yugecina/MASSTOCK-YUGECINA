@@ -7,7 +7,7 @@
 import { useState, useEffect } from 'react';
 import { Spinner } from '../../components/ui/Spinner';
 import { AdminLayout } from '../../components/layout/AdminLayout';
-import { adminService } from '../../services/admin';
+import { adminDashboardService } from '../../services/adminDashboardService';
 import logger from '@/utils/logger';
 
 interface ErrorLog {
@@ -36,7 +36,7 @@ export function AdminErrors() {
     async function loadErrors() {
       try {
         logger.debug('🔥 AdminErrors: Loading errors...');
-        const data: ErrorsResponse = await adminService.getErrors();
+        const data: ErrorsResponse = await adminDashboardService.getErrors();
         logger.debug('✅ AdminErrors: Data loaded:', data);
         setErrors(data.errors || []);
       } catch (err: any) {

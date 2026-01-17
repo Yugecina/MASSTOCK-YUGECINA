@@ -357,3 +357,139 @@ export function SkeletonWithDelay({ delay = 200, children }: SkeletonWithDelayPr
 
   return show ? <>{children}</> : null
 }
+
+/**
+ * Skeleton for single Execution item
+ */
+export function SkeletonExecutionItem() {
+  return (
+    <div
+      className="card"
+      style={{
+        padding: 'var(--spacing-md)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 'var(--spacing-md)',
+      }}
+    >
+      <Skeleton width="40px" height="40px" variant="circle" />
+      <div style={{ flex: 1 }}>
+        <Skeleton width="60%" height="16px" className="mb-2" />
+        <Skeleton width="40%" height="14px" />
+      </div>
+      <Skeleton width="80px" height="24px" />
+      <Skeleton width="24px" height="24px" />
+    </div>
+  )
+}
+
+/**
+ * Skeleton for Executions list page
+ */
+export function SkeletonExecutions() {
+  return (
+    <div style={{ padding: 'var(--spacing-lg)' }}>
+      {/* Header */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          marginBottom: 'var(--spacing-lg)',
+        }}
+      >
+        <Skeleton width="200px" height="32px" />
+        <Skeleton width="120px" height="40px" />
+      </div>
+
+      {/* Stats pills */}
+      <div
+        style={{
+          display: 'flex',
+          gap: 'var(--spacing-sm)',
+          marginBottom: 'var(--spacing-lg)',
+        }}
+      >
+        {[1, 2, 3, 4, 5].map((i) => (
+          <Skeleton key={i} width="80px" height="32px" />
+        ))}
+      </div>
+
+      {/* Filtres */}
+      <div
+        className="card"
+        style={{
+          padding: 'var(--spacing-md)',
+          marginBottom: 'var(--spacing-lg)',
+        }}
+      >
+        <div style={{ display: 'flex', gap: 'var(--spacing-md)' }}>
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} width="150px" height="40px" />
+          ))}
+        </div>
+      </div>
+
+      {/* Liste */}
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 'var(--spacing-sm)',
+        }}
+      >
+        {[1, 2, 3, 4, 5].map((i) => (
+          <SkeletonExecutionItem key={i} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Skeleton for Execution detail page
+ */
+export function SkeletonExecutionDetail() {
+  return (
+    <div style={{ padding: 'var(--spacing-lg)' }}>
+      {/* Header avec bouton retour */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'var(--spacing-md)',
+          marginBottom: 'var(--spacing-xl)',
+        }}
+      >
+        <Skeleton width="40px" height="40px" />
+        <Skeleton width="300px" height="32px" />
+      </div>
+
+      {/* Info cards */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: 'var(--spacing-md)',
+          marginBottom: 'var(--spacing-xl)',
+        }}
+      >
+        {[1, 2, 3].map((i) => (
+          <SkeletonCard key={i} compact />
+        ))}
+      </div>
+
+      {/* Paramètres */}
+      <Skeleton width="150px" height="24px" className="mb-4" />
+      <SkeletonCard />
+
+      {/* Résultats */}
+      <Skeleton
+        width="150px"
+        height="24px"
+        className="mb-4"
+        style={{ marginTop: 'var(--spacing-xl)' }}
+      />
+      <Skeleton width="100%" height="300px" />
+    </div>
+  )
+}

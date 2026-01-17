@@ -1,0 +1,168 @@
+/* ========================================
+   EXECUTION DETAIL PAGE - LOADING STATE
+   ======================================== */
+
+.execution-detail-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+}
+
+.execution-detail-error {
+  text-align: center;
+  padding: var(--spacing-12);
+}
+
+.execution-detail-error h2 {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  margin-bottom: var(--spacing-2);
+  color: var(--foreground);
+}
+
+.execution-detail-error p {
+  color: var(--muted-foreground);
+  margin-bottom: var(--spacing-6);
+}
+
+/* ========================================
+   TECHNICAL DATA COLLAPSIBLE SECTION
+   ======================================== */
+
+.execution-technical-section {
+  margin-top: 32px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+  overflow: hidden;
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.execution-technical-section:hover {
+  border-color: rgba(46, 107, 123, 0.3);
+}
+
+.execution-technical-section.expanded {
+  border-color: rgba(46, 107, 123, 0.4);
+}
+
+.execution-technical-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 20px 24px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: inherit;
+}
+
+.execution-technical-header:hover {
+  background: linear-gradient(
+    to right,
+    rgba(46, 107, 123, 0.04),
+    transparent 50%
+  );
+}
+
+.execution-technical-header:active {
+  transform: scale(0.995);
+}
+
+.execution-technical-header-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.execution-technical-chevron {
+  color: var(--muted-foreground);
+  transition: all 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.execution-technical-header:hover .execution-technical-chevron {
+  color: var(--primary);
+}
+
+.execution-technical-section.expanded .execution-technical-chevron {
+  transform: rotate(90deg);
+  color: var(--primary);
+}
+
+.execution-technical-header-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.execution-technical-title {
+  font-family: 'Space Grotesk', var(--font-sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+  transition: color 200ms ease;
+}
+
+.execution-technical-header:hover .execution-technical-title {
+  color: var(--primary);
+}
+
+.execution-technical-subtitle {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+  letter-spacing: 0.01em;
+}
+
+.execution-technical-toggle-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: rgba(46, 107, 123, 0.08);
+  transition: all 200ms ease;
+}
+
+.execution-technical-header:hover .execution-technical-toggle-label {
+  background: rgba(46, 107, 123, 0.12);
+  color: var(--primary);
+}
+
+.execution-technical-section.expanded .execution-technical-toggle-label {
+  background: rgba(46, 107, 123, 0.15);
+  color: var(--primary);
+}
+
+.execution-technical-content {
+  padding: 0 24px 24px 24px;
+  animation: executionSlideDown 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes executionSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.execution-technical-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+}

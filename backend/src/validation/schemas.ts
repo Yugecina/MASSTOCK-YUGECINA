@@ -151,6 +151,36 @@ const inviteCollaboratorSchema = z.object({
   role: z.enum(['user', 'admin']).default('user'),
 });
 
+// User Preferences
+const updatePreferencesSchema = z.object({
+  notifications_toast: z.boolean().optional(),
+  notifications_sound: z.boolean().optional(),
+  notifications_email: z.boolean().optional(),
+  language: z.enum(['fr', 'en']).optional(),
+  date_format: z.enum(['DD/MM/YYYY', 'MM/DD/YYYY']).optional(),
+  results_per_page: z.union([
+    z.literal(10),
+    z.literal(25),
+    z.literal(50),
+    z.literal(100)
+  ]).optional(),
+  theme: z.enum(['dark', 'light']).optional()
+});
+
+// Password Change
+const changePasswordSchema = z.object({
+  current_password: z.string().min(8, 'Password must be at least 8 characters'),
+  new_password: z.string()
+    .min(8, 'Password must be at least 8 characters')
+    .regex(/[A-Z]/, 'Must contain at least one uppercase letter')
+    .regex(/[a-z]/, 'Must contain at least one lowercase letter')
+    .regex(/[0-9]/, 'Must contain at least one number'),
+  confirm_password: z.string().min(8)
+}).refine(data => data.new_password === data.confirm_password, {
+  message: "Passwords don't match",
+  path: ["confirm_password"]
+});
+
 // ============================================
 // Workflow Execution Schemas (nano_banana)
 // ============================================
@@ -174,6 +204,7 @@ const executionsQuerySchema = z.object({
   workflow_id: uuidSchema.optional(),
   user_id: uuidSchema.optional(),
   fields: z.string().optional(),
+  sortBy: z.enum(['newest', 'oldest', 'duration']).default('newest'),
 });
 
 // ============================================
@@ -220,6 +251,8 @@ export {
 
   // Settings
   inviteCollaboratorSchema,
+  updatePreferencesSchema,
+  changePasswordSchema,
 
   // Queries
   executionsQuerySchema,

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAssetsStore } from '../store/assetsStore';
 import { ClientLayout } from '../components/layout/ClientLayout';
 import { OptimizedImage } from '../components/common/OptimizedImage';
+import logger from '@/utils/logger';
 
 export function Assets() {
   const {
@@ -20,7 +21,6 @@ export function Assets() {
   const [selectedAsset, setSelectedAsset] = useState(null);
   const [gridColumns, setGridColumns] = useState(4); // 2-6 columns
   const [collapsedGroups, setCollapsedGroups] = useState({}); // Track collapsed state per group
-  const [imageHeights, setImageHeights] = useState<Record<string, number>>({}); // Track image heights for masonry
 
   // Get grouped assets
   const groupedAssets = getGroupedAssets();
@@ -33,26 +33,10 @@ export function Assets() {
     }));
   };
 
-  // Calculate row span for masonry layout
-  const handleImageLoad = (assetId: string, img: HTMLImageElement) => {
-    const aspectRatio = img.naturalHeight / img.naturalWidth;
-    // Calculate how many 10px rows this image needs
-    // Base width is calculated from container width / columns
-    // We'll estimate ~300px per column (average), so height = 300 * aspectRatio
-    const estimatedHeight = 300 * aspectRatio;
-    // Convert to row units (10px each) + add some for card padding/border (~60px)
-    const rowSpan = Math.ceil((estimatedHeight + 60) / 10);
-
-    setImageHeights(prev => ({
-      ...prev,
-      [assetId]: rowSpan
-    }));
-  };
-
   // Initial fetch on mount only - load ALL assets
   useEffect(() => {
     fetchAssets({}, { loadAll: true }).catch(err => {
-      console.error('❌ Assets: Failed to load', { err });
+      logger.error('❌ Assets: Failed to load', { err });
       setError('Failed to load assets');
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -63,7 +47,7 @@ export function Assets() {
       setError(null);
       await setFilters({ asset_type: type });
     } catch (err) {
-      console.error('❌ Assets: Failed to filter', { err, type });
+      logger.error('❌ Assets: Failed to filter', { err, type });
       setError('Failed to apply filter');
     }
   };
@@ -73,7 +57,7 @@ export function Assets() {
       setError(null);
       await setFilters({ sort });
     } catch (err) {
-      console.error('❌ Assets: Failed to sort', { err, sort });
+      logger.error('❌ Assets: Failed to sort', { err, sort });
       setError('Failed to apply sort');
     }
   };
@@ -82,7 +66,7 @@ export function Assets() {
     try {
       await loadMore();
     } catch (err) {
-      console.error('❌ Assets: Failed to load more', { err });
+      logger.error('❌ Assets: Failed to load more', { err });
       setError('Failed to load more assets');
     }
   };
@@ -287,18 +271,15 @@ export function Assets() {
                     <div
                       className="assets-container masonry"
                       style={{
-                        gridTemplateColumns: `repeat(${Math.min(gridColumns, group.asset_count)}, 1fr)`
+                        gridTemplateColumns: `repeat(${gridColumns}, 1fr)`
                       }}
                     >
-                  {group.assets.map((asset, assetIndex) => {
-                    const rowSpan = imageHeights[asset.id] || 50; // Default ~500px if not loaded yet
-                    return (
+                  {group.assets.map((asset, assetIndex) => (
                       <div
                         key={asset.id}
                         className="asset-item"
                         style={{
-                          animationDelay: `${(groupIndex * 0.05) + (assetIndex * 0.03)}s`,
-                          gridRowEnd: `span ${rowSpan}`
+                          animationDelay: `${(groupIndex * 0.05) + (assetIndex * 0.03)}s`
                         }}
                         onClick={() => handleAssetClick(asset)}
                       >
@@ -308,7 +289,6 @@ export function Assets() {
                             alt={asset.prompt_text}
                             thumbnailSize={600}
                             aspectRatio={null}
-                            onLoad={(img) => handleImageLoad(asset.id, img)}
                           />
                         <div className="asset-overlay">
                           <div className="overlay-top">
@@ -328,8 +308,7 @@ export function Assets() {
                         </div>
                       </div>
                     </div>
-                    )
-                  })}
+                  ))}
                     </div>
                   )}
                 </div>

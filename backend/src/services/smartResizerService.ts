@@ -11,7 +11,7 @@
 
 import { supabaseAdmin } from '../config/database';
 import * as imageProcessing from './imageProcessingService';
-import geminiService from './geminiImageService';
+import vertexAIService from './vertexAIImageService';
 import {
   FormatPresetKey,
   getFormatPreset,
@@ -589,11 +589,25 @@ class SmartResizerService {
     const startTime = Date.now();
 
     try {
-      // Simple prompt - let Nano Banana Pro handle text preservation natively
-      const prompt = `Adapt this image to ${ratio} aspect ratio. Keep all text, logos, and visual elements exactly as they are. Only reorganize the layout to fit the new format.`;
+      // Detailed prompt to ensure intelligent recomposition without black borders
+      const prompt = `Transform this image to a ${ratio} aspect ratio by intelligently reorganizing and expanding the composition.
 
-      // Call Gemini Image Service (Nano Banana Pro)
-      const result = await geminiService.generateImageWithReference({
+CRITICAL REQUIREMENTS:
+1. DO NOT add black borders or letterboxing
+2. DO NOT simply crop or stretch the image
+3. PRESERVE all text content exactly as written (same fonts, colors, sizes)
+4. PRESERVE all logos and brand elements exactly
+5. EXPAND the background/scene naturally to fill the new dimensions
+6. RECOMPOSE the layout to fit ${ratio} while maintaining visual balance
+7. The final image must be a complete, full-bleed ${ratio} composition
+
+Think of this as creating a new ${ratio} version of the same creative, not just resizing it.`;
+
+      // Configure model: Use Pro model for creative recomposition
+      vertexAIService.setModel('gemini-3-pro-image-preview');
+
+      // Call Vertex AI Image Service (Nano Banana Pro)
+      const result = await vertexAIService.generateImageWithReference({
         prompt,
         referenceImage: masterImageBase64,
         aspectRatio: ratio,
@@ -615,6 +629,8 @@ class SmartResizerService {
         formatKey,
         ratio,
         error: error.message,
+        stack: error.stack,
+        fullError: JSON.stringify(error, Object.getOwnPropertyNames(error)),
       });
       throw error;
     }

@@ -29,6 +29,12 @@
   gap: var(--spacing-6);
 }
 
+/* Compact Header Variant */
+.nb-header-compact {
+  padding: 12px 16px;
+  gap: var(--spacing-3);
+}
+
 .nb-header-content {
   display: flex;
   align-items: center;
@@ -46,12 +52,31 @@
   color: var(--primary);
 }
 
+.nb-header-icon-compact {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--muted);
+  border-radius: 6px;
+  color: var(--primary);
+}
+
 .nb-header-title {
   font-size: 20px;
   font-weight: 600;
   color: var(--foreground);
   margin: 0;
   letter-spacing: -0.02em;
+}
+
+.nb-header-title-compact {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+  letter-spacing: -0.01em;
 }
 
 .nb-header-subtitle {
@@ -64,9 +89,27 @@
   margin-top: 4px;
 }
 
+.nb-header-subtitle-compact {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin: 0;
+  margin-top: 2px;
+}
+
 .nb-status-dot {
   width: 8px;
   height: 8px;
+  background: var(--success);
+  border-radius: 50%;
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+.nb-status-dot-compact {
+  width: 6px;
+  height: 6px;
   background: var(--success);
   border-radius: 50%;
   animation: pulse-dot 2s ease-in-out infinite;
@@ -93,12 +136,26 @@
   gap: var(--spacing-4);
 }
 
+.nb-header-stats-compact {
+  display: flex;
+  gap: 8px;
+}
+
 .nb-stat {
   text-align: center;
   padding: var(--spacing-3) var(--spacing-5);
   background: var(--muted);
   border-radius: 8px;
   min-width: 80px;
+}
+
+.nb-stat-compact {
+  text-align: center;
+  padding: 6px 12px;
+  background: rgba(46, 107, 123, 0.12);
+  border: 1px solid rgba(46, 107, 123, 0.25);
+  border-radius: 6px;
+  min-width: 60px;
 }
 
 .nb-stat-accent {
@@ -115,6 +172,15 @@
   letter-spacing: -0.02em;
 }
 
+.nb-stat-value-compact {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--primary);
+  letter-spacing: -0.01em;
+}
+
 .nb-stat-accent .nb-stat-value {
   color: var(--primary);
 }
@@ -129,6 +195,16 @@
   margin-top: 2px;
 }
 
+.nb-stat-label-compact {
+  display: block;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-top: 1px;
+}
+
 /* ========================================
    STEP CARDS
    ======================================== */
@@ -138,6 +214,11 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: var(--spacing-6);
+}
+
+/* Compact Step Variant */
+.nb-step-compact {
+  padding: 14px 16px;
 }
 
 .nb-step-optional {
@@ -156,6 +237,14 @@
   margin-bottom: var(--spacing-5);
 }
 
+/* Compact Step Header */
+.nb-step-header-compact {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
 .nb-step-badge {
   width: 36px;
   height: 36px;
@@ -168,6 +257,22 @@
   font-weight: 700;
   font-family: var(--font-mono);
   border-radius: 8px;
+  flex-shrink: 0;
+}
+
+/* Compact Step Badge */
+.nb-step-badge-compact {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--primary);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  border-radius: 5px;
   flex-shrink: 0;
 }
 
@@ -192,6 +297,25 @@
   font-size: 13px;
   color: var(--muted-foreground);
   margin: 4px 0 0 0;
+}
+
+/* Compact Step Title */
+.nb-step-title-compact {
+  flex: 1;
+}
+
+.nb-step-title-compact h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+
+.nb-step-title-compact p {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin: 2px 0 0 0;
 }
 
 /* ========================================
@@ -573,6 +697,11 @@
   position: relative;
 }
 
+/* Compact Upload Zone */
+.nb-upload-zone-compact {
+  position: relative;
+}
+
 .nb-upload-input {
   position: absolute;
   inset: 0;
@@ -596,13 +725,39 @@
   transition: all 150ms ease-out;
 }
 
+/* Compact Upload Label */
+.nb-upload-label-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: var(--background);
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 150ms ease-out;
+}
+
 .nb-upload-label:hover {
   border-color: var(--primary);
   background: rgba(46, 107, 123, 0.05);
 }
 
+.nb-upload-label-compact:hover {
+  border-color: var(--primary);
+  background: rgba(46, 107, 123, 0.05);
+  color: var(--foreground);
+}
+
 .nb-upload-label svg {
   opacity: 0.5;
+}
+
+.nb-upload-label-compact svg {
+  opacity: 0.6;
 }
 
 /* ========================================
@@ -755,6 +910,74 @@
 .nb-file-item.loading .nb-file-preview {
   opacity: 0.5;
   filter: blur(2px);
+}
+
+/* ========================================
+   COMPACT FILE PREVIEW - Minimal Grid
+   ======================================== */
+
+.nb-file-list-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.nb-file-item-compact {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  cursor: default;
+  transition: all 150ms ease-out;
+}
+
+.nb-file-item-compact:hover {
+  border-color: var(--primary);
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+}
+
+.nb-file-preview-compact {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.nb-file-remove-compact {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  border: none;
+  border-radius: 3px;
+  color: white;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 150ms ease-out;
+}
+
+.nb-file-item-compact:hover .nb-file-remove-compact {
+  opacity: 1;
+}
+
+.nb-file-remove-compact:hover {
+  background: var(--destructive);
+  transform: scale(1.1);
+}
+
+.nb-file-remove-compact:active {
+  transform: scale(0.95);
 }
 
 .nb-file-item.loading::after {
