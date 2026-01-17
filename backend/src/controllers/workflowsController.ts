@@ -311,16 +311,24 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
         req_files_is_array: Array.isArray((req as any).files)
       });
 
+      // Helper: Ensure parameter is a string (prevent type confusion attacks)
+      const ensureString = (value: unknown): string | undefined => {
+        if (typeof value === 'string') return value;
+        if (Array.isArray(value) && value.length > 0) return String(value[0]);
+        return undefined;
+      };
+
       // NEW: Get model, aspect_ratio, and resolution with defaults
-      const model = validatedData.model || req.body.model || workflow.config.default_model || 'gemini-2.5-flash-image';
-      const aspect_ratio = validatedData.aspect_ratio || req.body.aspect_ratio || workflow.config.default_aspect_ratio || '1:1';
+      // CodeQL Fix: Prevent type confusion by ensuring values are strings
+      const model = ensureString(validatedData.model) || ensureString(req.body.model) || workflow.config.default_model || 'gemini-2.5-flash-image';
+      const aspect_ratio = ensureString(validatedData.aspect_ratio) || ensureString(req.body.aspect_ratio) || workflow.config.default_aspect_ratio || '1:1';
 
       // Determine resolution default based on model type
       const isProModel = model === 'gemini-3-pro-image-preview';
       const defaultResolution = isProModel
         ? (workflow.config.default_resolution?.pro || '1K')
         : (workflow.config.default_resolution?.flash || '1K');
-      const resolution = validatedData.resolution || req.body.resolution || defaultResolution;
+      const resolution = ensureString(validatedData.resolution) || ensureString(req.body.resolution) || defaultResolution;
 
       logger.debug('📥 Received workflow execution request:', {
         hasPromptsText: !!prompts_text,

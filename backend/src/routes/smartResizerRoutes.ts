@@ -17,7 +17,7 @@ import {
 } from '../controllers/smartResizerController';
 import { authenticate } from '../middleware/auth';
 import { uploadSingle } from '../middleware/upload';
-import { uploadLimiter } from '../middleware/rateLimit';
+import { uploadLimiter, apiLimiter } from '../middleware/rateLimit';
 import { logger } from '../config/logger';
 
 const router = express.Router();
@@ -70,13 +70,13 @@ router.post('/jobs', authenticate, uploadLimiter, uploadSingle('masterImage'), c
  *   }
  * }
  */
-router.get('/jobs/:id', authenticate, getJobById);
+router.get('/jobs/:id', authenticate, apiLimiter, getJobById);
 
 /**
  * GET /api/v1/smart-resizer/debug
  * Debug endpoint to test authentication and client_members query
  */
-router.get('/debug', authenticate, async (req, res) => {
+router.get('/debug', authenticate, apiLimiter, async (req, res) => {
   try {
     const user = (req as any).user;
 
@@ -153,7 +153,7 @@ router.get('/debug', authenticate, async (req, res) => {
  *   }
  * }
  */
-router.get('/formats', authenticate, listFormats);
+router.get('/formats', authenticate, apiLimiter, listFormats);
 
 /**
  * POST /api/v1/smart-resizer/jobs/:id/retry
@@ -167,6 +167,6 @@ router.get('/formats', authenticate, listFormats);
  *   }
  * }
  */
-router.post('/jobs/:id/retry', authenticate, retryJob);
+router.post('/jobs/:id/retry', authenticate, apiLimiter, retryJob);
 
 export default router;
