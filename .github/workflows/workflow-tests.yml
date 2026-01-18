@@ -110,8 +110,8 @@ jobs:
     permissions:
       contents: read
       issues: write
-    # Only run on push to main or manual workflow dispatch
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event.inputs.run_e2e == 'true'
+    # Only run on manual workflow dispatch with run_e2e enabled (E2E tests are for local dev only)
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.run_e2e == 'true'
 
     services:
       redis:
