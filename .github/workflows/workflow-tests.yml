@@ -92,13 +92,14 @@ jobs:
           name: workflow-tests
           fail_ci_if_error: false
 
-      - name: Comment PR with coverage
-        if: github.event_name == 'pull_request'
-        uses: romeovs/lcov-reporter-action@2a28ec3e25fb7eae9cb537e9141603f861a7a8e2  # v0.3.1
-        with:
-          lcov-file: ./backend/coverage/lcov.info
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          delete-old-comments: true
+      # Disabled - action no longer available
+      # - name: Comment PR with coverage
+      #   if: github.event_name == 'pull_request'
+      #   uses: romeovs/lcov-reporter-action@2a28ec3e25fb7eae9cb537e9141603f861a7a8e2  # v0.3.1
+      #   with:
+      #     lcov-file: ./backend/coverage/lcov.info
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     delete-old-comments: true
 
   # ============================================================================
   # JOB 2: Tests E2E (Réels - sur merge to main ou manuel)
