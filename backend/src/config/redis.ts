@@ -20,4 +20,31 @@ const redisConfig: RedisConfig = {
 
 const redisClient = new Redis(redisConfig);
 
+/**
+ * Test Redis connection by sending a PING command
+ * @returns {Promise<boolean>} True if connection successful, false otherwise
+ */
+export async function testRedisConnection(): Promise<boolean> {
+  try {
+    await redisClient.ping();
+    return true;
+  } catch (error) {
+    console.error('Redis connection test failed:', error);
+    return false;
+  }
+}
+
+/**
+ * Gracefully close Redis connection
+ * @returns {Promise<void>}
+ */
+export async function closeRedisConnection(): Promise<void> {
+  try {
+    await redisClient.quit();
+  } catch (error) {
+    console.error('Error closing Redis connection:', error);
+    // Don't throw - we want graceful shutdown
+  }
+}
+
 export { redisClient, redisConfig };
