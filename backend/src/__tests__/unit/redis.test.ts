@@ -7,7 +7,7 @@ jest.mock('ioredis', () => require('ioredis-mock'));
 
 // Import once outside describe block since modules are cached
 import Redis from 'ioredis';
-import redisModule from '../../config/redis';
+import * as redisModule from '../../config/redis';
 
 describe('Redis Configuration', () => {
   beforeEach(() => {
