@@ -40,6 +40,7 @@ services:
     volumes:
       - ./backend/logs:/app/logs
       - ./backend/uploads:/app/uploads
+      - /opt/credentials:/app/credentials:ro
     networks:
       - masstock_network
     healthcheck:
@@ -72,6 +73,7 @@ services:
       - ./backend/.env.production
     volumes:
       - ./backend/logs:/app/logs
+      - /opt/credentials:/app/credentials:ro
     networks:
       - masstock_network
     healthcheck:
@@ -125,6 +127,7 @@ services:
 
 networks:
   masstock_network:
+    name: masstock_network
     driver: bridge
 
 volumes:
