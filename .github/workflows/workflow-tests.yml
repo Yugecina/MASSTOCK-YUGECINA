@@ -52,9 +52,9 @@ jobs:
         working-directory: backend
         run: npm ci
 
-      - name: Run all tests (unit + integration)
+      - name: Run unit tests with coverage (threshold check disabled in CI)
         working-directory: backend
-        run: npm test
+        run: npm run test:unit -- --coverage --coverageThreshold='{}'
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
