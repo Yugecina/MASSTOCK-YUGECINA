@@ -1,5 +1,5 @@
 /**
- * Executions Store
+ * Executions Store - Refactored (NO Cache, AbortController, Single Source of Truth)
  * Zustand store for executions management
  */
 
@@ -8,8 +8,8 @@ import { workflowService } from '../services/workflows';
 import logger from '@/utils/logger';
 import { Workflow, Execution, User } from '../types/index';
 
-const CACHE_DURATION = 30000; // 30 seconds for executions
-const STATIC_CACHE_DURATION = 300000; // 5 minutes for workflows/members
+const STATIC_CACHE_DURATION = 300000; // 5 minutes for workflows/members (static data)
+const EXECUTIONS_CACHE_DURATION = 30000; // 30 seconds for executions (short-term cache)
 
 interface Filters {
   status: string;
@@ -18,9 +18,11 @@ interface Filters {
   sortBy: string;
 }
 
-interface FetchOptions {
-  force?: boolean;
-  append?: boolean;
+interface StatusCounts {
+  completed: number;
+  pending: number;
+  processing: number;
+  failed: number;
 }
 
 interface ExecutionsState {
@@ -34,26 +36,31 @@ interface ExecutionsState {
   membersLoading: boolean;
   membersLastFetch: number | null;
 
-  // Dynamic data (cached with 30s TTL)
+  // Dynamic data (with short-term cache)
   executions: Execution[];
-  executionsLoading: boolean;
-  executionsRefreshing: boolean;
-  executionsLastFetch: number | null;
+  executionsLoading: boolean;        // Main loading (initial or filter change)
+  executionsLoadingMore: boolean;    // Pagination loading
   executionsTotal: number;
   executionsHasMore: boolean;
   executionsOffset: number;
+  executionsError: string | null;
+  executionsLastFetch: number | null;
+  statusCounts: StatusCounts;
 
-  // Filters
+  // AbortController for request cancellation
+  _abortController: AbortController | null;
+
+  // Filters (SINGLE source of truth)
   filters: Filters;
 }
 
 interface ExecutionsActions {
   fetchWorkflows: (force?: boolean) => Promise<void>;
   fetchMembers: (force?: boolean) => Promise<void>;
-  fetchExecutions: (params?: Record<string, any>, options?: FetchOptions) => Promise<void>;
-  refreshExecutionsInBackground: (params?: Record<string, any>) => Promise<void>;
+  fetchExecutions: (reset?: boolean) => Promise<void>;
   loadMore: () => Promise<void>;
-  setFilters: (newFilters: Partial<Filters>) => void;
+  setFilter: (key: keyof Filters, value: string) => void;
+  resetFilters: () => void;
   initialize: () => Promise<void>;
   refresh: () => Promise<void>;
   reset: () => void;
@@ -76,14 +83,24 @@ export const useExecutionsStore = create<ExecutionsStore>((set, get) => ({
   membersLoading: false,
   membersLastFetch: null,
 
-  // Dynamic data (cached with 30s TTL)
+  // Dynamic data (with short-term cache)
   executions: [],
   executionsLoading: false,
-  executionsRefreshing: false,
-  executionsLastFetch: null,
+  executionsLoadingMore: false,
   executionsTotal: 0,
   executionsHasMore: false,
   executionsOffset: 0,
+  executionsError: null,
+  executionsLastFetch: null,
+  statusCounts: {
+    completed: 0,
+    pending: 0,
+    processing: 0,
+    failed: 0,
+  },
+
+  // AbortController
+  _abortController: null,
 
   // Filters
   filters: {
@@ -97,7 +114,7 @@ export const useExecutionsStore = create<ExecutionsStore>((set, get) => ({
   // ACTIONS
   // ============================================
 
-  // Fetch workflows (with cache)
+  // Fetch workflows (with cache for static data)
   fetchWorkflows: async (force: boolean = false) => {
     const { workflowsLastFetch, workflows } = get();
     const now = Date.now();
@@ -135,7 +152,7 @@ export const useExecutionsStore = create<ExecutionsStore>((set, get) => ({
     }
   },
 
-  // Fetch members (with cache)
+  // Fetch members (with cache for static data)
   fetchMembers: async (force: boolean = false) => {
     const { membersLastFetch, members } = get();
     const now = Date.now();
@@ -169,153 +186,184 @@ export const useExecutionsStore = create<ExecutionsStore>((set, get) => ({
     }
   },
 
-  // Fetch executions (with stale-while-revalidate)
-  fetchExecutions: async (params: Record<string, any> = {}, options: FetchOptions = { force: false, append: false }) => {
-    const { executionsLastFetch, executions, filters } = get();
-    const now = Date.now();
+  // Fetch executions (NO cache, AbortController, optimistic UI)
+  fetchExecutions: async (reset: boolean = true) => {
+    const { filters, _abortController, executions, executionsOffset } = get();
 
-    const queryParams = { ...filters, ...params };
-    const isInitialLoad = executions.length === 0;
+    // Cancel previous request if exists
+    if (_abortController) {
+      logger.debug('🚫 executionsStore.fetchExecutions: Aborting previous request');
+      _abortController.abort();
+    }
 
-    // Stale-while-revalidate: show cached, fetch in background
-    if (!options.force && !isInitialLoad && executionsLastFetch && (now - executionsLastFetch < CACHE_DURATION)) {
-      logger.debug('✅ executionsStore.fetchExecutions: Using cached data (stale-while-revalidate)', {
-        age: Math.round((now - executionsLastFetch) / 1000) + 's'
+    // Create new AbortController
+    const newAbortController = new AbortController();
+    set({ _abortController: newAbortController });
+
+    // Set loading state (keep executions visible for optimistic UI)
+    if (reset) {
+      set({
+        executionsLoading: true,
+        executionsError: null,
+        executionsOffset: 0
       });
-      // Return cached immediately, but fetch fresh in background
-      get().refreshExecutionsInBackground(queryParams);
-      return;
-    }
-
-    logger.debug('🔍 executionsStore.fetchExecutions: Fetching from API', { params: queryParams });
-
-    // Use executionsRefreshing for updates, executionsLoading for initial load
-    if (isInitialLoad) {
-      set({ executionsLoading: true });
     } else {
-      set({ executionsRefreshing: true });
+      set({
+        executionsLoadingMore: true,
+        executionsError: null
+      });
     }
+
+    logger.debug('🔍 executionsStore.fetchExecutions: Fetching from API', {
+      filters,
+      reset,
+      offset: reset ? 0 : executionsOffset
+    });
 
     try {
       const response = await workflowService.getAllExecutions({
         limit: 20,
-        offset: options.append ? get().executionsOffset : 0,
-        status: queryParams.status !== 'all' ? queryParams.status : undefined,
-        workflow_id: queryParams.workflow_id !== 'all' ? queryParams.workflow_id : undefined,
-        user_id: queryParams.user_id !== 'all' ? queryParams.user_id : undefined,
+        offset: reset ? 0 : executionsOffset,
+        status: filters.status !== 'all' ? filters.status : undefined,
+        workflow_id: filters.workflow_id !== 'all' ? filters.workflow_id : undefined,
+        user_id: filters.user_id !== 'all' ? filters.user_id : undefined,
+        sortBy: filters.sortBy,
         fields: 'id,status,workflow_id,created_at,duration_seconds,triggered_by_user_id,error_message,started_at,completed_at,retry_count'
       });
+
+      // Check if request was aborted
+      if (newAbortController.signal.aborted) {
+        logger.debug('⚠️ executionsStore.fetchExecutions: Request was aborted');
+        return;
+      }
 
       const executionsData = response.data?.data || response.data;
       const newExecutions = executionsData.executions || [];
 
       set({
-        executions: options.append ? [...get().executions, ...newExecutions] : newExecutions,
+        executions: reset ? newExecutions : [...executions, ...newExecutions],
         executionsTotal: executionsData.total || 0,
+        statusCounts: executionsData.statusCounts || {
+          completed: 0,
+          pending: 0,
+          processing: 0,
+          failed: 0,
+        },
         executionsHasMore: executionsData.hasMore || false,
-        executionsOffset: options.append ? get().executionsOffset + newExecutions.length : newExecutions.length,
+        executionsOffset: reset ? newExecutions.length : executionsOffset + newExecutions.length,
         executionsLoading: false,
-        executionsRefreshing: false,
-        executionsLastFetch: Date.now()
+        executionsLoadingMore: false,
+        executionsError: null,
+        executionsLastFetch: Date.now(),
+        _abortController: null
       });
 
       logger.debug('✅ executionsStore.fetchExecutions: Success', {
         count: newExecutions.length,
-        total: executionsData.total
+        total: executionsData.total,
+        offset: reset ? newExecutions.length : executionsOffset + newExecutions.length
       });
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError' || error.code === 'ERR_CANCELED') {
+        logger.debug('⚠️ executionsStore.fetchExecutions: Request aborted');
+        return;
+      }
+
       logger.error('❌ executionsStore.fetchExecutions: Error', { error });
       set({
         executionsLoading: false,
-        executionsRefreshing: false,
-        executions: [],
-        executionsTotal: 0,
-        executionsHasMore: false
+        executionsLoadingMore: false,
+        executionsError: error.response?.data?.message || error.message || 'Failed to load executions',
+        _abortController: null
       });
-    }
-  },
-
-  // Background refresh (stale-while-revalidate)
-  refreshExecutionsInBackground: async (params: Record<string, any> = {}) => {
-    logger.debug('🔄 executionsStore.refreshExecutionsInBackground: Starting silent update');
-    set({ executionsRefreshing: true });
-
-    try {
-      const response = await workflowService.getAllExecutions({
-        limit: 20,
-        offset: 0,
-        status: params.status !== 'all' ? params.status : undefined,
-        workflow_id: params.workflow_id !== 'all' ? params.workflow_id : undefined,
-        user_id: params.user_id !== 'all' ? params.user_id : undefined,
-        fields: 'id,status,workflow_id,created_at,duration_seconds,triggered_by_user_id,error_message,started_at,completed_at,retry_count'
-      });
-
-      const executionsData = response.data?.data || response.data;
-      const newExecutions = executionsData.executions || [];
-
-      set({
-        executions: newExecutions,
-        executionsTotal: executionsData.total || 0,
-        executionsHasMore: executionsData.hasMore || false,
-        executionsOffset: newExecutions.length,
-        executionsRefreshing: false,
-        executionsLastFetch: Date.now()
-      });
-
-      logger.debug('✅ executionsStore.refreshExecutionsInBackground: Success (silent update)', {
-        count: newExecutions.length
-      });
-    } catch (error) {
-      logger.error('❌ executionsStore.refreshExecutionsInBackground: Error (silent)', { error });
-      set({ executionsRefreshing: false });
     }
   },
 
   // Load more executions (pagination)
   loadMore: async () => {
-    const { executionsHasMore, executionsLoading, filters } = get();
+    const { executionsHasMore, executionsLoading, executionsLoadingMore } = get();
 
-    if (!executionsHasMore || executionsLoading) {
+    if (!executionsHasMore || executionsLoading || executionsLoadingMore) {
       logger.debug('⚠️ executionsStore.loadMore: Cannot load more', {
         hasMore: executionsHasMore,
-        loading: executionsLoading
+        loading: executionsLoading,
+        loadingMore: executionsLoadingMore
       });
       return;
     }
 
     logger.debug('🔄 executionsStore.loadMore: Loading more executions');
-    await get().fetchExecutions(filters, { append: true });
+    await get().fetchExecutions(false); // reset=false for append
   },
 
-  // Update filters
-  setFilters: (newFilters: Partial<Filters>) => {
-    logger.debug('🔍 executionsStore.setFilters:', newFilters);
+  // Set single filter (SINGLE source of truth, optimistic UI)
+  setFilter: (key: keyof Filters, value: string) => {
+    const currentFilters = get().filters;
 
+    // Only update if value actually changed
+    if (currentFilters[key] === value) {
+      logger.debug('⚠️ executionsStore.setFilter: Value unchanged, skipping', { key, value });
+      return;
+    }
+
+    logger.debug('🔍 executionsStore.setFilter:', { key, value });
+
+    // Update filter and invalidate cache (keep executions visible for optimistic UI)
     set({
-      filters: { ...get().filters, ...newFilters },
-      executions: [],
-      executionsOffset: 0,
-      executionsHasMore: true,
-      executionsLastFetch: null // Invalidate cache on filter change
+      filters: { ...currentFilters, [key]: value },
+      executionsLastFetch: null  // Invalidate cache on filter change
     });
 
     // Fetch with new filters
-    get().fetchExecutions({ ...get().filters, ...newFilters });
+    get().fetchExecutions(true); // reset=true for new filter
+  },
+
+  // Reset all filters to defaults
+  resetFilters: () => {
+    logger.debug('🔄 executionsStore.resetFilters: Resetting to defaults');
+
+    const defaultFilters: Filters = {
+      status: 'all',
+      workflow_id: 'all',
+      user_id: 'all',
+      sortBy: 'newest'
+    };
+
+    set({
+      filters: defaultFilters,
+      executionsLastFetch: null  // Invalidate cache on reset
+    });
+    get().fetchExecutions(true);
   },
 
   // Initialize (called on page mount)
   initialize: async () => {
     logger.debug('🚀 executionsStore.initialize: Starting');
     const startTime = Date.now();
+    const { executionsLastFetch, executions } = get();
+    const now = Date.now();
 
-    // Fetch workflows and members in parallel (cached if available)
+    // Fetch workflows and members in parallel (use cache if available)
     await Promise.all([
       get().fetchWorkflows(),
       get().fetchMembers()
     ]);
 
-    // Fetch executions (stale-while-revalidate if cached)
-    await get().fetchExecutions();
+    // Check if executions cache is valid (30 seconds)
+    const cacheValid = executions.length > 0 &&
+                       executionsLastFetch &&
+                       (now - executionsLastFetch < EXECUTIONS_CACHE_DURATION);
+
+    if (!cacheValid) {
+      // Fetch executions if cache is stale or empty
+      await get().fetchExecutions(true);
+    } else {
+      logger.debug('✅ executionsStore.initialize: Using cached executions', {
+        age: Math.round((now - executionsLastFetch) / 1000) + 's',
+        count: executions.length
+      });
+    }
 
     const duration = Date.now() - startTime;
     logger.debug('✅ executionsStore.initialize: Complete', { duration: duration + 'ms' });
@@ -326,10 +374,11 @@ export const useExecutionsStore = create<ExecutionsStore>((set, get) => ({
     logger.debug('🔄 executionsStore.refresh: Force refresh all data');
     const startTime = Date.now();
 
+    // Force refresh static data + fetch fresh executions
     await Promise.all([
       get().fetchWorkflows(true),
       get().fetchMembers(true),
-      get().fetchExecutions({}, { force: true })
+      get().fetchExecutions(true)
     ]);
 
     const duration = Date.now() - startTime;
@@ -339,6 +388,13 @@ export const useExecutionsStore = create<ExecutionsStore>((set, get) => ({
   // Reset store (on logout)
   reset: () => {
     logger.debug('🔄 executionsStore.reset: Clearing all data');
+
+    // Cancel any pending request
+    const { _abortController } = get();
+    if (_abortController) {
+      _abortController.abort();
+    }
+
     set({
       workflows: [],
       workflowsMap: {},
@@ -349,11 +405,19 @@ export const useExecutionsStore = create<ExecutionsStore>((set, get) => ({
       membersLastFetch: null,
       executions: [],
       executionsLoading: false,
-      executionsRefreshing: false,
-      executionsLastFetch: null,
+      executionsLoadingMore: false,
       executionsTotal: 0,
       executionsHasMore: false,
       executionsOffset: 0,
+      executionsError: null,
+      executionsLastFetch: null,
+      statusCounts: {
+        completed: 0,
+        pending: 0,
+        processing: 0,
+        failed: 0,
+      },
+      _abortController: null,
       filters: {
         status: 'all',
         workflow_id: 'all',

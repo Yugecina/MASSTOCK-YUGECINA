@@ -16,6 +16,34 @@ import { encryptApiKey } from '../utils/encryption';
 import { z, ZodError } from 'zod';
 import { executeWorkflowSchema, executionsQuerySchema } from '../validation/schemas';
 
+// ============================================
+// SECURITY: Log Injection Prevention
+// ============================================
+
+/**
+ * Sanitize user input before logging to prevent log injection attacks
+ *
+ * Log injection occurs when user-controlled data containing newlines
+ * or special characters is written to logs, allowing attackers to:
+ * - Forge fake log entries
+ * - Hide malicious activity
+ * - Poison log analysis tools
+ *
+ * @param input - User-controlled string to sanitize
+ * @returns Sanitized string safe for logging
+ */
+const sanitizeForLog = (input: unknown): string => {
+  if (input === null || input === undefined) return '[null]';
+
+  const str = String(input);
+
+  // Remove newlines, carriage returns, tabs (log injection vectors)
+  // Limit length to prevent log flooding
+  return str
+    .replace(/[\n\r\t]/g, ' ')
+    .substring(0, 200);
+};
+
 // Create a fresh admin client for each query to avoid auth context contamination
 function getCleanAdmin() {
   return createClient(
@@ -145,7 +173,7 @@ export async function getWorkflow(req: Request, res: Response): Promise<void> {
   }
 
   if (!access) {
-    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+    logger.warn(`⚠️ No access found for client ${sanitizeForLog(clientId)} to workflow ${sanitizeForLog(workflow_id)}`);
     throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
   }
 
@@ -240,7 +268,7 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
     }
 
     if (!access) {
-      logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+      logger.warn(`⚠️ No access found for client ${sanitizeForLog(clientId)} to workflow ${sanitizeForLog(workflow_id)}`);
       throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
     }
 
@@ -289,7 +317,12 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
       // Use provided values or fall back to defaults only after validation
       const prompts_text = prompts_text_input || process.env.DEFAULT_NANO_BANANA_PROMPT;
       const api_key = validatedData?.api_key || req.body.api_key || process.env.DEFAULT_GEMINI_API_KEY;
-      const files = (req as any).files || [];
+
+      // Ensure files is always an array (Multer can return undefined or {} when no files)
+      let files = (req as any).files?.['reference_images'] || (req as any).files || [];
+      if (!Array.isArray(files)) {
+        files = [];
+      }
 
       // DEBUG: Log received files from Multer
       logger.debug('🔍 MULTER FILES RECEIVED:', {
@@ -306,16 +339,24 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
         req_files_is_array: Array.isArray((req as any).files)
       });
 
+      // Helper: Ensure parameter is a string (prevent type confusion attacks)
+      const ensureString = (value: unknown): string | undefined => {
+        if (typeof value === 'string') return value;
+        if (Array.isArray(value) && value.length > 0) return String(value[0]);
+        return undefined;
+      };
+
       // NEW: Get model, aspect_ratio, and resolution with defaults
-      const model = validatedData.model || req.body.model || workflow.config.default_model || 'gemini-2.5-flash-image';
-      const aspect_ratio = validatedData.aspect_ratio || req.body.aspect_ratio || workflow.config.default_aspect_ratio || '1:1';
+      // CodeQL Fix: Prevent type confusion by ensuring values are strings
+      const model = ensureString(validatedData.model) || ensureString(req.body.model) || workflow.config.default_model || 'gemini-2.5-flash-image';
+      const aspect_ratio = ensureString(validatedData.aspect_ratio) || ensureString(req.body.aspect_ratio) || workflow.config.default_aspect_ratio || '1:1';
 
       // Determine resolution default based on model type
       const isProModel = model === 'gemini-3-pro-image-preview';
       const defaultResolution = isProModel
         ? (workflow.config.default_resolution?.pro || '1K')
         : (workflow.config.default_resolution?.flash || '1K');
-      const resolution = validatedData.resolution || req.body.resolution || defaultResolution;
+      const resolution = ensureString(validatedData.resolution) || ensureString(req.body.resolution) || defaultResolution;
 
       logger.debug('📥 Received workflow execution request:', {
         hasPromptsText: !!prompts_text,
@@ -432,6 +473,138 @@ export async function executeWorkflow(req: Request, res: Response): Promise<void
         model: model,
         aspect_ratio: aspect_ratio,
         resolution: resolution,
+        pricing_details: pricing
+      };
+    } else if (workflow.config.workflow_type === 'smart_resizer') {
+      // Smart Resizer workflow: multipart form with images and formats
+      const filesObj = (req as any).files || {};
+      const imageFiles = filesObj['images'] || [];
+      const batch_count = parseInt(req.body.batch_count || '0');
+      const ai_regeneration = req.body.ai_regeneration === 'true';
+
+      // Validate required fields
+      if (imageFiles.length === 0) {
+        throw new ApiError(400, 'At least one image is required', 'MISSING_IMAGES');
+      }
+
+      // Validate workflow config
+      if (!workflow.config.available_formats || !Array.isArray(workflow.config.available_formats)) {
+        throw new ApiError(500, 'Workflow configuration missing available_formats', 'INVALID_WORKFLOW_CONFIG');
+      }
+
+
+      // Build batch with per-image formats
+      const batch = imageFiles.map((file: any, index: number) => {
+        const formatsKey = `formats_${index}`;
+        let formats: string[];
+        try {
+          formats = req.body[formatsKey] ? JSON.parse(req.body[formatsKey]) : [];
+        } catch (parseError: any) {
+          throw new ApiError(400, `Invalid JSON for ${formatsKey}: ${parseError.message}`, 'INVALID_FORMATS_JSON');
+        }
+
+        if (formats.length === 0) {
+          throw new ApiError(400, `Image ${index} has no formats selected`, 'MISSING_FORMATS');
+        }
+
+        // Validate formats against available_formats
+        const validFormats = workflow.config.available_formats.map((f: any) => f.id);
+        const invalidFormats = formats.filter((f: string) => !validFormats.includes(f));
+        if (invalidFormats.length > 0) {
+          throw new ApiError(400, `Invalid formats for image ${index}: ${invalidFormats.join(', ')}`, 'INVALID_FORMATS');
+        }
+
+        return {
+          image_base64: file.buffer.toString('base64'),
+          image_mime: file.mimetype,
+          image_name: file.originalname,
+          formats
+        };
+      });
+
+      // Calculate pricing (total formats across all images)
+      const totalFormats = batch.reduce((sum, item) => sum + item.formats.length, 0);
+      const pricingConfig = workflow.config.pricing?.per_format || { cost_per_format: 0.001, revenue_per_format: 0.01 };
+      const pricing = {
+        cost_per_format: pricingConfig.cost_per_format,
+        total_cost: totalFormats * pricingConfig.cost_per_format,
+        total_revenue: totalFormats * pricingConfig.revenue_per_format,
+        format_count: totalFormats,
+        image_count: batch.length
+      };
+
+      logger.info('💰 Smart Resizer pricing calculated:', pricing);
+
+      // Prepare input data
+      input_data = {
+        batch,
+        ai_regeneration,
+        pricing_details: pricing
+      };
+
+      updatedConfig = {
+        ...workflow.config,
+        pricing_details: pricing
+      };
+    } else if (workflow.config.workflow_type === 'room_redesigner') {
+      // Room Redesigner workflow: multipart form with room images
+      const filesObj = (req as any).files || {};
+      const roomImageFiles = filesObj['room_images'] || [];
+      const design_style = req.body.design_style;
+      const budget_level = req.body.budget_level || 'medium';
+      const season = req.body.season || null;
+      const api_key = req.body.api_key;
+
+      // Validate required fields
+      if (roomImageFiles.length === 0) {
+        throw new ApiError(400, 'At least one room image is required', 'MISSING_IMAGES');
+      }
+
+      if (!design_style) {
+        throw new ApiError(400, 'design_style is required', 'MISSING_DESIGN_STYLE');
+      }
+
+      if (!api_key) {
+        throw new ApiError(400, 'api_key is required', 'MISSING_API_KEY');
+      }
+
+      // Encrypt API key
+      const encryptedApiKey = encryptApiKey(api_key);
+
+      // Convert room images to base64
+      const roomImages = roomImageFiles.map((file: any) => ({
+        image_base64: file.buffer.toString('base64'),
+        image_mime: file.mimetype,
+        image_name: file.originalname,
+        design_style,
+        budget_level,
+        season
+      }));
+
+      // Calculate pricing (cost per image)
+      const pricingConfig = workflow.config.pricing?.per_image || { cost_per_image: 0.01, revenue_per_image: 0.05 };
+      const pricing = {
+        cost_per_image: pricingConfig.cost_per_image,
+        total_cost: roomImages.length * pricingConfig.cost_per_image,
+        total_revenue: roomImages.length * pricingConfig.revenue_per_image,
+        profit: (roomImages.length * pricingConfig.revenue_per_image) - (roomImages.length * pricingConfig.cost_per_image),
+        image_count: roomImages.length
+      };
+
+      logger.info('💰 Room Redesigner pricing calculated:', pricing);
+
+      // Prepare input data
+      input_data = {
+        room_images: roomImages,
+        design_style,
+        budget_level,
+        season,
+        api_key_encrypted: encryptedApiKey,
+        pricing_details: pricing
+      };
+
+      updatedConfig = {
+        ...workflow.config,
         pricing_details: pricing
       };
     } else {
@@ -637,7 +810,7 @@ export async function getWorkflowExecutions(req: Request, res: Response): Promis
     }
 
     if (!access) {
-      logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+      logger.warn(`⚠️ No access found for client ${sanitizeForLog(clientId)} to workflow ${sanitizeForLog(workflow_id)}`);
       throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
     }
 
@@ -723,7 +896,7 @@ export async function getWorkflowStats(req: Request, res: Response): Promise<voi
   }
 
   if (!access) {
-    logger.warn(`⚠️ No access found for client ${clientId} to workflow ${workflow_id}`);
+    logger.warn(`⚠️ No access found for client ${sanitizeForLog(clientId)} to workflow ${sanitizeForLog(workflow_id)}`);
     throw new ApiError(404, 'Workflow not found or access denied', 'WORKFLOW_NOT_FOUND');
   }
 
@@ -978,12 +1151,12 @@ export async function getAllClientExecutions(req: Request, res: Response): Promi
 
     // Validate query parameters with Zod
     const validatedQuery = executionsQuerySchema.parse(req.query);
-    const { limit, offset, status, workflow_id, user_id, fields } = validatedQuery;
+    const { limit, offset, status, workflow_id, user_id, fields, sortBy } = validatedQuery;
 
     logger.info('📡 getAllClientExecutions called:', {
       clientId,
       userId: (req as any).user?.id,
-      filters: { limit, offset, status, workflow_id, user_id, fields }
+      filters: { limit, offset, status, workflow_id, user_id, fields, sortBy }
     });
 
     // Use a fresh admin client to avoid auth context issues
@@ -1020,12 +1193,47 @@ export async function getAllClientExecutions(req: Request, res: Response): Promi
       fieldCount: selectFields.length
     });
 
+    // Calculate status counts (always on ALL client executions, unfiltered)
+    const { data: allExecutions } = await admin
+      .from('workflow_executions')
+      .select('status')
+      .eq('client_id', clientId);
+
+    const statusCounts = {
+      completed: allExecutions?.filter((e: any) => e.status === 'completed').length || 0,
+      pending: allExecutions?.filter((e: any) => e.status === 'pending').length || 0,
+      processing: allExecutions?.filter((e: any) => e.status === 'processing').length || 0,
+      failed: allExecutions?.filter((e: any) => e.status === 'failed').length || 0,
+    };
+
+    logger.debug('Status counts calculated:', statusCounts);
+
+    // Determine sort order based on sortBy parameter
+    let orderBy: string;
+    let ascending: boolean;
+
+    switch (sortBy) {
+      case 'oldest':
+        orderBy = 'created_at';
+        ascending = true;
+        break;
+      case 'duration':
+        orderBy = 'duration_seconds';
+        ascending = false; // Longest first
+        break;
+      case 'newest':
+      default:
+        orderBy = 'created_at';
+        ascending = false;
+        break;
+    }
+
     // Fetch executions first
     let executionsQuery = admin
       .from('workflow_executions')
       .select(selectString, { count: 'exact' })
       .eq('client_id', clientId)
-      .order('created_at', { ascending: false })
+      .order(orderBy, { ascending })
       .range(offset, offset + limit - 1);
 
     // Apply optional filters
@@ -1113,6 +1321,7 @@ export async function getAllClientExecutions(req: Request, res: Response): Promi
       data: {
         executions: formattedExecutions,
         total: count,
+        statusCounts,
         limit,
         offset,
         hasMore: offset + formattedExecutions.length < count

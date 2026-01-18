@@ -1,6 +1,6 @@
 import { useState, FormEvent, ChangeEvent } from 'react';
 import toast from 'react-hot-toast';
-import { adminClientService } from '../../services/adminClientService';
+import { adminResourceService } from '../../services/adminResourceService';
 import { Spinner } from '../ui/Spinner';
 import type { AddClientModalProps, CreateClientFormData } from '../../types/admin';
 
@@ -70,7 +70,7 @@ export function AddClientModal({ onClose, onSuccess }: AddClientModalProps) {
       };
 
       console.log('📡 AddClientModal: Calling API', { payload });
-      const response = await adminClientService.createClient(payload);
+      const response = await adminResourceService.createClient(payload);
       console.log('✅ AddClientModal: Success', { response });
 
       toast.success('Client created successfully!');

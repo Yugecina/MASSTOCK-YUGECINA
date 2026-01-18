@@ -42,9 +42,9 @@ api.interceptors.response.use(
     // Handle 401 errors with automatic token refresh
     if (error.response?.status === 401 &&
       !originalRequest._retry &&
-      !originalRequest.url?.includes('/v1/auth/login') &&
-      !originalRequest.url?.includes('/v1/auth/refresh') &&
-      !originalRequest.url?.includes('/v1/auth/logout')) {
+      !originalRequest.url?.includes('/auth/login') &&
+      !originalRequest.url?.includes('/auth/refresh') &&
+      !originalRequest.url?.includes('/auth/logout')) {
 
       // If already refreshing, queue this request
       if (isRefreshing) {
@@ -66,7 +66,7 @@ api.interceptors.response.use(
         console.log('🔄 Access token expired - attempting refresh...');
 
         // Try to refresh the token
-        await api.post('/v1/auth/refresh');
+        await api.post('/auth/refresh');
 
         console.log('✅ Token refreshed successfully - retrying request');
 
@@ -98,7 +98,7 @@ api.interceptors.response.use(
     }
 
     // For /auth/me endpoint, don't logout automatically (used for initial auth check)
-    if (error.response?.status === 401 && originalRequest.url?.includes('/v1/auth/me')) {
+    if (error.response?.status === 401 && originalRequest.url?.includes('/auth/me')) {
       console.log('🔍 Auth check failed - user not authenticated');
       return Promise.reject(error);
     }

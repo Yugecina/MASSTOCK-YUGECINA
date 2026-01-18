@@ -14,6 +14,7 @@ import settingsRoutes from './routes/settingsRoutes';
 import adminRoutes from './routes/adminRoutes';
 import assetsRoutes from './routes/assetsRoutes';
 import contactRoutes from './routes/contactRoutes';
+import smartResizerRoutes from './routes/smartResizerRoutes';
 
 const app: Application = express();
 const PORT = process.env.PORT || 3000;
@@ -63,6 +64,10 @@ app.options('*', cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// CSRF Protection: All authentication cookies use sameSite: 'lax' attribute
+// (configured in authController.ts and adminController.ts)
+// This provides protection against CSRF attacks for state-changing requests
 app.use(cookieParser());
 
 app.get('/health', (req: Request, res: Response) => {
@@ -79,6 +84,8 @@ app.use('/api/v1/support-tickets', supportTicketRoutes);
 app.use('/api/v1/settings', settingsRoutes);
 app.use('/api/v1/assets', assetsRoutes);
 app.use('/api/v1/admin', adminRoutes);
+// TODO: Remove smart-resizer standalone routes - now integrated into workflows
+// app.use('/api/v1/smart-resizer', smartResizerRoutes);
 
 // Global error handler (must be last middleware)
 app.use(errorHandler);

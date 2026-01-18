@@ -8,11 +8,11 @@ interface CreateWorkflowRequestData {
 
 export const requestService = {
   create: (data: CreateWorkflowRequestData): Promise<any> =>
-    api.post('/v1/workflow-requests', data),
+    api.post('/workflow-requests', data),
 
   list: (): Promise<any> =>
-    api.get('/v1/workflow-requests'),
+    api.get('/workflow-requests'),
 
   get: (id: string): Promise<any> =>
-    api.get(`/v1/workflow-requests/${id}`),
+    api.get(`/workflow-requests/${id}`),
 };

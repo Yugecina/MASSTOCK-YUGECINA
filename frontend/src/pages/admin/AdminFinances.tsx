@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Spinner } from '../../components/ui/Spinner';
 import { AdminLayout } from '../../components/layout/AdminLayout';
-import { adminService } from '../../services/admin';
+import { adminDashboardService } from '../../services/adminDashboardService';
 import logger from '@/utils/logger';
 import './AdminFinances.css';
 
@@ -40,7 +40,7 @@ export function AdminFinances() {
     async function loadFinances() {
       try {
         logger.debug('💰 AdminFinances: Loading finances...');
-        const data: FinanceData = await adminService.getFinances();
+        const data: FinanceData = await adminDashboardService.getFinances();
         logger.debug('✅ AdminFinances: Data loaded:', data);
         setFinances(data);
       } catch (err: any) {

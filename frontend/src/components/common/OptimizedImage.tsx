@@ -7,6 +7,7 @@ interface OptimizedImageProps {
   thumbnailSize?: number;
   aspectRatio?: string | null;
   onClick?: () => void;
+  onLoad?: (img: HTMLImageElement) => void;
 }
 
 /**
@@ -22,7 +23,8 @@ export function OptimizedImage({
   className = '',
   thumbnailSize = 400,
   aspectRatio = '4 / 3',
-  onClick
+  onClick,
+  onLoad
 }: OptimizedImageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
@@ -38,7 +40,9 @@ export function OptimizedImage({
       const urlObj = new URL(url);
 
       // Google Storage optimization
-      if (urlObj.hostname.includes('storage.googleapis.com')) {
+      // CodeQL Fix: Use strict hostname validation instead of .includes()
+      if (urlObj.hostname === 'storage.googleapis.com' ||
+          urlObj.hostname.endsWith('.storage.googleapis.com')) {
         // Add image transformation parameters
         urlObj.searchParams.set('width', size);
         urlObj.searchParams.set('quality', '80');
@@ -46,7 +50,8 @@ export function OptimizedImage({
       }
 
       // Supabase Storage optimization
-      if (urlObj.hostname.includes('supabase.co')) {
+      if (urlObj.hostname === 'supabase.co' ||
+          urlObj.hostname.endsWith('.supabase.co')) {
         // Supabase supports transform parameters
         urlObj.searchParams.set('width', size);
         urlObj.searchParams.set('quality', '80');
@@ -55,7 +60,8 @@ export function OptimizedImage({
       }
 
       // CloudFlare Images optimization
-      if (urlObj.hostname.includes('imagedelivery.net')) {
+      if (urlObj.hostname === 'imagedelivery.net' ||
+          urlObj.hostname.endsWith('.imagedelivery.net')) {
         // CloudFlare Images format: /cdn-cgi/image/width=400/url
         return url.replace(/\/cdn-cgi\/image\/[^\/]+/, `/cdn-cgi/image/width=${size},quality=80`);
       }
@@ -99,9 +105,14 @@ export function OptimizedImage({
     };
   }, [src, thumbnailSize, imageSrc]);
 
-  const handleLoad = () => {
+  const handleLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
     setIsLoading(false);
     setHasError(false);
+
+    // Call parent onLoad callback with image element
+    if (onLoad && e.currentTarget) {
+      onLoad(e.currentTarget);
+    }
   };
 
   const handleError = () => {

@@ -1,12 +1,15 @@
 import pLimit from 'p-limit';
 import { Job } from 'bull';
 import { workflowQueue, WorkflowJobData } from '../queues/workflowQueue';
+import smartResizerQueue from '../queues/smartResizerQueue';
 import { supabaseAdmin } from '../config/database';
-import { createGeminiImageService, ReferenceImage } from '../services/geminiImageService';
+import vertexAIService, { ReferenceImage } from '../services/vertexAIImageService';
 import { decryptApiKey, EncryptedData } from '../utils/encryption';
 import { logger } from '../config/logger';
 import apiRateLimiter from '../utils/apiRateLimiter';
 import { RateLimiterStats } from '../utils/apiRateLimiter';
+import smartResizerService, { SmartResizerJobData, SmartResizerResult } from '../services/smartResizerService';
+import { FormatPresetKey } from '../utils/formatPresets';
 import {
   logWorkflowStart,
   logPromptProcessing,
@@ -20,11 +23,49 @@ import {
   logWorkflowFailed
 } from '../utils/workflowLogger';
 
-logger.debug('🚀 Workflow worker starting...');
+logger.debug('🚀 General workflow worker starting...');
 
 interface InputData {
   prompts: string[];
   reference_images?: ReferenceImage[];
+}
+
+interface SmartResizerInputData {
+  batch: Array<{
+    image_base64: string;
+    image_mime: string;
+    image_name: string;
+    formats: FormatPresetKey[];
+  }>;
+  ai_regeneration: boolean;
+  pricing_details: {
+    cost_per_format: number;
+    total_cost: number;
+    total_revenue: number;
+    format_count: number;
+    image_count: number;
+  };
+}
+
+interface RoomRedesignerInputData {
+  room_images: Array<{
+    image_base64: string;
+    image_mime: string;
+    image_name: string;
+    design_style: string;
+    budget_level: string;
+    season: string | null;
+  }>;
+  design_style: string;
+  budget_level: string;
+  season: string | null;
+  pricing_details: {
+    cost_per_image: number;
+    total_cost: number;
+    total_revenue: number;
+    profit: number;
+    image_count: number;
+  };
 }
 
 interface WorkflowConfig {
@@ -87,84 +128,38 @@ async function processNanoBananaWorkflow(
     referenceImageCount: referenceImagesBase64.length
   });
 
-  // Declare variables that need to be accessible in the for-loop
-  let geminiService;
-  let aspectRatio: string;
-  let resolution: string;
+  // Configure aspect ratio and resolution
+  const aspectRatio = config.aspect_ratio || '1:1';
+  const resolution = config.resolution || '1K';
 
-  // Validate and decrypt API key
-  try {
-    if (!config.api_key_encrypted) {
-      throw new Error('Missing API key in workflow config. Please provide api_key when executing the workflow.');
-    }
+  // Set model with fallback
+  const model = config.model || 'gemini-2.5-flash-image';
+  vertexAIService.setModel(model);
 
-    logger.debug('Processing Nano Banana workflow', {
-      executionId,
-      hasEncryptedKey: !!config.api_key_encrypted,
-      encryptedKeyType: typeof config.api_key_encrypted,
-      configKeys: Object.keys(config)
-    });
-
-    // Parse if string, otherwise use as-is
-    const encryptedData = typeof config.api_key_encrypted === 'string'
-      ? JSON.parse(config.api_key_encrypted)
-      : config.api_key_encrypted;
-
-    // decryptApiKey expects Partial<EncryptedData> object
-    const decryptedApiKey = decryptApiKey(encryptedData);
-
-    logDecryption(true, {
-      keyLength: decryptedApiKey?.length
-    });
-
-    logger.debug('API key decrypted', {
-      hasDecryptedKey: !!decryptedApiKey,
-      decryptedKeyLength: decryptedApiKey?.length
-    });
-
-    geminiService = createGeminiImageService(decryptedApiKey);
-
-    // Set model with fallback
-    const model = config.model || 'gemini-2.5-flash-image';
-    geminiService.setModel(model);
-
-    // Get aspect ratio and resolution with fallbacks
-    aspectRatio = config.aspect_ratio || '1:1';
-    resolution = config.resolution || '1K';
-
-    logger.info('🎨 Nano Banana Config:', {
-      model,
-      aspectRatio,
-      resolution,
-      promptCount: prompts.length
-    });
-  } catch (error) {
-    const err = error as Error;
-    logDecryption(false, { error: err.message });
-    logError('API_KEY_DECRYPTION', err, {
-      executionId,
-      hasEncryptedKey: !!config.api_key_encrypted,
-      encryptedKeyType: typeof config.api_key_encrypted
-    });
-    throw error;
-  }
+  logger.info('🎨 Nano Banana Config:', {
+    model,
+    aspectRatio,
+    resolution,
+    promptCount: prompts.length
+  });
 
   // Configure concurrency based on model (Flash = faster, Pro = slower)
-  const model = config.model || 'gemini-2.5-flash-preview-image';
   const isFlash = model.includes('flash');
 
+  // Vertex AI concurrency settings (higher throughput)
   const PROMPT_CONCURRENCY = isFlash
-    ? parseInt(process.env.PROMPT_CONCURRENCY_FLASH || '15', 10)
-    : parseInt(process.env.PROMPT_CONCURRENCY_PRO || '10', 10);
+    ? parseInt(process.env.VERTEX_PROMPT_CONCURRENCY_FLASH || '30', 10)
+    : parseInt(process.env.VERTEX_PROMPT_CONCURRENCY_PRO || '20', 10);
 
   const limit = pLimit(PROMPT_CONCURRENCY);
 
+  logger.debug(`🔧 API: Vertex AI`);
   logger.debug(`🔧 Model: ${model} (${isFlash ? 'Flash' : 'Pro'})`);
   logger.debug(`🔧 Prompt concurrency set to: ${PROMPT_CONCURRENCY} parallel prompts`);
   logger.debug(`📊 Rate limiter stats: ${JSON.stringify(apiRateLimiter.getStats(model))}`);
 
   /**
-   * Process a single prompt with Gemini API
+   * Process a single prompt with Vertex AI
    * Includes rate limiting, error handling, and database updates
    */
   const processSinglePrompt = async (prompt: string, batchIndex: number, promptIndex: number): Promise<ProcessingResult> => {
@@ -202,11 +197,11 @@ async function processNanoBananaWorkflow(
       await apiRateLimiter.acquire(model);
       logger.debug(`✅ Rate limiter slot acquired`);
 
-      // Generate image with Gemini
+      // Generate image with Vertex AI
       const startTime = Date.now();
-      logger.debug(`⏱️  Calling Gemini API...`);
+      logger.debug(`⏱️  Calling Vertex AI API...`);
 
-      const result = await geminiService.generateImage(prompt, {
+      const result = await vertexAIService.generateImage(prompt, {
         referenceImages: referenceImagesBase64,
         aspectRatio: aspectRatio,
         imageSize: resolution
@@ -276,12 +271,14 @@ async function processNanoBananaWorkflow(
       } else {
         logger.debug(`❌ Image generation failed for prompt ${promptIndex + 1}`);
 
-        logError('IMAGE_GENERATION', result.error!, {
+        const error = new Error(result.error?.message || 'Image generation failed');
+        logError('IMAGE_GENERATION', error, {
           executionId,
           promptIndex: promptIndex + 1,
           totalPrompts,
           prompt,
-          processingTime
+          processingTime,
+          errorCode: result.error?.code
         });
 
         // Update batch result with failure
@@ -421,6 +418,394 @@ async function processNanoBananaWorkflow(
 }
 
 /**
+ * Process Smart Resizer workflow (multi-format image generation)
+ */
+async function processSmartResizerWorkflow(
+  job: Job<WorkflowJobData>,
+  executionId: string,
+  inputData: SmartResizerInputData,
+  config: WorkflowConfig
+): Promise<WorkflowResult> {
+  const workflowStartTime = Date.now();
+  const {
+    batch,
+    ai_regeneration
+  } = inputData;
+
+  // Calculate total formats across all images
+  const totalFormats = batch.reduce((sum: number, item: any) => sum + item.formats.length, 0);
+
+  logger.debug(`\n🎨 Processing Smart Resizer workflow - Execution ID: ${executionId}`);
+  logger.debug(`   Images: ${batch.length}, Total formats: ${totalFormats}, AI Regen: ${ai_regeneration}`);
+
+  logWorkflowStart(executionId, 'smart_resizer', {
+    workflowId: job.data.workflowId,
+    clientId: job.data.clientId,
+    numberOfPrompts: totalFormats,
+    hasApiKey: false
+  });
+
+  try {
+    let successCount = 0;
+    let failCount = 0;
+    let batchResultIndex = 0;
+
+    // Process each image in the batch
+    for (let imageIndex = 0; imageIndex < batch.length; imageIndex++) {
+      const imageItem = batch[imageIndex];
+
+      logger.debug(`🖼️ Processing image ${imageIndex + 1}/${batch.length}: ${imageItem.image_name}`);
+
+      // Convert base64 to Buffer
+      const masterImageBuffer = Buffer.from(imageItem.image_base64, 'base64');
+
+      try {
+        // Process using workflow-specific method (no smart_resizer_jobs interaction)
+        const result = await smartResizerService.processImageFormats({
+          clientId: job.data.clientId,
+          userId: job.data.userId,
+          executionId,
+          imageIndex,
+          imageName: imageItem.image_name,
+          masterImageBuffer,
+          masterImageBase64: imageItem.image_base64,
+          formatsRequested: imageItem.formats
+        });
+
+        logger.debug(`✅ Image ${imageIndex + 1} processed: ${result.formatResults.length} formats`);
+
+        // Store each format result in workflow_batch_results
+        for (const formatResult of result.formatResults) {
+          if (formatResult.status === 'completed') {
+            successCount++;
+          } else {
+            failCount++;
+          }
+
+          try {
+            await supabaseAdmin
+              .from('workflow_batch_results')
+              .insert({
+                execution_id: executionId,
+                batch_index: batchResultIndex++,
+                prompt_text: `${imageItem.image_name} → ${formatResult.formatName}`,
+                status: formatResult.status === 'completed' ? 'completed' : 'failed',
+                result_url: formatResult.resultUrl,
+                processing_time_ms: formatResult.processingTimeMs,
+                error_message: formatResult.errorMessage,
+                completed_at: new Date().toISOString(),
+                width: formatResult.width,
+                height: formatResult.height,
+                format_name: formatResult.formatName
+              });
+
+            logger.debug(`✓ Stored result for ${imageItem.image_name} → ${formatResult.formatName}`);
+          } catch (dbError) {
+            logger.error(`Failed to store result for ${formatResult.formatName}`, {
+              error: (dbError as Error).message
+            });
+          }
+        }
+      } catch (imageError) {
+        logger.error(`Failed to process image ${imageItem.image_name}`, {
+          error: (imageError as Error).message
+        });
+
+        // Mark all formats for this image as failed
+        for (const formatKey of imageItem.formats) {
+          failCount++;
+          try {
+            await supabaseAdmin
+              .from('workflow_batch_results')
+              .insert({
+                execution_id: executionId,
+                batch_index: batchResultIndex++,
+                prompt_text: `${imageItem.image_name} → ${formatKey}`,
+                status: 'failed',
+                result_url: null,
+                processing_time_ms: 0,
+                error_message: (imageError as Error).message,
+                completed_at: new Date().toISOString()
+              });
+          } catch (dbError) {
+            logger.error(`Failed to store error result for ${formatKey}`, {
+              error: (dbError as Error).message
+            });
+          }
+        }
+      }
+
+      // Update job progress
+      const progress = Math.floor(((imageIndex + 1) / batch.length) * 100);
+      job.progress(progress);
+    }
+
+    // Update execution status with final results
+    const durationSeconds = Math.floor((Date.now() - workflowStartTime) / 1000);
+
+    await supabaseAdmin
+      .from('workflow_executions')
+      .update({
+        status: 'completed',
+        output_data: {
+          successful: successCount,
+          failed: failCount,
+          total: totalFormats,
+          images_processed: batch.length
+        },
+        completed_at: new Date().toISOString(),
+        duration_seconds: durationSeconds
+      })
+      .eq('id', executionId);
+
+    // Final progress update
+    job.progress(100);
+
+    logWorkflowComplete(executionId, {
+      totalPrompts: totalFormats, // Using totalPrompts for consistency
+      successful: successCount,
+      failed: failCount,
+      totalTime: Date.now() - workflowStartTime
+    });
+
+    logger.info('Smart Resizer workflow execution completed', {
+      executionId,
+      successCount,
+      failCount,
+      totalFormats
+    });
+
+    return { success: true, successCount, failCount, totalPrompts: totalFormats };
+
+  } catch (error) {
+    const err = error as Error;
+    logger.debug(`\n❌ SMART RESIZER WORKFLOW FAILED`);
+    logger.debug(`   Execution ID: ${executionId}`);
+    logger.debug(`   Error: ${err.message}`);
+    logger.debug(`   Stack: ${err.stack}`);
+
+    logWorkflowFailed(executionId, err, {
+      totalPrompts: totalFormats
+    });
+
+    logger.error('Smart Resizer workflow execution failed', {
+      executionId,
+      error: err.message
+    });
+
+    throw error;
+  }
+}
+
+/**
+ * Process Room Redesigner workflow (batch room image redesign)
+ */
+async function processRoomRedesignerWorkflow(
+  job: Job<WorkflowJobData>,
+  executionId: string,
+  inputData: RoomRedesignerInputData,
+  config: WorkflowConfig
+): Promise<WorkflowResult> {
+  const workflowStartTime = Date.now();
+  const {
+    room_images,
+    design_style,
+    budget_level,
+    season
+  } = inputData;
+
+  logger.debug(`\n🏠 Processing Room Redesigner workflow - Execution ID: ${executionId}`);
+  logger.debug(`   Room images: ${room_images.length}, Style: ${design_style}, Budget: ${budget_level}, Season: ${season || 'None'}`);
+
+  logWorkflowStart(executionId, 'room_redesigner', {
+    workflowId: job.data.workflowId,
+    clientId: job.data.clientId,
+    numberOfPrompts: room_images.length,
+    hasApiKey: false
+  });
+
+  try {
+    // Import room redesigner service
+    const roomRedesignerService = (await import('../services/roomRedesignerService')).default;
+
+    // Prepare inputs for batch redesign (no API key needed - uses Vertex AI)
+    const redesignInputs = room_images.map((img) => ({
+      image_base64: img.image_base64,
+      image_mime: img.image_mime,
+      design_style: img.design_style as any,
+      budget_level: img.budget_level as any,
+      season: img.season as any
+    }));
+
+    logger.debug(`🚀 Starting batch redesign of ${redesignInputs.length} room images`);
+
+    // Call batch redesign method (already exists with concurrency = 5)
+    const batchResults = await roomRedesignerService.batchRedesign(redesignInputs as any);
+
+    logger.debug(`✅ Batch redesign completed: ${batchResults.length} results`);
+
+    let successCount = 0;
+    let failCount = 0;
+
+    // Process each result
+    for (let i = 0; i < batchResults.length; i++) {
+      const result = batchResults[i];
+      const roomImage = room_images[i];
+
+      // Update progress
+      const progress = Math.floor(((i + 1) / batchResults.length) * 100);
+      job.progress(progress);
+
+      if (result.success && result.image_base64) {
+        successCount++;
+
+        try {
+          // Upload result to storage
+          const fileName = `${executionId}/${i}_${Date.now()}.png`;
+          const imageBuffer = Buffer.from(result.image_base64, 'base64');
+
+          logStorageUpload('workflow-results', fileName, imageBuffer.length, {
+            contentType: 'image/png'
+          });
+
+          const { error: uploadError } = await supabaseAdmin.storage
+            .from('workflow-results')
+            .upload(fileName, imageBuffer, {
+              contentType: 'image/png',
+              cacheControl: '3600',
+              upsert: false
+            });
+
+          if (uploadError) throw uploadError;
+
+          // Get public URL
+          const { data: publicUrlData } = supabaseAdmin.storage
+            .from('workflow-results')
+            .getPublicUrl(fileName);
+
+          const publicUrl = publicUrlData.publicUrl;
+
+          logStorageSuccess(publicUrl, {
+            uploadTime: Date.now() - workflowStartTime
+          });
+
+          // Insert batch result
+          await supabaseAdmin
+            .from('workflow_batch_results')
+            .insert({
+              execution_id: executionId,
+              batch_index: i,
+              prompt_text: `${roomImage.image_name} → ${design_style}`,
+              status: 'completed',
+              result_url: publicUrl,
+              processing_time_ms: result.processing_time || 0,
+              completed_at: new Date().toISOString(),
+              width: 1024, // Default dimensions from Gemini
+              height: 1024
+            });
+
+          logger.debug(`✓ Stored result for ${roomImage.image_name}`);
+        } catch (storageError) {
+          logger.error(`Failed to store result for image ${i}`, {
+            error: (storageError as Error).message
+          });
+          successCount--;
+          failCount++;
+
+          // Update batch result with error
+          await supabaseAdmin
+            .from('workflow_batch_results')
+            .insert({
+              execution_id: executionId,
+              batch_index: i,
+              prompt_text: `${roomImage.image_name} → ${design_style}`,
+              status: 'failed',
+              result_url: null,
+              processing_time_ms: result.processing_time || 0,
+              error_message: (storageError as Error).message,
+              completed_at: new Date().toISOString()
+            });
+        }
+      } else {
+        failCount++;
+
+        // Insert failed batch result
+        await supabaseAdmin
+          .from('workflow_batch_results')
+          .insert({
+            execution_id: executionId,
+            batch_index: i,
+            prompt_text: `${roomImage.image_name} → ${design_style}`,
+            status: 'failed',
+            result_url: null,
+            processing_time_ms: result.processing_time || 0,
+            error_message: result.error || 'Unknown error',
+            completed_at: new Date().toISOString()
+          });
+
+        logger.debug(`✗ Failed to process ${roomImage.image_name}: ${result.error}`);
+      }
+    }
+
+    // Update execution status
+    const durationSeconds = Math.floor((Date.now() - workflowStartTime) / 1000);
+
+    await supabaseAdmin
+      .from('workflow_executions')
+      .update({
+        status: 'completed',
+        output_data: {
+          successful: successCount,
+          failed: failCount,
+          total: room_images.length,
+          design_style,
+          budget_level,
+          season
+        },
+        completed_at: new Date().toISOString(),
+        duration_seconds: durationSeconds
+      })
+      .eq('id', executionId);
+
+    job.progress(100);
+
+    logWorkflowComplete(executionId, {
+      totalPrompts: room_images.length,
+      successful: successCount,
+      failed: failCount,
+      totalTime: Date.now() - workflowStartTime
+    });
+
+    logger.info('Room Redesigner workflow execution completed', {
+      executionId,
+      successCount,
+      failCount,
+      totalImages: room_images.length
+    });
+
+    return { success: true, successCount, failCount, totalPrompts: room_images.length };
+
+  } catch (error) {
+    const err = error as Error;
+    logger.debug(`\n❌ ROOM REDESIGNER WORKFLOW FAILED`);
+    logger.debug(`   Execution ID: ${executionId}`);
+    logger.debug(`   Error: ${err.message}`);
+    logger.debug(`   Stack: ${err.stack}`);
+
+    logWorkflowFailed(executionId, err, {
+      totalPrompts: room_images.length
+    });
+
+    logger.error('Room Redesigner workflow execution failed', {
+      executionId,
+      error: err.message
+    });
+
+    throw error;
+  }
+}
+
+/**
  * Process standard workflow (placeholder for future workflows)
  */
 async function processStandardWorkflow(
@@ -467,6 +852,10 @@ workflowQueue.process(WORKER_CONCURRENCY, async (job: Job<WorkflowJobData>) => {
     // Dispatch to appropriate workflow handler based on type
     if (config.workflow_type === 'nano_banana') {
       result = await processNanoBananaWorkflow(job, executionId, inputData, config);
+    } else if (config.workflow_type === 'smart_resizer') {
+      result = await processSmartResizerWorkflow(job, executionId, inputData as unknown as SmartResizerInputData, config);
+    } else if (config.workflow_type === 'room_redesigner') {
+      result = await processRoomRedesignerWorkflow(job, executionId, inputData as unknown as RoomRedesignerInputData, config);
     } else {
       result = await processStandardWorkflow(job, executionId, inputData, config);
     }
@@ -512,10 +901,142 @@ workflowQueue.on('failed', (job: Job, err: Error) => {
   logger.error(`❌ Job ${job.id} failed:`, err.message);
 });
 
+/**
+ * Smart Resizer Queue Processor
+ * Handles standalone Smart Resizer jobs (direct API calls to /smart-resizer/jobs)
+ *
+ * Concurrency: 2 (process 2 master images simultaneously)
+ */
+const SMART_RESIZER_CONCURRENCY = parseInt(process.env.SMART_RESIZER_CONCURRENCY || '2', 10);
+logger.info(`🔧 Smart Resizer concurrency set to: ${SMART_RESIZER_CONCURRENCY} parallel jobs`);
+
+smartResizerQueue.process(SMART_RESIZER_CONCURRENCY, async (job: Job<SmartResizerJobData>): Promise<SmartResizerResult> => {
+  const { jobId, clientId, formatsRequested } = job.data;
+
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug('🚀 General Worker - SmartResizer Job started', {
+      jobId,
+      clientId,
+      formatCount: formatsRequested.length,
+    });
+  }
+
+  logger.info('Smart Resizer job started', {
+    jobId,
+    clientId,
+    formatCount: formatsRequested.length,
+  });
+
+  try {
+    // Process the job using smartResizerService
+    const result = await smartResizerService.processJob(job.data);
+
+    // Update job progress to 100%
+    await job.progress(100);
+
+    logger.info('Smart Resizer job completed', {
+      jobId,
+      status: result.status,
+      successCount: result.results.filter(r => r.status === 'completed').length,
+      failedCount: result.results.filter(r => r.status === 'failed').length,
+      processingTimeMs: result.totalProcessingTimeMs,
+    });
+
+    if (process.env.NODE_ENV === 'development') {
+      logger.debug('✅ General Worker - SmartResizer Job completed', {
+        jobId,
+        status: result.status,
+        successCount: result.results.filter(r => r.status === 'completed').length,
+        failedCount: result.results.filter(r => r.status === 'failed').length,
+        totalTime: `${result.totalProcessingTimeMs}ms`,
+      });
+    }
+
+    return result;
+  } catch (error: any) {
+    logger.error('Smart Resizer job failed', {
+      jobId,
+      error: error.message,
+      stack: error.stack,
+    });
+
+    if (process.env.NODE_ENV === 'development') {
+      logger.error('❌ General Worker - SmartResizer Job failed', {
+        jobId,
+        error: error.message,
+      });
+    }
+
+    throw error;
+  }
+});
+
+/**
+ * Smart Resizer Queue Event Listeners
+ */
+smartResizerQueue.on('completed', (job: Job, result: SmartResizerResult) => {
+  logger.info('Smart Resizer queue job completed', {
+    jobId: job.id,
+    dataJobId: result.jobId,
+    status: result.status,
+  });
+
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug('🎉 General Worker - SmartResizer queue job completed', {
+      queueJobId: job.id,
+      jobId: result.jobId,
+    });
+  }
+});
+
+smartResizerQueue.on('failed', (job: Job, err: Error) => {
+  logger.error('Smart Resizer queue job failed', {
+    jobId: job.id,
+    error: err.message,
+    attemptsMade: job.attemptsMade,
+    attemptsTotal: job.opts.attempts,
+  });
+
+  if (process.env.NODE_ENV === 'development') {
+    logger.error('❌ General Worker - SmartResizer queue job failed', {
+      queueJobId: job.id,
+      error: err.message,
+      attempts: `${job.attemptsMade}/${job.opts.attempts}`,
+    });
+  }
+});
+
+smartResizerQueue.on('stalled', (job: Job) => {
+  logger.warn('Smart Resizer queue job stalled', {
+    jobId: job.id,
+  });
+
+  if (process.env.NODE_ENV === 'development') {
+    logger.warn('⚠️  General Worker - SmartResizer queue job stalled', {
+      queueJobId: job.id,
+    });
+  }
+});
+
+smartResizerQueue.on('progress', (job: Job, progress: number) => {
+  logger.debug('Smart Resizer queue job progress', {
+    jobId: job.id,
+    progress: `${progress}%`,
+  });
+
+  if (process.env.NODE_ENV === 'development') {
+    logger.debug('📊 General Worker - SmartResizer progress update', {
+      queueJobId: job.id,
+      progress: `${progress}%`,
+    });
+  }
+});
+
 process.on('SIGTERM', async () => {
-  logger.debug('SIGTERM received, closing worker...');
+  logger.debug('SIGTERM received, closing workers...');
   await workflowQueue.close();
+  await smartResizerQueue.close();
   process.exit(0);
 });
 
-logger.debug('✅ Workflow worker ready');
+logger.info('✅ General workflow worker ready (workflowQueue + smartResizerQueue)');

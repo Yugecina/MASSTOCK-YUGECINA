@@ -1,6 +1,6 @@
 import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import toast from 'react-hot-toast';
-import { adminClientService } from '../../services/adminClientService';
+import { adminResourceService } from '../../services/adminResourceService';
 import { Spinner } from '../ui/Spinner';
 import type { EditClientModalProps, EditClientFormData } from '../../types/admin';
 
@@ -75,7 +75,7 @@ export function EditClientModal({ client, onClose, onSuccess }: EditClientModalP
       };
 
       console.log('📡 EditClientModal: Calling API', { payload });
-      const response = await adminClientService.updateClient(client.id, payload);
+      const response = await adminResourceService.updateClient(client.id, payload);
       console.log('✅ EditClientModal: Success', { response });
 
       toast.success('Client updated successfully!');
@@ -102,7 +102,7 @@ export function EditClientModal({ client, onClose, onSuccess }: EditClientModalP
     console.log('🗑️ EditClientModal: Suspending client', { clientId: client.id });
     setLoading(true);
     try {
-      await adminClientService.deleteClient(client.id);
+      await adminResourceService.deleteClient(client.id);
       console.log('✅ EditClientModal: Client suspended');
       toast.success('Client suspended successfully');
       onSuccess?.();

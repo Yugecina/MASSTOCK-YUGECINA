@@ -5,11 +5,11 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import api from '../../services/api';
-import { adminWorkflowService } from '../../services/adminWorkflowService';
+import { adminResourceService } from '../../services/adminResourceService';
 
 vi.mock('../../services/api');
 
-describe('adminWorkflowService', () => {
+describe('adminResourceService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -44,9 +44,9 @@ describe('adminWorkflowService', () => {
 
       api.get.mockResolvedValue(mockResponse);
 
-      const result = await adminWorkflowService.getWorkflows();
+      const result = await adminResourceService.getWorkflows();
 
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/workflows', {
+      expect(api.get).toHaveBeenCalledWith('/admin/workflows', {
         params: { page: 1, limit: 10 },
       });
       expect(result).toEqual(mockResponse);
@@ -57,9 +57,9 @@ describe('adminWorkflowService', () => {
       api.get.mockResolvedValue(mockResponse);
 
       const filters = { status: 'deployed', client_id: 'client-1', search: 'test' };
-      await adminWorkflowService.getWorkflows(2, filters);
+      await adminResourceService.getWorkflows(2, filters);
 
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/workflows', {
+      expect(api.get).toHaveBeenCalledWith('/admin/workflows', {
         params: { page: 2, limit: 10, ...filters },
       });
     });
@@ -68,7 +68,7 @@ describe('adminWorkflowService', () => {
       const error = new Error('Network error');
       api.get.mockRejectedValue(error);
 
-      await expect(adminWorkflowService.getWorkflows()).rejects.toThrow('Network error');
+      await expect(adminResourceService.getWorkflows()).rejects.toThrow('Network error');
     });
   });
 
@@ -85,9 +85,9 @@ describe('adminWorkflowService', () => {
 
       api.get.mockResolvedValue(mockResponse);
 
-      const result = await adminWorkflowService.getWorkflow('1');
+      const result = await adminResourceService.getWorkflow('1');
 
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/workflows/1');
+      expect(api.get).toHaveBeenCalledWith('/admin/workflows/1');
       expect(result).toEqual(mockResponse);
     });
 
@@ -95,7 +95,7 @@ describe('adminWorkflowService', () => {
       const error = new Error('Workflow not found');
       api.get.mockRejectedValue(error);
 
-      await expect(adminWorkflowService.getWorkflow('999')).rejects.toThrow(
+      await expect(adminResourceService.getWorkflow('999')).rejects.toThrow(
         'Workflow not found'
       );
     });
@@ -116,9 +116,9 @@ describe('adminWorkflowService', () => {
 
       api.get.mockResolvedValue(mockResponse);
 
-      const result = await adminWorkflowService.getWorkflowStats('1');
+      const result = await adminResourceService.getWorkflowStats('1');
 
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/workflows/1/stats');
+      expect(api.get).toHaveBeenCalledWith('/admin/workflows/1/stats');
       expect(result).toEqual(mockResponse);
     });
   });
@@ -144,9 +144,9 @@ describe('adminWorkflowService', () => {
 
       api.get.mockResolvedValue(mockResponse);
 
-      const result = await adminWorkflowService.getWorkflowRequests();
+      const result = await adminResourceService.getWorkflowRequests();
 
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/workflow-requests', {
+      expect(api.get).toHaveBeenCalledWith('/admin/workflow-requests', {
         params: { page: 1, limit: 10 },
       });
       expect(result).toEqual(mockResponse);
@@ -157,9 +157,9 @@ describe('adminWorkflowService', () => {
       api.get.mockResolvedValue(mockResponse);
 
       const filters = { status: 'submitted', search: 'automation' };
-      await adminWorkflowService.getWorkflowRequests(1, filters);
+      await adminResourceService.getWorkflowRequests(1, filters);
 
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/workflow-requests', {
+      expect(api.get).toHaveBeenCalledWith('/admin/workflow-requests', {
         params: { page: 1, limit: 10, ...filters },
       });
     });
@@ -177,9 +177,9 @@ describe('adminWorkflowService', () => {
 
       api.get.mockResolvedValue(mockResponse);
 
-      const result = await adminWorkflowService.getWorkflowRequest('req-1');
+      const result = await adminResourceService.getWorkflowRequest('req-1');
 
-      expect(api.get).toHaveBeenCalledWith('/v1/admin/workflow-requests/req-1');
+      expect(api.get).toHaveBeenCalledWith('/admin/workflow-requests/req-1');
       expect(result).toEqual(mockResponse);
     });
   });
@@ -194,12 +194,12 @@ describe('adminWorkflowService', () => {
 
       api.put.mockResolvedValue(mockResponse);
 
-      const result = await adminWorkflowService.updateWorkflowRequestStage(
+      const result = await adminResourceService.updateWorkflowRequestStage(
         'req-1',
         'reviewing'
       );
 
-      expect(api.put).toHaveBeenCalledWith('/v1/admin/workflow-requests/req-1/stage', {
+      expect(api.put).toHaveBeenCalledWith('/admin/workflow-requests/req-1/stage', {
         stage: 'reviewing',
       });
       expect(result).toEqual(mockResponse);
@@ -210,7 +210,7 @@ describe('adminWorkflowService', () => {
       api.put.mockRejectedValue(error);
 
       await expect(
-        adminWorkflowService.updateWorkflowRequestStage('req-1', 'invalid')
+        adminResourceService.updateWorkflowRequestStage('req-1', 'invalid')
       ).rejects.toThrow('Invalid stage');
     });
   });
@@ -224,9 +224,9 @@ describe('adminWorkflowService', () => {
 
       api.delete.mockResolvedValue(mockResponse);
 
-      const result = await adminWorkflowService.deleteWorkflow('1');
+      const result = await adminResourceService.deleteWorkflow('1');
 
-      expect(api.delete).toHaveBeenCalledWith('/v1/admin/workflows/1');
+      expect(api.delete).toHaveBeenCalledWith('/admin/workflows/1');
       expect(result).toEqual(mockResponse);
     });
 
@@ -234,7 +234,7 @@ describe('adminWorkflowService', () => {
       const error = new Error('Workflow not found');
       api.delete.mockRejectedValue(error);
 
-      await expect(adminWorkflowService.deleteWorkflow('999')).rejects.toThrow(
+      await expect(adminResourceService.deleteWorkflow('999')).rejects.toThrow(
         'Workflow not found'
       );
     });

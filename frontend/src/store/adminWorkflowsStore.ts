@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand';
-import { adminWorkflowService } from '../services/adminWorkflowService';
+import { adminResourceService } from '../services/adminResourceService';
 import { Workflow } from '../types/index';
 
 interface WorkflowRequest {
@@ -81,7 +81,7 @@ export const useAdminWorkflowsStore = create<AdminWorkflowsStore>((set, get) => 
     set({ loading: true, error: null });
 
     try {
-      const response = await adminWorkflowService.getWorkflows(page, filters);
+      const response = await adminResourceService.getWorkflows(page, filters);
 
       // Note: response is already unwrapped by axios interceptor
       // Check for both response.success and response.data (for mock data compatibility)
@@ -110,7 +110,7 @@ export const useAdminWorkflowsStore = create<AdminWorkflowsStore>((set, get) => 
     set({ loading: true, error: null });
 
     try {
-      const response = await adminWorkflowService.getWorkflowRequests(page, filters);
+      const response = await adminResourceService.getWorkflowRequests(page, filters);
 
       // Note: response is already unwrapped by axios interceptor
       const requests = response.requests || [];
@@ -138,7 +138,7 @@ export const useAdminWorkflowsStore = create<AdminWorkflowsStore>((set, get) => 
     set({ loading: true, error: null });
 
     try {
-      await adminWorkflowService.updateWorkflowRequestStage(id, stage);
+      await adminResourceService.updateWorkflowRequestStage(id, stage);
 
       // Refresh requests after update
       const currentPage = get().pagination.page;
@@ -156,7 +156,7 @@ export const useAdminWorkflowsStore = create<AdminWorkflowsStore>((set, get) => 
     set({ loading: true, error: null });
 
     try {
-      await adminWorkflowService.deleteWorkflow(id);
+      await adminResourceService.deleteWorkflow(id);
 
       // Refresh workflows after deletion
       const currentPage = get().pagination.page;

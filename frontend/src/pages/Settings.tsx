@@ -3,6 +3,11 @@ import { ClientLayout } from '../components/layout/ClientLayout'
 import { useAuth } from '../hooks/useAuth'
 import { settingsService } from '../services/settings'
 import { Spinner } from '../components/ui/Spinner'
+import DarkModeToggle from '../components/ui/DarkModeToggle'
+import { NotificationSettings } from '../components/settings/NotificationSettings'
+import { InterfaceSettings } from '../components/settings/InterfaceSettings'
+import { SecuritySettings } from '../components/settings/SecuritySettings'
+import { usePreferencesStore } from '../store/preferencesStore'
 import toast from 'react-hot-toast'
 import logger from '@/utils/logger'
 import './Settings.css'
@@ -37,21 +42,88 @@ interface Collaborator {
   created_at: string
 }
 
+interface SettingsTab {
+  id: string
+  label: string
+  icon: JSX.Element
+}
+
+const SETTINGS_TABS: SettingsTab[] = [
+  {
+    id: 'profile',
+    label: 'Profil',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+      </svg>
+    )
+  },
+  {
+    id: 'team',
+    label: 'Équipe',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+      </svg>
+    )
+  },
+  {
+    id: 'preferences',
+    label: 'Préférences',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="3" />
+        <path d="M12 1v6m0 6v6M5.64 5.64l4.24 4.24m4.24 4.24l4.24 4.24M1 12h6m6 0h6M5.64 18.36l4.24-4.24m4.24-4.24l4.24-4.24" />
+      </svg>
+    )
+  },
+  {
+    id: 'security',
+    label: 'Sécurité',
+    icon: (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+      </svg>
+    )
+  },
+]
+
 /**
  * Settings Page - Dark Premium Style
  */
 export function Settings(): JSX.Element {
   const { user } = useAuth()
+  const { loadPreferences } = usePreferencesStore()
   const [loading, setLoading] = useState<boolean>(true)
   const [profile, setProfile] = useState<ProfileResponse | null>(null)
   const [collaborators, setCollaborators] = useState<Collaborator[]>([])
   const [showInviteForm, setShowInviteForm] = useState<boolean>(false)
   const [inviteEmail, setInviteEmail] = useState<string>('')
   const [inviting, setInviting] = useState<boolean>(false)
+  const [activeTab, setActiveTab] = useState<string>('profile')
 
   useEffect(() => {
     loadData()
+    loadPreferences()
   }, [])
+
+  // Sync tab with URL hash
+  useEffect(() => {
+    const hash = window.location.hash.replace('#', '')
+    if (hash && SETTINGS_TABS.some(tab => tab.id === hash)) {
+      setActiveTab(hash)
+    }
+  }, [])
+
+  const handleTabChange = (tabId: string): void => {
+    setActiveTab(tabId)
+    window.history.replaceState(null, '', `#${tabId}`)
+  }
 
   const loadData = async (): Promise<void> => {
     try {
@@ -157,9 +229,28 @@ export function Settings(): JSX.Element {
             <Spinner size="lg" />
           </div>
         ) : (
-          <div className="settings-content">
-            {/* User Information */}
-            <section className="settings-card">
+          <>
+            {/* Tabs Navigation */}
+            <div className="settings-tabs">
+              {SETTINGS_TABS.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => handleTabChange(tab.id)}
+                  className={`settings-tab ${activeTab === tab.id ? 'settings-tab--active' : ''}`}
+                >
+                  <span className="settings-tab-icon">{tab.icon}</span>
+                  <span className="settings-tab-label">{tab.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="settings-tab-content">
+              {/* Profile Tab */}
+              {activeTab === 'profile' && (
+                <div className="settings-content">
+                  {/* User Information */}
+                  <section className="settings-card">
               <h2 className="settings-card-title">User Information</h2>
 
               <div className="settings-grid">
@@ -192,10 +283,16 @@ export function Settings(): JSX.Element {
                 </div>
               </div>
             </section>
+                </div>
+              )}
 
-            {/* Company Information */}
-            {profile?.client && (
-              <section className="settings-card">
+              {/* Team Tab */}
+              {activeTab === 'team' && (
+                <div className="settings-content">
+                  {/* Company Information */}
+                  {profile?.client ? (
+                    <>
+                      <section className="settings-card">
                 <h2 className="settings-card-title">Company Information</h2>
 
                 <div className="settings-grid">
@@ -224,15 +321,17 @@ export function Settings(): JSX.Element {
                   </div>
                 </div>
               </section>
-            )}
 
-            {/* Collaborators Management */}
-            {isOwner && (
+              {/* Collaborators Management */}
+              {isOwner && (
               <section className="settings-card">
                 <div className="settings-card-header">
                   <h2 className="settings-card-title">Team Management</h2>
                   {!showInviteForm && (
-                    <button className="btn btn-primary" disabled>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => setShowInviteForm(true)}
+                    >
                       + Invite Collaborator
                     </button>
                   )}
@@ -251,13 +350,18 @@ export function Settings(): JSX.Element {
                         className="settings-input"
                         disabled={inviting}
                       />
-                      <button type="submit" className="btn btn-primary" disabled>
+                      <button
+                        type="submit"
+                        className="btn btn-primary"
+                        disabled={inviting}
+                      >
                         {inviting ? 'Sending...' : 'Send Invitation'}
                       </button>
                       <button
                         type="button"
                         className="btn btn-secondary"
-                        disabled
+                        onClick={() => setShowInviteForm(false)}
+                        disabled={inviting}
                       >
                         Cancel
                       </button>
@@ -287,7 +391,7 @@ export function Settings(): JSX.Element {
                         {collab.client_role !== 'owner' && (
                           <button
                             className="btn btn-danger btn-sm"
-                            disabled
+                            onClick={() => handleRemoveCollaborator(collab)}
                           >
                             Remove
                           </button>
@@ -303,26 +407,58 @@ export function Settings(): JSX.Element {
                   )}
                 </div>
               </section>
-            )}
+              )}
+                    </>
+                  ) : (
+                    <section className="settings-card">
+                      <div className="settings-empty">
+                        <p>Aucune entreprise associée.</p>
+                      </div>
+                    </section>
+                  )}
+                </div>
+              )}
 
-            {/* Security */}
+              {/* Preferences Tab */}
+              {activeTab === 'preferences' && (
+                <div className="settings-content">
+                  {/* Notifications */}
+                  <section className="settings-card">
+              <NotificationSettings />
+            </section>
+
+            {/* Interface & Display */}
             <section className="settings-card">
-              <h2 className="settings-card-title">Security</h2>
+              <InterfaceSettings />
+            </section>
+
+            {/* Appearance */}
+            <section className="settings-card">
+              <h2 className="settings-card-title">Appearance</h2>
 
               <div className="settings-security-row">
                 <div className="settings-security-info">
-                  <p className="settings-security-title">Change Password</p>
-                  <p className="settings-security-desc">Update your password regularly to keep your account secure</p>
+                  <p className="settings-security-title">Dark Mode</p>
+                  <p className="settings-security-desc">Toggle between dark and light theme</p>
                 </div>
-                <button
-                  className="btn btn-secondary"
-                  disabled
-                >
-                  Change
-                </button>
+                <div className="settings-dark-mode-wrapper">
+                  <DarkModeToggle />
+                </div>
               </div>
             </section>
-          </div>
+                </div>
+              )}
+
+              {/* Security Tab */}
+              {activeTab === 'security' && (
+                <div className="settings-content">
+                  <section className="settings-card">
+              <SecuritySettings />
+            </section>
+                </div>
+              )}
+            </div>
+          </>
         )}
       </div>
     </ClientLayout>

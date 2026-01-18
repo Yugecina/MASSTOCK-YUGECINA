@@ -1,0 +1,670 @@
+/**
+ * Room Redesigner Results Styles
+ * Architectural Portfolio Aesthetic
+ * Dark Premium + MasStock Design System
+ *
+ * Typography: Space Grotesk (titles) + Inter (body)
+ */
+
+/* ========================================
+   CONTAINER
+   ======================================== */
+
+.room-results {
+  max-width: 1400px;
+  margin: 0;
+  padding: 0;
+  animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ========================================
+   HEADER - Compact & Smart
+   ======================================== */
+
+.room-results-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-5);
+  padding: var(--spacing-4) var(--spacing-5);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.2s backwards;
+  gap: var(--spacing-4);
+}
+
+.room-results-header-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.room-results-title {
+  font-family: var(--font-sans); /* Space Grotesk */
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.room-results-subtitle {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin: 4px 0 0 0;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  font-weight: 500;
+}
+
+.room-results-actions {
+  display: flex;
+  gap: var(--spacing-2);
+  flex-shrink: 0;
+}
+
+.room-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-4);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  font-weight: var(--weight-medium);
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.room-action-btn--secondary {
+  background: var(--primary);
+  color: white;
+  border: 1px solid var(--primary);
+}
+
+.room-action-btn--secondary:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(46, 107, 123, 0.3);
+}
+
+.room-action-btn svg {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+}
+
+/* ========================================
+   COMPARISON SHOWCASE - Before/After Slider
+   ======================================== */
+
+.room-comparison-showcase {
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.3s backwards;
+}
+
+/* Container pour l'image + bouton */
+.room-comparison-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: var(--spacing-8);
+  margin-top: var(--spacing-6);
+}
+
+/* Wrapper pour l'image unique */
+.room-comparison-image-wrapper {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  background: var(--muted);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3), 0 0 0 1px var(--border);
+}
+
+.room-comparison-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* Placeholder for missing original images */
+.room-comparison-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--muted) 0%, var(--background) 100%);
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.room-comparison-placeholder p {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  text-align: center;
+  padding: var(--spacing-4);
+}
+
+/* Label (Original / Redesigned) */
+.room-comparison-label {
+  position: absolute;
+  top: var(--spacing-4);
+  left: var(--spacing-4);
+  padding: var(--spacing-2) var(--spacing-4);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  color: white;
+  font-size: 11px;
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  z-index: 2;
+}
+
+/* Bouton toggle */
+.room-comparison-toggle {
+  position: absolute;
+  bottom: var(--spacing-4);
+  right: var(--spacing-4);
+  padding: var(--spacing-3) var(--spacing-5);
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10;
+}
+
+.room-comparison-toggle:hover {
+  background: rgba(0, 0, 0, 0.9);
+  border-color: var(--primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* ========================================
+   NAVIGATION ARROWS - Always Visible
+   ======================================== */
+
+.room-nav-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 10;
+  color: white;
+}
+
+.room-nav-arrow:hover {
+  background: rgba(0, 0, 0, 0.9);
+  border-color: var(--primary);
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.room-nav-arrow:active {
+  transform: translateY(-50%) scale(0.95);
+}
+
+.room-nav-arrow--left {
+  left: var(--spacing-4);
+}
+
+.room-nav-arrow--right {
+  right: var(--spacing-4);
+}
+
+.room-nav-arrow svg {
+  width: 24px;
+  height: 24px;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ========================================
+   SPECIFICATIONS - Compact Inline Tags
+   ======================================== */
+
+.room-specs {
+  margin-bottom: var(--spacing-4);
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.4s backwards;
+}
+
+.room-specs-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  justify-content: flex-start;
+}
+
+.room-spec-card {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: var(--spacing-2) var(--spacing-4);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  transition: all 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.room-spec-card:hover {
+  border-color: var(--primary);
+  background: var(--card);
+  transform: translateY(-1px);
+}
+
+.room-spec-label {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+.room-spec-value {
+  font-family: var(--font-sans); /* Space Grotesk */
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+  margin: 0;
+}
+
+/* ========================================
+   THUMBNAIL GALLERY - Additional Results
+   ======================================== */
+
+.room-gallery {
+  margin-bottom: var(--spacing-8);
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.5s backwards;
+}
+
+.room-gallery-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-foreground);
+  margin-bottom: var(--spacing-4);
+}
+
+.room-gallery-grid {
+  display: flex;
+  gap: var(--spacing-4);
+  overflow-x: auto;
+  padding: var(--spacing-4) 0;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary) var(--muted);
+}
+
+.room-gallery-grid::-webkit-scrollbar {
+  height: 8px;
+}
+
+.room-gallery-grid::-webkit-scrollbar-track {
+  background: var(--muted);
+  border-radius: var(--radius-sm);
+}
+
+.room-gallery-grid::-webkit-scrollbar-thumb {
+  background: var(--primary);
+  border-radius: var(--radius-sm);
+}
+
+.room-gallery-grid::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-light);
+}
+
+.room-gallery-item {
+  background: var(--card);
+  border: 2px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  padding: 0;
+  text-align: left;
+  flex: 0 0 auto;
+  width: 200px;
+  scroll-snap-align: center;
+  position: relative;
+}
+
+.room-gallery-item:hover {
+  border-color: var(--primary);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+}
+
+.room-gallery-item--active {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(46, 107, 123, 0.3);
+}
+
+.room-gallery-item--active::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  background: var(--primary);
+  border-radius: 50%;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.room-gallery-item--active::after {
+  content: '✓';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  color: white;
+  font-weight: bold;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 11;
+}
+
+.room-gallery-thumbnail {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  background: var(--background);
+  position: relative;
+}
+
+.room-gallery-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.room-gallery-item:hover .room-gallery-thumbnail img {
+  transform: scale(1.08);
+}
+
+.room-gallery-info {
+  padding: var(--spacing-3);
+  background: var(--card);
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.room-gallery-title {
+  font-family: var(--font-sans); /* Space Grotesk */
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-bottom: var(--spacing-1);
+  letter-spacing: -0.01em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.room-gallery-style {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--muted-foreground);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 500;
+}
+
+/* ========================================
+   LOADING STATE
+   ======================================== */
+
+.room-results-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: var(--spacing-4);
+}
+
+.room-results-loading p {
+  font-family: var(--font-serif); /* Inter */
+  font-size: 18px;
+  color: var(--muted-foreground);
+  letter-spacing: -0.01em;
+}
+
+.room-results-spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   ERROR STATE
+   ======================================== */
+
+.room-results-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  gap: var(--spacing-4);
+  text-align: center;
+}
+
+.room-results-error-icon {
+  width: 64px;
+  height: 64px;
+  color: var(--destructive);
+}
+
+.room-results-error p {
+  font-family: var(--font-serif);
+  font-size: var(--text-base);
+  color: var(--muted-foreground);
+  max-width: 400px;
+}
+
+/* ========================================
+   WARNING MESSAGE
+   ======================================== */
+
+.room-results-warning {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+  color: var(--warning);
+  font-family: var(--font-serif);
+  font-size: var(--text-sm);
+  animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.6s backwards;
+}
+
+.room-results-warning svg {
+  flex-shrink: 0;
+}
+
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ========================================
+   LIGHT MODE OVERRIDES
+   NOTE: .dark class = LIGHT theme (inverted naming for compatibility)
+   Default (no class) = DARK theme
+   ======================================== */
+
+.dark .room-comparison-toggle {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--foreground);
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+.dark .room-comparison-toggle:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: var(--primary);
+}
+
+.dark .room-spec-card {
+  background: var(--card);
+  border-color: var(--border);
+}
+
+.dark .room-gallery-item {
+  background: var(--card);
+  border-color: var(--border);
+}
+
+.dark .room-gallery-item:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 1024px) {
+  .room-results-title {
+    font-size: 20px;
+  }
+
+  .room-results-header {
+    padding: var(--spacing-3) var(--spacing-4);
+  }
+}
+
+@media (max-width: 768px) {
+  .room-results-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-3);
+  }
+
+  .room-results-title {
+    font-size: 18px;
+  }
+
+  .room-results-actions {
+    width: 100%;
+  }
+
+  .room-action-btn {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .room-comparison-image-wrapper {
+    aspect-ratio: 4 / 3;
+  }
+
+  .room-comparison-toggle {
+    font-size: 12px;
+    padding: var(--spacing-2) var(--spacing-4);
+  }
+
+  .room-spec-card {
+    padding: var(--spacing-1) var(--spacing-3);
+  }
+
+  .room-spec-label {
+    font-size: 9px;
+  }
+
+  .room-spec-value {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .room-results-title {
+    font-size: 16px;
+  }
+
+  .room-action-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .room-results-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .room-gallery-item {
+    width: 180px;
+  }
+}

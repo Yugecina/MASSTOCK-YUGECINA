@@ -130,21 +130,20 @@ class ModelRateLimiters {
   };
 
   constructor() {
+    // Vertex AI rate limits
+    const flashLimit = parseInt(process.env.VERTEX_RATE_LIMIT_FLASH || '1000', 10);
+    const proLimit = parseInt(process.env.VERTEX_RATE_LIMIT_PRO || '500', 10);
+    const window = 60000; // 1 minute window
+
     // Create separate rate limiters for each model type
     this.limiters = {
-      flash: new ApiRateLimiter(
-        parseInt(process.env.GEMINI_RATE_LIMIT_FLASH || '500', 10),
-        parseInt(process.env.GEMINI_RATE_WINDOW || '60000', 10)
-      ),
-      pro: new ApiRateLimiter(
-        parseInt(process.env.GEMINI_RATE_LIMIT_PRO || '100', 10),
-        parseInt(process.env.GEMINI_RATE_WINDOW || '60000', 10)
-      )
+      flash: new ApiRateLimiter(flashLimit, window),
+      pro: new ApiRateLimiter(proLimit, window)
     };
 
-    logger.info(`🚦 Model Rate Limiters initialized:`);
-    logger.info(`   Flash models: ${process.env.GEMINI_RATE_LIMIT_FLASH || 500} RPM`);
-    logger.info(`   Pro models: ${process.env.GEMINI_RATE_LIMIT_PRO || 100} RPM`);
+    logger.info(`🚦 Model Rate Limiters initialized (Vertex AI):`);
+    logger.info(`   Flash models: ${flashLimit} RPM`);
+    logger.info(`   Pro models: ${proLimit} RPM`);
   }
 
   /**

@@ -27,14 +27,35 @@ export interface Client {
   updated_at: string;
 }
 
+export type WorkflowType = 'nano_banana' | 'smart_resizer' | 'room_redesigner';
+
+export interface WorkflowField {
+  name: string;
+  label?: string;
+  type?: string;
+  placeholder?: string;
+  required?: boolean;
+  options?: string[];
+}
+
+export interface WorkflowConfig {
+  workflow_type?: WorkflowType;
+  fields?: WorkflowField[];
+  default_model?: string;
+  default_aspect_ratio?: string;
+  default_resolution?: { pro: string };
+  [key: string]: any; // Allow additional properties
+}
+
 export interface Workflow {
   id: string;
   name: string;
   description?: string;
   client_id: string;
-  config: Record<string, any>;
+  config: WorkflowConfig;
   status: WorkflowStatus;
   version: number;
+  execution_count?: number; // Add execution count for WorkflowsList and WorkflowCard
   created_at: string;
   updated_at: string;
 }

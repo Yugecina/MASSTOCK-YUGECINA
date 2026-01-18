@@ -78,4 +78,28 @@ router.delete('/collaborators/:collaborator_id',
   })
 );
 
+/**
+ * GET /api/v1/settings/preferences
+ * Get user preferences
+ */
+router.get('/preferences',
+  asyncHandler(settingsController.getPreferences)
+);
+
+/**
+ * PUT /api/v1/settings/preferences
+ * Update user preferences
+ */
+router.put('/preferences',
+  asyncHandler(settingsController.updatePreferences)
+);
+
+/**
+ * POST /api/v1/settings/change-password
+ * Change user password
+ */
+router.post('/change-password',
+  asyncHandler(settingsController.changePassword)
+);
+
 export default router;

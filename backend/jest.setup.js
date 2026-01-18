@@ -1,5 +1,19 @@
-// Load environment variables from .env for E2E tests
-require('dotenv').config();
+// Load environment variables from .env.test for E2E tests, fallback to .env
+const dotenv = require('dotenv');
+const path = require('path');
+
+// Try to load .env.test first (for E2E tests), then fallback to .env
+const envTestPath = path.resolve(__dirname, '.env.test');
+const envPath = path.resolve(__dirname, '.env');
+
+const fs = require('fs');
+if (fs.existsSync(envTestPath)) {
+  dotenv.config({ path: envTestPath });
+  console.log('✅ Loaded .env.test for E2E tests');
+} else {
+  dotenv.config({ path: envPath });
+  console.log('⚠️  .env.test not found, using .env');
+}
 
 // Set test environment variables
 process.env.NODE_ENV = 'test';
@@ -30,4 +44,4 @@ process.env.REDIS_TLS = 'false';
 // };
 
 // Increase timeout for E2E and integration tests
-jest.setTimeout(30000); // 30 seconds for E2E tests with real database
+jest.setTimeout(300000); // 5 minutes for E2E tests with real API calls

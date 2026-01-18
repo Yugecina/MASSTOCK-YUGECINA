@@ -7,6 +7,7 @@ import { create } from 'zustand';
 import api from '../services/api';
 import logger from '@/utils/logger';
 import { useExecutionsStore } from './executionsStore';
+import { useActiveExecutionsStore } from './activeExecutionsStore';
 import { User } from '../types/index';
 
 interface AuthState {
@@ -35,7 +36,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   initAuth: async () => {
     set({ loading: true });
     try {
-      const response = await api.get('/v1/auth/me');
+      const response = await api.get('/auth/me');
       set({
         user: response.user,
         isAuthenticated: true,
@@ -52,7 +53,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
     set({ loading: true, error: null });
     try {
       // Backend now sets httpOnly cookies automatically
-      const response = await api.post('/v1/auth/login', { email, password });
+      const response = await api.post('/auth/login', { email, password });
       const { user } = response;
 
       // Validate that we received the expected data
@@ -78,7 +79,7 @@ export const useAuthStore = create<AuthStore>((set) => ({
   logout: async () => {
     try {
       // Call backend to clear cookies
-      await api.post('/v1/auth/logout');
+      await api.post('/auth/logout');
     } catch (error) {
       // Continue with logout even if backend call fails
       logger.error('Logout error:', error);
@@ -93,5 +94,9 @@ export const useAuthStore = create<AuthStore>((set) => ({
     // Clear executions cache on logout for security
     logger.debug('🔄 authStore.logout: Clearing executions cache');
     useExecutionsStore.getState().reset();
+
+    // Clear active executions on logout
+    logger.debug('🔄 authStore.logout: Clearing active executions');
+    useActiveExecutionsStore.getState().reset();
   },
 }));

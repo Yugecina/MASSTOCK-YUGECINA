@@ -1,0 +1,158 @@
+/* ========================================
+   NOTIFICATION SETTINGS COMPONENT
+   Dark Premium - Refined Toggles
+   ======================================== */
+
+.notification-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+}
+
+.notification-settings__title {
+  font-family: var(--font-sans);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--foreground);
+  margin: 0;
+  letter-spacing: var(--tracking-tight);
+}
+
+.notification-settings__subtitle {
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+  margin: 0;
+  margin-top: calc(var(--spacing-2) * -1);
+}
+
+.notification-settings__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+/* ===== NOTIFICATION SETTING ITEM ===== */
+
+.notification-setting {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-4);
+  padding: var(--spacing-4);
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast) var(--ease-smooth);
+}
+
+.notification-setting:hover {
+  background: rgba(46, 107, 123, 0.05);
+  border-color: rgba(46, 107, 123, 0.2);
+}
+
+.notification-setting__content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  flex: 1;
+}
+
+.notification-setting__label {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  cursor: pointer;
+}
+
+.notification-setting__description {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  line-height: var(--line-height-relaxed);
+  margin: 0;
+}
+
+.notification-setting__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  color: var(--accent-light);
+  background: var(--accent-bg-dark);
+  border: 1px solid rgba(46, 107, 123, 0.3);
+  border-radius: 12px;
+  letter-spacing: 0.02em;
+}
+
+/* ===== TOGGLE SWITCH ===== */
+
+.toggle {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-fast) var(--ease-smooth);
+  flex-shrink: 0;
+  padding: 0;
+}
+
+.toggle:hover:not(.toggle--disabled) {
+  background: rgba(46, 107, 123, 0.1);
+  border-color: var(--accent-base);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--accent-base);
+  outline-offset: 2px;
+}
+
+.toggle--active {
+  background: var(--accent-base);
+  border-color: var(--accent-base);
+}
+
+.toggle--active:hover:not(.toggle--disabled) {
+  background: var(--accent-dark);
+  border-color: var(--accent-dark);
+}
+
+.toggle--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.toggle__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  background: var(--foreground);
+  border-radius: var(--radius-full);
+  transition: all var(--transition-fast) var(--ease-spring);
+  box-shadow: var(--shadow-sm);
+}
+
+.toggle--active .toggle__thumb {
+  transform: translateX(20px);
+  background: var(--primary-foreground);
+}
+
+/* ===== RESPONSIVE ===== */
+
+@media (max-width: 640px) {
+  .notification-setting {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toggle {
+    align-self: flex-start;
+  }
+}

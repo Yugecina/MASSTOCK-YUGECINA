@@ -149,6 +149,10 @@ storage/
 *.p12
 *.pfx
 
+# Google Cloud Service Account credentials
+backend/credentials/
+credentials/
+
 # ============================================
 # Misc
 # ============================================

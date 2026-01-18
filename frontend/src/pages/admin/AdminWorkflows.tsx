@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Spinner } from '../../components/ui/Spinner';
 import { AdminLayout } from '../../components/layout/AdminLayout';
-import { adminWorkflowService } from '../../services/adminWorkflowService';
+import { adminResourceService } from '../../services/adminResourceService';
 import logger from '@/utils/logger';
 import './AdminWorkflows.css';
 
@@ -27,6 +27,7 @@ interface Workflow {
   id: string;
   name: string;
   description?: string;
+  status?: string;
   config?: WorkflowConfig;
   stats?: WorkflowStats;
 }
@@ -47,9 +48,15 @@ export function AdminWorkflows() {
     async function loadWorkflows() {
       try {
         logger.debug('🔄 AdminWorkflows: Loading workflows...');
-        const response: { data?: WorkflowsResponse } = await adminWorkflowService.getWorkflows();
+        const response: { data?: WorkflowsResponse } = await adminResourceService.getWorkflows();
         logger.debug('✅ AdminWorkflows: Response received:', response);
-        setWorkflows(response.data?.workflows || []);
+
+        // Filter out archived workflows
+        const activeWorkflows = (response.data?.workflows || []).filter(
+          (w) => w.status !== 'archived'
+        );
+
+        setWorkflows(activeWorkflows);
       } catch (error: any) {
         logger.error('❌ AdminWorkflows: Failed to load workflows:', error);
         toast.error('Failed to load workflows');

@@ -11,10 +11,20 @@
 .br-container {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-4);
-  max-width: 1200px;
+  gap: 1rem;
+  max-width: 1400px;
   margin: 0 auto;
   width: 100%;
+  padding: 0;
+}
+
+/* Augmenter la largeur pour Grid 4 et 5 */
+.br-container:has(.br-grid--4) {
+  max-width: 1600px;
+}
+
+.br-container:has(.br-grid--5) {
+  max-width: 1800px;
 }
 
 /* ========================================
@@ -144,10 +154,10 @@
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: var(--spacing-4);
+  padding: 1rem;
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-3);
+  gap: 0.75rem;
 }
 
 .br-controls-row {
@@ -298,16 +308,16 @@
 }
 
 /* ========================================
-   RESULTS GRID
+   RESULTS GRID - CSS GRID LAYOUT
    ======================================== */
 
 .br-grid {
   display: grid;
-  gap: var(--spacing-4);
-  grid-auto-rows: auto; /* Allow cards to define their own height */
+  gap: 1rem;
+  align-items: start;
 }
 
-.br-grid--1 { grid-template-columns: 1fr; }
+.br-grid--1 { grid-template-columns: repeat(1, 1fr); }
 .br-grid--2 { grid-template-columns: repeat(2, 1fr); }
 .br-grid--3 { grid-template-columns: repeat(3, 1fr); }
 .br-grid--4 { grid-template-columns: repeat(4, 1fr); }
@@ -324,6 +334,8 @@
   overflow: hidden;
   position: relative;
   transition: all 200ms ease-out;
+  display: flex;
+  flex-direction: column;
 }
 
 .br-card:hover {
@@ -383,7 +395,6 @@
   background: var(--muted);
   width: 100%;
   cursor: pointer;
-  min-height: 200px; /* Minimum height pour éviter des cartes trop petites */
 }
 
 .br-card-image img,
@@ -436,7 +447,7 @@
 }
 
 .br-card-placeholder {
-  aspect-ratio: 16 / 9;
+  min-height: 150px;
   background: var(--muted);
   display: flex;
   align-items: center;
@@ -964,10 +975,11 @@
     justify-content: center;
   }
 
+  /* Réduire à 2 colonnes max sur tablette */
   .br-grid--3,
   .br-grid--4,
   .br-grid--5 {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(2, 1fr) !important;
   }
 
   /* Preview responsive */
@@ -1006,11 +1018,12 @@
 }
 
 @media (max-width: 480px) {
+  /* 1 colonne sur mobile */
   .br-grid--2,
   .br-grid--3,
   .br-grid--4,
   .br-grid--5 {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(1, 1fr) !important;
   }
 
   /* Preview mobile */

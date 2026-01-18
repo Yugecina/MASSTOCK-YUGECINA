@@ -6,7 +6,7 @@ import { Router } from 'express';
 import { body, param, query } from 'express-validator';
 import { asyncHandler, validate } from '../middleware/errorHandler';
 import { authenticate, requireClient } from '../middleware/auth';
-import { executionLimiter } from '../middleware/rateLimit';
+import { executionLimiter, apiLimiter } from '../middleware/rateLimit';
 import { upload, handleUploadError } from '../middleware/upload';
 import * as workflowsController from '../controllers/workflowsController';
 
@@ -19,6 +19,7 @@ const router: Router = Router();
 router.get('/client/members',
   authenticate,
   requireClient,
+  apiLimiter,
   asyncHandler(workflowsController.getClientMembers)
 );
 
@@ -29,6 +30,7 @@ router.get('/client/members',
 router.get('/stats/dashboard',
   authenticate,
   requireClient,
+  apiLimiter,
   asyncHandler(workflowsController.getDashboardStats)
 );
 
@@ -39,6 +41,7 @@ router.get('/stats/dashboard',
 router.get('/',
   authenticate,
   requireClient,
+  apiLimiter,
   asyncHandler(workflowsController.getWorkflows)
 );
 
@@ -50,6 +53,7 @@ router.get('/',
 router.get('/executions/all',
   authenticate,
   requireClient,
+  apiLimiter,
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('offset').optional().isInt({ min: 0 }),
   query('status').optional().isString(),
@@ -67,6 +71,7 @@ router.get('/executions/all',
 router.get('/:workflow_id',
   authenticate,
   requireClient,
+  apiLimiter,
   param('workflow_id').isUUID(),
   validate,
   asyncHandler(workflowsController.getWorkflow)
@@ -75,13 +80,18 @@ router.get('/:workflow_id',
 /**
  * POST /api/workflows/:workflow_id/execute
  * Execute workflow
- * Supports both JSON and multipart/form-data (for workflows with file uploads like nano_banana)
+ * Supports both JSON and multipart/form-data (for workflows with file uploads like nano_banana, smart_resizer, and room_redesigner)
  */
 router.post('/:workflow_id/execute',
   authenticate,
   requireClient,
   executionLimiter,
-  upload.array('reference_images', 3), // Optional file upload for workflows that need it
+  upload.fields([
+    { name: 'reference_images', maxCount: 14 }, // For nano_banana workflow
+    { name: 'master_image', maxCount: 1 }, // For smart_resizer workflow (single)
+    { name: 'images', maxCount: 20 }, // For smart_resizer workflow (batch)
+    { name: 'room_images', maxCount: 50 } // For room_redesigner workflow
+  ]),
   handleUploadError,
   param('workflow_id').isUUID(),
   // Note: input_data validation removed to support both JSON and FormData
@@ -96,6 +106,7 @@ router.post('/:workflow_id/execute',
 router.get('/:workflow_id/executions',
   authenticate,
   requireClient,
+  apiLimiter,
   param('workflow_id').isUUID(),
   query('limit').optional().isInt({ min: 1, max: 100 }),
   query('offset').optional().isInt({ min: 0 }),
@@ -110,6 +121,7 @@ router.get('/:workflow_id/executions',
 router.get('/:workflow_id/stats',
   authenticate,
   requireClient,
+  apiLimiter,
   param('workflow_id').isUUID(),
   validate,
   asyncHandler(workflowsController.getWorkflowStats)
@@ -122,6 +134,7 @@ router.get('/:workflow_id/stats',
 router.get('/executions/:execution_id',
   authenticate,
   requireClient,
+  apiLimiter,
   param('execution_id').isUUID(),
   validate,
   asyncHandler(workflowsController.getExecution)
@@ -134,6 +147,7 @@ router.get('/executions/:execution_id',
 router.get('/executions/:execution_id/batch-results',
   authenticate,
   requireClient,
+  apiLimiter,
   param('execution_id').isUUID(),
   validate,
   asyncHandler(workflowsController.getExecutionBatchResults)

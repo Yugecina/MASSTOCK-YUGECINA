@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useAssetsStore } from '../store/assetsStore';
 import { ClientLayout } from '../components/layout/ClientLayout';
 import { OptimizedImage } from '../components/common/OptimizedImage';
+import logger from '@/utils/logger';
 
 export function Assets() {
   const {
@@ -35,7 +36,7 @@ export function Assets() {
   // Initial fetch on mount only - load ALL assets
   useEffect(() => {
     fetchAssets({}, { loadAll: true }).catch(err => {
-      console.error('❌ Assets: Failed to load', { err });
+      logger.error('❌ Assets: Failed to load', { err });
       setError('Failed to load assets');
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -46,7 +47,7 @@ export function Assets() {
       setError(null);
       await setFilters({ asset_type: type });
     } catch (err) {
-      console.error('❌ Assets: Failed to filter', { err, type });
+      logger.error('❌ Assets: Failed to filter', { err, type });
       setError('Failed to apply filter');
     }
   };
@@ -56,7 +57,7 @@ export function Assets() {
       setError(null);
       await setFilters({ sort });
     } catch (err) {
-      console.error('❌ Assets: Failed to sort', { err, sort });
+      logger.error('❌ Assets: Failed to sort', { err, sort });
       setError('Failed to apply sort');
     }
   };
@@ -65,7 +66,7 @@ export function Assets() {
     try {
       await loadMore();
     } catch (err) {
-      console.error('❌ Assets: Failed to load more', { err });
+      logger.error('❌ Assets: Failed to load more', { err });
       setError('Failed to load more assets');
     }
   };
@@ -269,22 +270,26 @@ export function Assets() {
                   {!isCollapsed && (
                     <div
                       className="assets-container masonry"
-                      style={{ gridTemplateColumns: `repeat(${gridColumns}, 1fr)` }}
+                      style={{
+                        gridTemplateColumns: `repeat(${gridColumns}, 1fr)`
+                      }}
                     >
                   {group.assets.map((asset, assetIndex) => (
-                    <div
-                      key={asset.id}
-                      className="asset-item"
-                      style={{ animationDelay: `${(groupIndex * 0.05) + (assetIndex * 0.03)}s` }}
-                      onClick={() => handleAssetClick(asset)}
-                    >
-                      <div className="asset-image-wrapper">
-                        <OptimizedImage
-                          src={asset.result_url}
-                          alt={asset.prompt_text}
-                          thumbnailSize={600}
-                          aspectRatio={null}
-                        />
+                      <div
+                        key={asset.id}
+                        className="asset-item"
+                        style={{
+                          animationDelay: `${(groupIndex * 0.05) + (assetIndex * 0.03)}s`
+                        }}
+                        onClick={() => handleAssetClick(asset)}
+                      >
+                        <div className="asset-image-wrapper">
+                          <OptimizedImage
+                            src={asset.result_url}
+                            alt={asset.prompt_text}
+                            thumbnailSize={600}
+                            aspectRatio={null}
+                          />
                         <div className="asset-overlay">
                           <div className="overlay-top">
                             <span className="asset-type">

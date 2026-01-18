@@ -240,8 +240,33 @@ function filesToBase64(files: Express.Multer.File[] | undefined): Base64File[] {
   return files.map(fileToBase64);
 }
 
+/**
+ * Middleware for single file upload
+ * Wrapper for upload.single() with error handling
+ *
+ * @param fieldName - Form field name for the file
+ * @returns Express middleware function
+ */
+function uploadSingle(fieldName: string) {
+  return upload.single(fieldName);
+}
+
+/**
+ * Middleware for multiple file upload
+ * Wrapper for upload.array() with error handling
+ *
+ * @param fieldName - Form field name for the files
+ * @param maxCount - Maximum number of files (default: MAX_FILES)
+ * @returns Express middleware function
+ */
+function uploadArray(fieldName: string, maxCount: number = MAX_FILES) {
+  return upload.array(fieldName, maxCount);
+}
+
 export {
   upload,
+  uploadSingle,
+  uploadArray,
   handleUploadError,
   validateUploadedFiles,
   fileToBase64,

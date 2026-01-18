@@ -9,10 +9,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { AdminUsers } from '../../pages/admin/AdminUsers';
-import { adminUserService } from '../../services/adminUserService';
+import { adminResourceService } from '../../services/adminResourceService';
 
 // Mock du service
-vi.mock('../../services/adminUserService');
+vi.mock('../../services/adminResourceService');
 
 // Mock du composant toast (react-hot-toast)
 vi.mock('react-hot-toast', () => ({
@@ -52,7 +52,7 @@ describe('AdminUsers Page', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    adminUserService.getUsers.mockResolvedValue(mockUsersData);
+    adminResourceService.getUsers.mockResolvedValue(mockUsersData);
   });
 
   it('devrait afficher la page sans crash', async () => {
@@ -112,7 +112,7 @@ describe('AdminUsers Page', () => {
       await user.type(screen.getByPlaceholderText(/search/i), 'user1');
 
       await waitFor(() => {
-        expect(adminUserService.getUsers).toHaveBeenCalledWith(
+        expect(adminResourceService.getUsers).toHaveBeenCalledWith(
           1,
           expect.objectContaining({ search: 'user1' })
         );
@@ -137,7 +137,7 @@ describe('AdminUsers Page', () => {
       await user.selectOptions(screen.getByLabelText(/status/i), 'active');
 
       await waitFor(() => {
-        expect(adminUserService.getUsers).toHaveBeenCalledWith(
+        expect(adminResourceService.getUsers).toHaveBeenCalledWith(
           1,
           expect.objectContaining({ status: 'active' })
         );
@@ -162,7 +162,7 @@ describe('AdminUsers Page', () => {
       await user.selectOptions(screen.getByLabelText(/plan/i), 'pro');
 
       await waitFor(() => {
-        expect(adminUserService.getUsers).toHaveBeenCalledWith(
+        expect(adminResourceService.getUsers).toHaveBeenCalledWith(
           1,
           expect.objectContaining({ plan: 'pro' })
         );
@@ -197,7 +197,7 @@ describe('AdminUsers Page', () => {
 
     it('devrait bloquer un utilisateur au clic sur Block', async () => {
       const user = userEvent.setup();
-      adminUserService.blockUser.mockResolvedValue({});
+      adminResourceService.blockUser.mockResolvedValue({});
       render(<AdminUsers />);
 
       await waitFor(() => {
@@ -206,13 +206,13 @@ describe('AdminUsers Page', () => {
       await user.click(screen.getAllByTestId(/block-button/)[0]);
 
       await waitFor(() => {
-        expect(adminUserService.blockUser).toHaveBeenCalledWith('123e4567-e89b-12d3-a456-426614174000');
+        expect(adminResourceService.blockUser).toHaveBeenCalledWith('123e4567-e89b-12d3-a456-426614174000');
       });
     });
 
     it('devrait débloquer un utilisateur au clic sur Unblock', async () => {
       const user = userEvent.setup();
-      adminUserService.unblockUser.mockResolvedValue({});
+      adminResourceService.unblockUser.mockResolvedValue({});
       render(<AdminUsers />);
 
       await waitFor(() => {
@@ -222,7 +222,7 @@ describe('AdminUsers Page', () => {
       await user.click(screen.getAllByTestId(/block-button/)[1]);
 
       await waitFor(() => {
-        expect(adminUserService.unblockUser).toHaveBeenCalledWith('223e4567-e89b-12d3-a456-426614174001');
+        expect(adminResourceService.unblockUser).toHaveBeenCalledWith('223e4567-e89b-12d3-a456-426614174001');
       });
     });
   });
@@ -259,7 +259,7 @@ describe('AdminUsers Page', () => {
         ...mockUsersData,
         pagination: { page: 1, limit: 10, total: 20, totalPages: 2 }
       };
-      adminUserService.getUsers.mockResolvedValue(multiPageData);
+      adminResourceService.getUsers.mockResolvedValue(multiPageData);
       render(<AdminUsers />);
 
       await waitFor(() => {
@@ -268,14 +268,14 @@ describe('AdminUsers Page', () => {
       await user.click(screen.getByRole('button', { name: /next/i }));
 
       await waitFor(() => {
-        expect(adminUserService.getUsers).toHaveBeenCalledWith(2, expect.any(Object));
+        expect(adminResourceService.getUsers).toHaveBeenCalledWith(2, expect.any(Object));
       });
     });
   });
 
   describe('États de chargement et d\'erreur', () => {
     it('devrait afficher un spinner pendant le chargement', () => {
-      adminUserService.getUsers.mockImplementation(() => new Promise(() => {}));
+      adminResourceService.getUsers.mockImplementation(() => new Promise(() => {}));
 
       render(<AdminUsers />);
 
@@ -283,7 +283,7 @@ describe('AdminUsers Page', () => {
     });
 
     it('devrait afficher un message d\'erreur si le chargement échoue', async () => {
-      adminUserService.getUsers.mockRejectedValue(new Error('Failed to load users'));
+      adminResourceService.getUsers.mockRejectedValue(new Error('Failed to load users'));
 
       render(<AdminUsers />);
 
@@ -294,7 +294,7 @@ describe('AdminUsers Page', () => {
 
     it('devrait désactiver les boutons pendant les opérations', async () => {
       const user = userEvent.setup();
-      adminUserService.blockUser.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
+      adminResourceService.blockUser.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
       render(<AdminUsers />);
 
       await waitFor(() => {
@@ -309,7 +309,7 @@ describe('AdminUsers Page', () => {
   describe('Création d\'utilisateur', () => {
     it('devrait créer un utilisateur et rafraîchir la liste', async () => {
       const user = userEvent.setup();
-      adminUserService.createUser.mockResolvedValue({
+      adminResourceService.createUser.mockResolvedValue({
         user: { id: '999', email: 'new@example.com' }
       });
       render(<AdminUsers />);
@@ -329,14 +329,14 @@ describe('AdminUsers Page', () => {
       await user.click(submitButton);
 
       await waitFor(() => {
-        expect(adminUserService.createUser).toHaveBeenCalled();
-        expect(adminUserService.getUsers.mock.calls.length).toBeGreaterThanOrEqual(2);
+        expect(adminResourceService.createUser).toHaveBeenCalled();
+        expect(adminResourceService.getUsers.mock.calls.length).toBeGreaterThanOrEqual(2);
       });
     });
 
     it('devrait fermer le modal après création réussie', async () => {
       const user = userEvent.setup();
-      adminUserService.createUser.mockResolvedValue({
+      adminResourceService.createUser.mockResolvedValue({
         user: { id: '999', email: 'new@example.com' }
       });
       render(<AdminUsers />);

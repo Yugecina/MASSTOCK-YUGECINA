@@ -1,5 +1,6 @@
 import api from './api';
 import { Asset } from '@/types';
+import logger from '@/utils/logger';
 
 /**
  * Assets API Service
@@ -40,14 +41,14 @@ class AssetsService {
    */
   async getAssets(params: AssetsParams = {}): Promise<AssetsResponse> {
     try {
-      const response = await api.get('/v1/assets', { params });
-      console.log('✅ AssetsService.getAssets: Success', {
+      const response = await api.get('/assets', { params });
+      logger.debug('✅ AssetsService.getAssets: Success', {
         count: response.data.assets.length,
         stats: response.data.stats
       });
       return response.data;
     } catch (error: any) {
-      console.error('❌ AssetsService.getAssets: Error', {
+      logger.error('❌ AssetsService.getAssets: Error', {
         error: error.message,
         response: error.response?.data,
         status: error.response?.status

@@ -8,7 +8,7 @@ import { useState, useEffect } from 'react';
 import toast from 'react-hot-toast';
 import { Spinner } from '../../components/ui/Spinner';
 import { AdminLayout } from '../../components/layout/AdminLayout';
-import { adminService } from '../../services/admin';
+import { adminDashboardService } from '../../services/adminDashboardService';
 import logger from '@/utils/logger';
 
 interface SystemSettings {
@@ -55,7 +55,7 @@ export function AdminSettings() {
     async function loadSettings() {
       try {
         logger.debug('⚙️ AdminSettings: Loading settings...');
-        const response = await adminService.getSettings();
+        const response = await adminDashboardService.getSettings();
         logger.debug('✅ AdminSettings: Settings loaded:', response);
         setSettings(response.data);
       } catch (error: any) {
@@ -72,7 +72,7 @@ export function AdminSettings() {
     setSaving(true);
     try {
       logger.debug('💾 AdminSettings: Saving settings...');
-      await adminService.updateSettings(settings);
+      await adminDashboardService.updateSettings(settings);
       logger.debug('✅ AdminSettings: Settings saved successfully');
       toast.success('Settings saved successfully');
     } catch (error: any) {

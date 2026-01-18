@@ -584,20 +584,47 @@
   border-radius: var(--radius-full);
 }
 
-/* Assets Container - Masonry */
+/* Assets Container - Grid Masonry Layout */
 .assets-container {
   display: grid;
   gap: var(--spacing-5);
 }
 
+/* Grid masonry: simplified grid layout */
 .assets-container.masonry {
-  /* Grid columns set dynamically via inline style */
-  grid-auto-flow: dense;
+  display: grid;
+  /* grid-template-columns set dynamically via inline style (repeat(N, 1fr)) */
+  gap: 20px; /* 20px gap horizontal and vertical */
+  grid-auto-flow: dense; /* Fill gaps automatically */
+  align-items: start; /* Align items to top */
+}
+
+/* Asset items in masonry layout */
+.assets-container.masonry .asset-item {
+  /* Items take their natural height based on content */
+}
+
+/* Ensure images maintain aspect ratio */
+.assets-container.masonry .asset-image-wrapper {
+  width: 100%;
+}
+
+.assets-container.masonry .asset-image-wrapper img,
+.assets-container.masonry .optimized-image-container {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.assets-container.masonry .optimized-image {
+  width: 100%;
+  height: auto;
+  object-fit: cover;
 }
 
 @media (max-width: 768px) {
   .assets-container.masonry {
-    grid-template-columns: 1fr;
+    grid-template-columns: 1fr !important;
   }
 }
 

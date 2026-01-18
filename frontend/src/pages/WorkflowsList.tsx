@@ -2,6 +2,7 @@ import { useState, useEffect, ChangeEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ClientLayout } from '../components/layout/ClientLayout'
 import { Spinner } from '../components/ui/Spinner'
+import { WorkflowCard } from '../components/workflows/WorkflowCard'
 import { workflowService } from '../services/workflows'
 import logger from '@/utils/logger'
 import { Workflow } from '../types'
@@ -24,7 +25,11 @@ export function WorkflowsList(): JSX.Element {
       try {
         const response = await workflowService.list()
         const workflowsData = response.data?.workflows || response.workflows || []
-        setWorkflows(workflowsData)
+
+        // Filter out archived workflows
+        const activeWorkflows = workflowsData.filter((w: Workflow) => w.status !== 'archived')
+
+        setWorkflows(activeWorkflows)
       } catch (err) {
         logger.error('Failed to fetch workflows:', err)
       } finally {
@@ -42,7 +47,7 @@ export function WorkflowsList(): JSX.Element {
   const sortedWorkflows = [...filteredWorkflows].sort((a, b) => {
     switch (sortBy) {
       case 'popular':
-        return ((b as any).execution_count || 0) - ((a as any).execution_count || 0)
+        return (b.execution_count || 0) - (a.execution_count || 0)
       case 'recent':
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
       case 'name':
@@ -110,34 +115,11 @@ export function WorkflowsList(): JSX.Element {
         ) : (
           <div className="workflows-grid">
             {sortedWorkflows.map((workflow) => (
-              <article
+              <WorkflowCard
                 key={workflow.id}
+                workflow={workflow}
                 onClick={() => navigate(`/workflows/${workflow.id}/execute`)}
-                className="workflow-card"
-              >
-                <div className="workflow-card-header">
-                  <div className="workflow-card-icon">
-                    {getWorkflowIcon(workflow.name)}
-                  </div>
-                  <span className={`workflow-card-badge ${workflow.status === 'deployed' ? 'workflow-card-badge--active' : ''}`}>
-                    {workflow.status === 'deployed' ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-
-                <h3 className="workflow-card-title">{workflow.name}</h3>
-                <p className="workflow-card-description">
-                  {workflow.description || 'No description available'}
-                </p>
-
-                <div className="workflow-card-footer">
-                  <span className="workflow-card-runs">
-                    {(workflow as any).execution_count || 0} runs
-                  </span>
-                  <svg className="workflow-card-arrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M5 12h14M12 5l7 7-7 7" />
-                  </svg>
-                </div>
-              </article>
+              />
             ))}
           </div>
         )}
@@ -146,27 +128,3 @@ export function WorkflowsList(): JSX.Element {
   )
 }
 
-function getWorkflowIcon(workflowName: string): JSX.Element {
-  if (workflowName === 'Image Factory') {
-    return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <rect x="3" y="3" width="18" height="18" rx="2" />
-        <circle cx="8.5" cy="8.5" r="1.5" />
-        <path d="M21 15l-5-5L5 21" />
-      </svg>
-    )
-  }
-  if (workflowName === 'Nano Banana') {
-    return (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
-        <line x1="4" y1="22" x2="4" y2="15" />
-      </svg>
-    )
-  }
-  return (
-    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
-    </svg>
-  )
-}
